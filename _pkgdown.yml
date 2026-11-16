@@ -48,7 +48,7 @@ reference:
       - stratify_rates
 
   - title: Demographic processes
-    desc: Specify mortality, fertility, unions, and group transitions.
+    desc: Specify mortality, fertility, unions, group transitions, and immigration.
     contents:
       - mortality
       - summary.hammel_mortality
@@ -61,6 +61,10 @@ reference:
       - group_transition
       - summary.hammel_group_transition
       - household
+      - immigration
+      - immigration_stream
+      - migrant_assignment
+      - summary.hammel_immigration
 
   - title: Matching, inheritance, and weight models
     desc: Configure partner selection, newborn group inheritance, and selection within rate cells.

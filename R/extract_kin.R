@@ -234,7 +234,12 @@ count_kin <- function(
   )
   names(levels) <- by
   n_strata <- prod(lengths(levels))
-  birth <- persons$birth_time
+  # Immigrants are present only from arrival (D185).
+  birth <- if ("arrival_time" %in% names(persons)) {
+    pmax(persons$birth_time, persons$arrival_time, na.rm = TRUE)
+  } else {
+    persons$birth_time
+  }
   death <- persons$death_time
   strata <- matrix(0L, nrow = n, ncol = length(times))
   for (i in seq_along(times)) {

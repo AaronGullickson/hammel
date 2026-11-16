@@ -23,8 +23,9 @@
 #' be smaller where cells are small or homogeneous.
 #'
 #' Attach a weight model with the `weights` argument of [set_mortality()],
-#' [set_fertility()], [set_union_dissolution()], [set_group_transition()] and
-#' [set_union_formation()], or `weights_conversion` of [set_union_formation()].
+#' [set_fertility()], [set_union_dissolution()], [set_group_transition()],
+#' [set_union_formation()] and [immigration_stream()], or `weights_conversion`
+#' of [set_union_formation()].
 #'
 #' @section Variables: Group variables are named by the declared group
 #'   dimensions (see [set_groups()]); for a dimension `race` with categories A
@@ -38,6 +39,10 @@
 #'   `ancestry_race_A` and `ancestry_race_unknown`. Group transitions may also
 #'   use `destination`, the destination of the risk in the transition's
 #'   dimension.
+#'
+#'   Immigration streams select template people rather than cell members, and
+#'   may use `age` (at the template's end), `sex` and the template's groups
+#'   shared with the simulation.
 #'
 #'   Dissolution and conversion are union processes and may use `race_w`,
 #'   `race_h`, `parity_w`, `previous_union_w`, `previous_union_h`,
@@ -213,6 +218,18 @@ weight_builtins <- function(type) {
     levels = c("none", "separated", "widowed"),
     level_codes = c(none = 0L, separated = 1L, widowed = 2L)
   )
+  if (type == "migrant") {
+    return(
+      list(
+        sex = list(
+          code = -1L,
+          levels = c("f", "m"),
+          level_codes = c(f = 1L, m = 0L)
+        ),
+        age = list(code = -1L)
+      )
+    )
+  }
   if (type == "union") {
     return(
       list(
@@ -246,7 +263,9 @@ weight_builtins <- function(type) {
 }
 
 # Resolve a weight variable for a process type ("person", "transition",
-# "union"): its engine code, component and levels, or NULL when unavailable.
+# "union", "migrant"): its engine code, component and levels, or NULL when
+# unavailable. Migrant weights (immigration selection) are evaluated in R and
+# use only `sex`, `age` and group dimensions.
 # Group variables are named by declared dimension (D134), so they resolve only
 # with `context` (at simulation): `categories` (each dimension's categories,
 # named by dimension), `ancestry` (ancestry variable names, in engine column
@@ -266,6 +285,9 @@ weight_variable <- function(name, type, context = NULL) {
       component = match(d, dims) - 1L,
       levels = as.character(context$categories[[d]])
     )
+  }
+  if (type == "migrant") {
+    return(if (name %in% dims) group_info(1L, name))
   }
   if (type != "union") {
     if (name %in% dims) {
@@ -311,6 +333,9 @@ weight_group_name_possible <- function(name, type) {
       !grepl("^(partner|same|female|male|ancestry)_", x) &&
       !grepl("_(w|h)$", x) &&
       grepl("^[A-Za-z][A-Za-z0-9_.]*$", x)
+  }
+  if (type == "migrant") {
+    return(dim_ok(name))
   }
   if (type == "union") {
     base <- sub("_[wh]$", "", name)
@@ -455,7 +480,8 @@ weight_design <- function(
     process <- c(
       person = "person processes",
       transition = "group transitions",
-      union = "union processes"
+      union = "union processes",
+      migrant = "immigration streams"
     )[[type]]
     abort_hammel(
       c(

@@ -553,6 +553,7 @@ check_population <- function(
       call = call
     )
   }
+  check_arrivals(persons, time, call = call)
   validate_ancestry(x[["ancestry"]], persons, x$groups, call = call)
   invisible(x)
 }

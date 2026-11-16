@@ -25,6 +25,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Proportional input-rate stratification | `R/stratify_rates.R` |
 | Calendar model schedules and engine preparation | `R/model_schedules.R`; switches in `src/simulate.cpp` |
 | Group transition and household specifications | `R/group_transition.R`; events in `src/simulate.cpp` |
+| External immigration (phase 1) | `R/immigration.R`; arrival clocks and events in `src/simulate.cpp`; arrival-aware observation in `src/observation.cpp` |
 | Persistent fertility heterogeneity (internal, D176) | `R/het_fert.R`; cell weight trees in `src/fertility_cells.h` |
 | Weight models | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp`, `src/rate_cells.h` and `src/fertility_cells.h` |
 | Union formation, dissolution and cohabitation settings | `R/union_formation.R`, `R/union_dissolution.R`, `R/cohabitation.R` |
@@ -529,3 +530,21 @@ Grouped populations always include a `transitions` tibble, including empty
 histories. Restart retains the history and reconstructs duration. Observation
 kernels use private indexed history adapters to split group exposure at moves
 and attribute events at their occurrence. See [the contract](group-transitions.md).
+
+## External immigration (phase 1)
+
+`immigration(...)`/`set_immigration(model, ...)` attach one process of named
+`immigration_stream()`s; each call replaces every stream and a call without
+streams removes immigration (D184). Each stream has its own exponential
+arrival clock at a constant or piecewise-constant calendar intensity, redrawn
+at intensity edges; arrivals follow every other event at exact ties. An
+arrival draws an eligible template person (alive at the template endpoint,
+without a current partner) by normalized weight-model probabilities computed
+in R before the run, and creates a person of the same age and sex with
+unknown parents, no unions and parity zero. Shared group dimensions copy the
+template category; others are drawn from `migrant_assignment()`
+probabilities. Ancestry is copied where the template tracks it and is
+otherwise all in the migrant's category. `persons` gains `arrival_time` and
+`stream` when the model has streams or the input has them. Observation
+kernels and living-kin counts start at the later of birth and arrival. See
+the [phase 1 specification](immigration.md#phase-1-specification) (D185).

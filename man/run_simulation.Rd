@@ -8,8 +8,9 @@ run_simulation(model, years, seed = NULL, progress = FALSE)
 }
 \arguments{
 \item{model}{A \code{hammel_model} containing a population, mortality, fertility,
-and union-formation processes, optionally union dissolution and group
-transition processes. The population must have a finite \code{end_time}.}
+and union-formation processes, optionally union dissolution, group
+transition and immigration processes. The population must have a finite
+\code{end_time}.}
 
 \item{years}{Simulation duration in years; fractional years are
 supported.}

@@ -1483,3 +1483,31 @@ process. All existing hetfert, weight-model and calendar-rate tests were kept,
 with only the enabling call changed. `devtools::test()` passed 7,562
 expectations with 0 failures, 0 warnings and 1 skip (the opt-in live database
 test). No engine code changed.
+
+## External immigration phase 1 (November 16, 2026)
+
+`tests/testthat/test-immigration.R` covers the D185 contract: constructor and
+setter validation (stream names, replacement and removal, intensity tables,
+weights, assignments); Poisson arrival counts at a constant intensity over 30
+seeds; piecewise calendar intensities, including a zero interval and a
+coverage gap error; age and sex preservation, unknown parents and fresh IDs;
+eligibility (dead and partnered template people are never drawn; an empty
+eligible set is an error); weight-model selection probabilities, invariance to
+scaling all weights, and observed selection frequencies; shared, ignored and
+assigned groups (fixed, probability and custom methods) and the compatibility
+errors; ancestry copied from templates or set to the migrant's category;
+observation from arrival (population counts, mortality exposure, no
+unassigned births for migrants, and recovery of a constant death rate among
+migrants); the accounting identity living = initial + arrivals + births −
+deaths; arrival columns only with immigration and their survival through a
+restart; validation of arrival columns; and summaries.
+
+To check that models without immigration are unchanged, the result or error
+of every native `*_cpp` call made by the existing offline test files (all but
+`test-immigration.R` and the live database test) was hashed in call order on
+`master` (5640556) and on this branch, both built with `-ffp-contract=off`
+through `R_MAKEVARS_USER` (D175). The branch's `simulate_cpp` result gains an
+`arrivals` element, empty without streams, which was dropped before hashing.
+Both runs made 1,830 calls, and all 1,830 hashes were identical. With default
+flags, `devtools::test()` passed 8,714 expectations (165 in the new file) with
+no failures or warnings and one skip (the opt-in live database test).

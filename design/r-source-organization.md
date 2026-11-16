@@ -194,6 +194,12 @@ Specify persistent fertility heterogeneity and initialize/check individual weigh
 
 - Functions: `het_fert()`, `enable_het_fert()`, `validate_het_fert()`, `fertility_log_variance()`, `validate_fertility_weights()`, `initialize_fertility_weights()`.
 
+### `R/immigration.R`
+
+Construct, validate, and attach immigration streams (D184/D185); prepare migrants for the engine; validate and record arrival columns.
+
+- Functions: **`immigration()`**, **`set_immigration()`**, **`immigration_stream()`**, **`migrant_assignment()`**, **`summary.hammel_immigration()`**, **`print.summary.hammel_immigration()`**, `new_immigration()`, `validate_immigration()`, `new_immigration_stream()`, `validate_immigration_stream()`, `check_intensity()`, `validate_migrant_assignment()`, `eligible_migrants()`, `intensity_table()`, `complete_ancestry_columns()`, `prepare_immigration()`, `prepare_stream()`, `migrant_probabilities()`, `assignment_probabilities()`, `migrant_ancestry()`, `check_arrivals()`, `record_arrivals()`.
+
 ### `R/matching_groups.R`
 
 Group pair effects, multidimension matching resolution, and engine representation.

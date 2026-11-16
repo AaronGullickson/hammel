@@ -56,10 +56,14 @@ struct Formation {
   int kind;
 };  // 0 cohab, 1 marriage, 2 converted
 
-// Inputs shared by the counters, read once from the R tables.
+// Inputs shared by the counters, read once from the R tables. `entry` is when
+// a person joins the observed population: birth, or arrival for immigrants
+// (D185), who are not observed before it.
 struct Histories {
   int n;
   NumericVector ids, born, died, mothers;
+  std::vector<double> entry;
+  std::vector<char> arrived;
   std::vector<int> female;
   std::vector<std::vector<Snapshot>> timelines;
   std::vector<std::vector<Formation>> formations;
@@ -90,6 +94,17 @@ Histories build_histories(
   h.died = persons["death_time"];
   h.mothers = persons["mother_id"];
   h.n = h.ids.size();
+  h.entry.assign(h.born.begin(), h.born.end());
+  h.arrived.assign(h.n, 0);
+  if (persons.containsElementNamed("arrival_time")) {
+    NumericVector arrival = persons["arrival_time"];
+    for (int i = 0; i < h.n; ++i) {
+      if (!NumericVector::is_na(arrival[i])) {
+        h.arrived[i] = 1;
+        h.entry[i] = std::max(h.born[i], arrival[i]);
+      }
+    }
+  }
   CharacterVector sex = persons["sex"];
   h.female.resize(h.n);
   const std::map<double, int> index = hammel::id_index(h.ids);
@@ -380,7 +395,7 @@ List person_lexis_cpp(
     const auto& line = h.timelines[i];
     // Exposure: one piece per stretch of constant state.
     for (size_t j = 0; j < line.size(); ++j) {
-      const double lo = std::max(j ? line[j].time : h.born[i], h.born[i]);
+      const double lo = std::max(j ? line[j].time : h.entry[i], h.entry[i]);
       const double hi =
         std::min(j + 1 < line.size() ? line[j + 1].time : life_end, life_end);
       if (hi <= lo) {
@@ -429,7 +444,7 @@ List person_lexis_cpp(
       }
     }
     // Death.
-    if (!NumericVector::is_na(h.died[i])) {
+    if (!NumericVector::is_na(h.died[i]) && h.died[i] >= h.entry[i]) {
       const State& x = state_at(line, h.died[i], kDeathEvent);
       const int t = break_bin(h.died[i], time_breaks);
       const int a = break_bin(h.died[i] - origin_of(i, x), axis_breaks);
@@ -442,6 +457,9 @@ List person_lexis_cpp(
     const auto& kids = h.children[i];
     for (size_t j = 0; j < kids.size(); ++j) {
       const double when = h.born[kids[j]];
+      if (when < h.entry[i]) {
+        continue;
+      }
       State x = state_at(line, when, kBirthEvent);
       x.parity = static_cast<int>(j);
       const int t = break_bin(when, time_breaks);
@@ -453,6 +471,9 @@ List person_lexis_cpp(
     }
     // Union formations, under the state before them.
     for (const auto& f : h.formations[i]) {
+      if (f.time < h.entry[i]) {
+        continue;
+      }
       const State& x = state_at(line, f.time, kFormationEvent);
       if (!previous_mask[x.previous]) {
         continue;
@@ -473,7 +494,8 @@ List person_lexis_cpp(
     // only changes in the target dimension count; a same-instant change in
     // another dimension may precede it, so the origin is the move's own.
     for (const auto& m : h.moves[i]) {
-      if (!target.empty() && target[m.from] == target[m.to]) {
+      if ((!target.empty() && target[m.from] == target[m.to]) ||
+          m.time < h.entry[i]) {
         continue;
       }
       State x = state_at(line, m.time, kTransitionEvent);
@@ -486,9 +508,10 @@ List person_lexis_cpp(
       }
     }
   }
-  // Births with unknown mothers, by period.
+  // Births with unknown mothers, by period. An immigrant's birth is not a
+  // birth in the observed population.
   for (int i = 0; i < h.n; ++i) {
-    if (h.mother_row[i] < 0) {
+    if (h.mother_row[i] < 0 && !h.arrived[i]) {
       const int t = break_bin(h.born[i], time_breaks);
       if (t >= 0) {
         unknown[t] += 1;
@@ -538,7 +561,7 @@ NumericVector person_snapshot_cpp(
     const int s = L.sex && h.female[i] ? 1 : 0;
     for (int t = 0; t < L.nt; ++t) {
       const double when = times[t];
-      if (h.born[i] > when ||
+      if (h.entry[i] > when ||
           (!NumericVector::is_na(h.died[i]) && h.died[i] <= when)) {
         continue;
       }

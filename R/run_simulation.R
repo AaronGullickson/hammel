@@ -26,8 +26,9 @@
 #' existing RNG state.
 #'
 #' @param model A `hammel_model` containing a population, mortality, fertility,
-#'   and union-formation processes, optionally union dissolution and group
-#'   transition processes. The population must have a finite `end_time`.
+#'   and union-formation processes, optionally union dissolution, group
+#'   transition and immigration processes. The population must have a finite
+#'   `end_time`.
 #' @param years Simulation duration in years; fractional years are
 #'   supported.
 #' @param seed Optional integer seed for random number generation. If not
@@ -212,14 +213,15 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
              "fertility",
              "union_formation",
              "union_dissolution",
-             "group_transition"
+             "group_transition",
+             "immigration"
            )
       )) {
     unsupported <- setdiff(
       names(model$processes),
       c(
         "mortality", "fertility", "union_formation", "union_dissolution",
-        "group_transition"
+        "group_transition", "immigration"
       )
     )
     abort_hammel(
@@ -245,6 +247,19 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   union_process <- model$processes$union_formation
   attach_process(model, union_process)
+  immigration_process <- model$processes$immigration
+  if (!is.null(immigration_process)) {
+    attach_process(model, immigration_process)
+    if (!is.null(hetfert)) {
+      abort_hammel(
+        c(
+          "Immigration can't be combined with fertility heterogeneity.",
+          "i" = "Remove the immigration process or the heterogeneity."
+        ),
+        "specification"
+      )
+    }
+  }
   calendar_inputs <- list(
     mortality = death_rates,
     fertility = birth_rates,
@@ -378,6 +393,10 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     registries[[match_dims]]
   }
   tracked <- tracked_ancestry(declaration)
+  # Migrants may bring ancestry in categories nobody has yet (D185).
+  if (!is.null(immigration_process)) {
+    population <- complete_ancestry_columns(population, registries)
+  }
   components <- lapply(
     dimensions, function(d) {
       if (d %in% tracked) {
@@ -691,6 +710,17 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     )
     set.seed(seed)
   }
+  # After the seed, so custom weight and assignment functions are
+  # reproducible.
+  immigration_input <- if (is.null(immigration_process)) {
+    NULL
+  } else {
+    prepare_immigration(
+      immigration_process, declaration, registries, components, offsets,
+      start, start + years,
+      call = run_call
+    )
+  }
   population$persons <- initialize_fertility_weights(
     population$persons,
     hetfert
@@ -745,6 +775,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
         transition_rates,
         if (scheduled_models) model_context$config else NULL,
         weight_input, group_input,
+        immigration_input = immigration_input,
         progress = progress_callback
       )
     )
@@ -899,6 +930,12 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
       hidden_group, hidden_group[rep(
         NA_integer_, nrow(result$persons) - length(hidden_group)
       )]
+    )
+  }
+  if (!is.null(immigration_process)) {
+    result$persons <- record_arrivals(
+      result$persons, if (years > 0) native$arrivals else NULL,
+      names(immigration_process$streams)
     )
   }
   result$persons <- tibble::as_tibble(result$persons)

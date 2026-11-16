@@ -34,8 +34,9 @@ models, without affecting overall input rates. Population level effects can
 be smaller where cells are small or homogeneous.
 
 Attach a weight model with the \code{weights} argument of \code{\link[=set_mortality]{set_mortality()}},
-\code{\link[=set_fertility]{set_fertility()}}, \code{\link[=set_union_dissolution]{set_union_dissolution()}}, \code{\link[=set_group_transition]{set_group_transition()}} and
-\code{\link[=set_union_formation]{set_union_formation()}}, or \code{weights_conversion} of \code{\link[=set_union_formation]{set_union_formation()}}.
+\code{\link[=set_fertility]{set_fertility()}}, \code{\link[=set_union_dissolution]{set_union_dissolution()}}, \code{\link[=set_group_transition]{set_group_transition()}},
+\code{\link[=set_union_formation]{set_union_formation()}} and \code{\link[=immigration_stream]{immigration_stream()}}, or \code{weights_conversion}
+of \code{\link[=set_union_formation]{set_union_formation()}}.
 }
 \section{Variables}{
  Group variables are named by the declared group
@@ -50,6 +51,10 @@ when unpartnered) and, when the dimension tracks ancestry, shares
 \code{ancestry_race_A} and \code{ancestry_race_unknown}. Group transitions may also
 use \code{destination}, the destination of the risk in the transition's
 dimension.
+
+Immigration streams select template people rather than cell members, and
+may use \code{age} (at the template's end), \code{sex} and the template's groups
+shared with the simulation.
 
 Dissolution and conversion are union processes and may use \code{race_w},
 \code{race_h}, \code{parity_w}, \code{previous_union_w}, \code{previous_union_h},

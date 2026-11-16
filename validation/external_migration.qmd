@@ -1,0 +1,246 @@
+---
+title: "External Immigration Feature Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    self-contained: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+library(here)
+# installing will lead to faster computation
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(modelsummary)
+set_theme(theme_bw())
+```
+
+## Purpose and completion criteria
+
+Assess the external migration feature.
+
+| Measure | Comparison | Acceptance criterion |
+|---|---|---|
+| Accounting and implementation | Existing tests | Successful unit tests |
+
+## Overview of Design
+
+
+
+
+## Simulation Test
+
+We will keep the rest of the simulation simple for now with static fertility, mortality, and on demand union formation. However, I will add race and region as variables so I can get one variable whose ancestry is tracked in sim and one whose ancestry is not tracked. The immigrant template population(s) will need to match the race groups but will not need to contain region, but will have to have an assignment made.
+
+First, lets just sim a pop with the basics and no regional transitions for 100 years to get a good starting pop.
+
+```{r}
+#| label: setup-starting-pop
+
+
+model <- hammel_model() |>
+  set_fertility(usa_2000_fertility) |>
+  set_mortality(usa_2000_mortality) |>
+  set_union_formation(
+    "on_demand",
+    matching = age_gap_matching_model(
+      3, 5, 
+      group_exogamy = list(
+        region = NA,
+        race = c(
+          "White:Black" = -4,
+          "White:Asian" = -2,
+          "White:Latino" = -1.5,
+          "Black:Asian" = -4,
+          "Black:Latino" = -3,
+          "Asian:Latino" = -2
+        )
+      )
+    )
+  ) |>
+  set_groups(
+    race = group(
+      categories = c("White", "Black", "Asian", "Latino"),
+      ancestry = TRUE,
+      inheritance = "ancestry"
+    ),
+    region = group(
+      categories = c("NE", "MW", "S", "W")
+    )
+  )
+
+# start with no Asian or Latino members
+region_race_dist <- tibble::tribble(
+  ~race, ~region, ~weight,
+ "White",   "NE",    0.166,
+ "White",   "MW",    0.216,
+ "White",   "S",     0.294,
+ "White",   "W",     0.174,
+ "Black",   "NE",    0.025,
+ "Black",   "MW",    0.026,
+ "Black",   "S",     0.077,
+ "Black",   "W",     0.022,
+ "Asian",   "NE",    0.000,
+ "Asian",   "MW",    0.000,
+ "Asian",   "S",     0.000,
+ "Asian",   "W",     0.000,
+ "Latino",  "NE",    0.000,
+ "Latino",  "MW",    0.000,
+ "Latino",  "S",     0.000,
+ "Latino",  "W",     0.000
+)
+
+model <- model |>
+  set_population(generate_uniform_population(50000, groups = region_race_dist))
+
+pop_start <- run_simulation(model, 100, 42, progress = interactive())
+summary(pop_start)
+
+model <- model |>
+  set_population(pop_start)
+```
+
+Ok, so now lets set up two template populations: one from Latin America and one from Asia.
+
+```{r}
+# Use Taiwan
+mortality_taiwan <- get_mortality_hmd("TWN", 1980, shape = "5x1", open_age = 85)
+fertility_taiwan <- get_fertility_hfd("TWN", 1976)
+
+model_asian_template <- hammel_model() |>
+  set_fertility(fertility_taiwan) |>
+  set_mortality(mortality_taiwan) |>
+  set_union_formation("on_demand") |>
+  set_population(
+    generate_uniform_population(
+      20000,
+      groups = list(race = c(White = 0, Black = 0, Asian = 1, Latino = 0))
+    )
+  )
+
+pop_asian_template <- run_simulation(model_asian_template, 100, 42, progress = interactive())
+summary(pop_asian_template)
+```
+
+```{r}
+# use Chile
+mortality_chile <- get_mortality_hmd("CHL", 1992, shape = "5x1", open_age = 85)
+fertility_chile <- get_fertility_hfd("CHL", 1992)
+
+model_latino_template <- hammel_model() |>
+  set_fertility(fertility_chile) |>
+  set_mortality(mortality_chile) |>
+  set_union_formation("on_demand") |>
+  set_population(
+    generate_uniform_population(
+      30000,
+      groups = list(race = c(White = 0, Black = 0, Asian = 0, Latino = 1))
+    )
+  )
+
+pop_latino_template <- run_simulation(model_latino_template, 100, 42, progress = interactive())
+summary(pop_latino_template)
+```
+
+Ok, now lets add the migration streams.
+
+```{r}
+
+model <- model |>
+  set_immigration(
+    asia = immigration_stream(
+      pop_asian_template,
+      intensity = 200,
+      assignment = list(
+        region = migrant_assignment(
+          "probability", probs = c("NE" = 0.3, "MW" = 0.15, "S" = 0.15, "W" = 0.4)
+        )
+      )
+    ),
+    latin_america = immigration_stream(
+      pop_latino_template,
+      intensity = 600,
+      assignment = list(
+        region = migrant_assignment(
+          "probability", probs = c("NE" = 0.25, "MW" = 0.2, "S" = 0.2, "W" = 0.35)
+        )
+      )
+    )
+  )
+
+pop_end <- run_simulation(model, 50, 42, progress = interactive())
+```
+
+```{r}
+
+# get flows
+pop_end$persons |>
+  filter(!is.na(arrival_time)) |>
+  mutate(arrival_year = floor(arrival_time)) |>
+  count(stream, arrival_year) |>
+  #pivot_wider(id_cols = arrival_year, names_from = stream, values_from = n) |>
+  ggplot(aes(x = arrival_year, y = n, color = stream))+
+  geom_line()+
+  geom_hline(yintercept = c(200, 600), linetype = 2)+
+  scale_y_continuous(limits = c(0, NA))
+
+```
+
+
+```{r}
+
+pop_end |>
+  calculate_fertility_rates(
+    time_breaks = c(100, 150),
+    age_breaks = seq(15, 45, 5),
+    conf_level = 0.95
+  ) |>
+  ggplot(aes(x = age_start + 2.5, y = rate_fertility))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = usa_2000_fertility, aes(y = rate), linetype = 2, color = "red")
+```
+
+```{r}
+
+pop_end |>
+  calculate_mortality_rates(
+    time_breaks = c(100, 150),
+    age_breaks = c(0, 1, seq(5, 100, 5)),
+    conf_level = 0.95
+  ) |>
+  ggplot(aes(x = age_start + 2.5, y = rate_mortality))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = usa_2000_mortality, aes(y = rate), linetype = 2, color = "red")+
+  facet_wrap(~sex)+
+  scale_y_log10()
+```
+
+
+

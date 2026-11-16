@@ -30,8 +30,8 @@ dimension is not declared) and \code{transition} (the
 \code{summary.hammel_group_transition} of the dimension's transition
 process, or \code{NULL} when it has none).}
 \item{processes}{A named list of process summaries, in the order
-mortality, fertility, union formation, union dissolution, for the
-processes present.}
+mortality, fertility, union formation, union dissolution, immigration,
+for the processes present.}
 \item{missing}{A character vector naming the required elements that are
 not set: any of \code{"population"}, \code{"mortality"}, \code{"fertility"}, and
 \code{"union_formation"}, plus \code{"transition:<dimension>"} for each group

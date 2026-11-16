@@ -3811,3 +3811,53 @@ variables available for template people, calendar-scheduled selection
 weights, all-zero or empty eligible sets, remaining `immigration_stream()`
 arguments, the intensity column name and the non-immigrant label. See
 [external immigration](immigration.md#arriving-parties-and-imported-histories).
+
+## D185 — Phase 1 immigration contract (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026. The user approved
+the specification and authorized implementation the same day; phase 1 is
+implemented.
+
+**Decision:** Phase 1 of external immigration (D184) follows the
+[phase 1 specification](immigration.md#phase-1-specification):
+
+- Eligible template people are alive at the template's `end_time` and have
+  no current partner.
+- Each stream has its own exponential clock at its current intensity,
+  redrawn at intensity boundaries. Arrivals follow group transitions among
+  same-time events. Models without streams make no immigration draws. The
+  intensity column is `intensity`.
+- Phase 1 includes optional weight models using age, sex and
+  template-supplied groups. No eligible person or zero total weight is an
+  error before the run starts.
+- Migrants arrive with fresh IDs, preserved age, unknown parents, no unions,
+  parity zero and no transition history.
+- `persons` gains `arrival_time` and `stream` only when the model has
+  streams or the input population already has those columns.
+- Observation starts at the later of birth and arrival.
+- Same-name group dimensions must declare the same categories and copy
+  template values. Template-only dimensions are ignored. Destination
+  dimensions the template lacks require a `migrant_assignment()` in the
+  stream's `assignment` list, with methods `"fixed"`, `"probability"` and
+  `"custom"`; missing assignments, and assignments for dimensions the
+  template declares, are errors.
+- Ancestry is copied from the template where it tracks the dimension;
+  otherwise the migrant has 100% ancestry in their category, from the
+  template or assignment.
+- Calendar-scheduled templates, weight models and assignments, D182 rate
+  strata and D181 classifications are outside phase 1.
+
+**Rationale:** Parent-based inheritance methods do not apply to migrants
+without destination parents, so assignment is a separate component.
+Copying template ancestry preserves origin information the user wants
+retained; the 100% fallback applies only where the template has none.
+Omitting arrival columns keeps simulations without immigration unchanged.
+
+**Consequences:** Phase 1 migrants' group duration falls back to birth
+time, as for any person without transition history, until phase 2 imports
+source transitions. Every observation and calculation function must honor
+arrival times.
+
+**Open choices:** Remaining `immigration_stream()` and
+`migrant_assignment()` arguments, and the non-immigrant label.
+

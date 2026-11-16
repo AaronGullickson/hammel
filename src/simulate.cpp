@@ -260,6 +260,21 @@ double draw_threshold() {
   return value;
 }
 
+// One external immigration stream (D185): its piecewise-constant intensity
+// and, for each eligible template person, age, sex, categories (-1 where
+// assigned at arrival), ancestry shares (NA in blocks filled at arrival),
+// cumulative selection probability and per-dimension assignment
+// probabilities. `next` is the stream's next arrival time.
+struct ImmigrationStream {
+  std::vector<double> time_start, time_end, intensity;
+  NumericVector age, cumulative;
+  LogicalVector female;
+  IntegerMatrix categories;
+  NumericMatrix ancestry;
+  List assignment;
+  double next = R_PosInf;
+};
+
 // The strata of each non-fertility process from the active schedules.
 struct ProcessStrata {
   std::vector<std::vector<Band>> mortality, search, dissolution, conversion;
@@ -314,7 +329,8 @@ class Simulation {
     Nullable<List> transition_input,
     Nullable<List> model_schedule_input,
     Nullable<List> weight_input,
-    Nullable<List> group_input
+    Nullable<List> group_input,
+    Nullable<List> immigration_input
   );
   Simulation(const Simulation&) = delete;
   Simulation& operator=(const Simulation&) = delete;
@@ -332,6 +348,7 @@ class Simulation {
   void setup_calibration();
   void read_transitions(Nullable<List> transition_input);
   void read_weights(Nullable<List> weight_input);
+  void read_immigration(Nullable<List> immigration_input);
   void load_probabilities();
   void load_schedules();
   void load_dissolution();
@@ -460,6 +477,8 @@ class Simulation {
   void on_conversion(int i, int unit, double now);
   void on_search(int i, double now);
   void on_birth(int i, double now);
+  void on_arrival(int k, double now);
+  void draw_arrival(ImmigrationStream& stream, double now);
   void append_ancestry(int child, int mother, int father);
   int newborn_category(
     int d,
@@ -598,6 +617,15 @@ class Simulation {
   bool fertility_refresh_weights = false;
   double weight_now = 0;  // event time, for custom-function rate periods
 
+  // External immigration (D185): streams, each tracked dimension's engine
+  // column for each category's ancestry share, the earliest possible migrant
+  // birth, and the arrivals recorded.
+  std::vector<ImmigrationStream> streams;
+  std::vector<std::vector<int>> category_component;
+  double immigration_min_birth = R_PosInf;
+  std::vector<double> arrival_person, arrival_time;
+  std::vector<int> arrival_stream;
+
   // Unrealized births: (period, group, union type, parity start/end, age
   // start/end) -> count.
   std::map<
@@ -644,7 +672,8 @@ Simulation::Simulation(
   Nullable<List> transition_input,
   Nullable<List> model_schedule_input,
   Nullable<List> weight_input,
-  Nullable<List> group_input
+  Nullable<List> group_input,
+  Nullable<List> immigration_input
 )
     : unions(unions),
       all_mortality(mortality_rates),
@@ -719,20 +748,23 @@ Simulation::Simulation(
     stop("ffab must be a finite probability in [0, 1].");
   }
   read_groups(group_input, persons.nrows());
+  read_immigration(immigration_input);
   const std::map<double, int> index = read_people(persons, initial_ancestry);
 
-  // Draw models for the union, father and cohabitation matching models. An
-  // empty population never draws, so custom-formula grids are skipped then.
-  if (!people.empty() && !scheduled_models) {
+  // Draw models for the union, father and cohabitation matching models. A
+  // population that stays empty never draws, so custom-formula grids are
+  // skipped then.
+  const bool populated = !people.empty() || !streams.empty();
+  if (populated && !scheduled_models) {
     union_draw = make_draw_model(matching, group_count, end - min_birth);
   }
-  if (!scheduled_models && !people.empty() &&
+  if (!scheduled_models && populated &&
       SEXP(father_matching) != SEXP(matching)) {
     father_draw_storage =
       make_draw_model(father_matching, group_count, end - min_birth);
     father_draw = &father_draw_storage;
   }
-  if (!scheduled_models && cohab_enabled && !people.empty() &&
+  if (!scheduled_models && cohab_enabled && populated &&
       SEXP(cohab_matching) != SEXP(matching)) {
     cohab_draw_storage =
       make_draw_model(cohab_matching, group_count, end - min_birth);
@@ -804,6 +836,10 @@ Simulation::Simulation(
     refresh_person(i, start);
   }
   collect_sources();
+  // Arrival clocks draw last, so runs without immigration draw nothing more.
+  for (auto& stream : streams) {
+    draw_arrival(stream, start);
+  }
 }
 
 void Simulation::add_calendar_time(double time) {
@@ -900,7 +936,9 @@ Simulation::read_people(DataFrame persons, NumericMatrix initial_ancestry) {
     }
   }
   std::map<double, int> index;
-  min_birth = start;
+  // Pools and calibration bin by birth time, so they must reach the earliest
+  // migrant birth.
+  min_birth = std::min(start, immigration_min_birth);
   for (int i = 0; i < ids.size(); ++i) {
     const bool female = as<std::string>(sexes[i]) == "f";
     people.push_back(
@@ -1187,6 +1225,39 @@ void Simulation::read_weights(Nullable<List> weight_input) {
       "function is evaluated at every refresh of every woman, which can be "
       "slow."
     );
+  }
+}
+
+// Immigration streams (D185) prepared by R. Intensity edges inside the run
+// are calendar boundaries, where arrival clocks are redrawn.
+void Simulation::read_immigration(Nullable<List> immigration_input) {
+  if (immigration_input.isNull()) {
+    return;
+  }
+  List input(immigration_input.get());
+  immigration_min_birth = as<double>(input["min_birth"]);
+  List components = input["category_component"];
+  for (int d = 0; d < components.size(); ++d) {
+    category_component.push_back(as<std::vector<int>>(components[d]));
+  }
+  List list = input["streams"];
+  for (int k = 0; k < list.size(); ++k) {
+    List x = list[k];
+    ImmigrationStream stream;
+    stream.time_start = as<std::vector<double>>(x["time_start"]);
+    stream.time_end = as<std::vector<double>>(x["time_end"]);
+    stream.intensity = as<std::vector<double>>(x["intensity"]);
+    stream.age = x["age"];
+    stream.cumulative = x["cumulative"];
+    stream.female = x["female"];
+    stream.categories = as<IntegerMatrix>(x["categories"]);
+    stream.ancestry = as<NumericMatrix>(x["ancestry"]);
+    stream.assignment = x["assignment"];
+    for (size_t j = 0; j < stream.time_start.size(); ++j) {
+      add_calendar_time(stream.time_start[j]);
+      add_calendar_time(stream.time_end[j]);
+    }
+    streams.push_back(stream);
   }
 }
 
@@ -2739,7 +2810,17 @@ List Simulation::run(SEXP progress) {
         event_source = k;
       }
     }
-    if (boundary < end && boundary <= next_event) {
+    // Arrivals follow every other process at exact ties (D185).
+    double next_arrival = R_PosInf;
+    int arrival_source = -1;
+    for (size_t k = 0; k < streams.size(); ++k) {
+      if (streams[k].next < next_arrival) {
+        next_arrival = streams[k].next;
+        arrival_source = static_cast<int>(k);
+      }
+    }
+    const double first = std::min(next_event, next_arrival);
+    if (boundary < end && boundary <= first) {
       weight_now = boundary;
       const EventSource& x = sources[boundary_source];
       if (x.cells) {
@@ -2749,11 +2830,19 @@ List Simulation::run(SEXP progress) {
       }
       continue;
     }
-    if (!(next_event < end)) {
+    if (!(first < end)) {
       break;
     }
     if (++processed % 1024 == 0) {
       checkUserInterrupt();
+    }
+    if (next_arrival < next_event) {
+      weight_now = next_arrival;
+      if (probability_tracker) {
+        probability_tracker->advance(next_arrival);
+      }
+      on_arrival(arrival_source, next_arrival);
+      continue;
     }
     const double now = next_event;
     weight_now = now;
@@ -2822,9 +2911,24 @@ bool Simulation::apply_calendar_boundary() {
       return false;
     }
   }
+  for (const auto& stream : streams) {
+    if (!(now <= stream.next)) {
+      return false;
+    }
+  }
   calendar_boundaries.erase(calendar_boundaries.begin());
   weight_now = now;
   checkUserInterrupt();
+  // A stream whose intensity interval starts or ends here redraws its clock,
+  // valid after survival to the boundary (memoryless).
+  for (auto& stream : streams) {
+    if (std::find(stream.time_start.begin(), stream.time_start.end(), now) !=
+          stream.time_start.end() ||
+        std::find(stream.time_end.begin(), stream.time_end.end(), now) !=
+          stream.time_end.end()) {
+      draw_arrival(stream, now);
+    }
+  }
   const bool matching_changed = update_models(now);
   const bool weights_changed = switch_weights(now);
   const bool probability_changed = calendar_changes_at(all_probability, now);
@@ -3130,6 +3234,112 @@ void Simulation::on_birth(int i, double now) {
   refresh_person(i, now);
 }
 
+// An immigrant (D185): draw an eligible template person by selection
+// probability, then create a destination person of the same age and sex,
+// with unknown parents and no unions, and categories from the template or
+// drawn from the assignment probabilities. Ancestry comes from the template,
+// or is all in the person's category for assigned dimensions.
+void Simulation::on_arrival(int k, double now) {
+  ImmigrationStream& stream = streams[k];
+  if (next_id >= kMaxExactId ||
+      people.size() >= static_cast<size_t>(std::numeric_limits<int>::max())) {
+    stop("[limits] Population exceeds supported ID or row limits.");
+  }
+  const double u = R::runif(0, 1);
+  const int n = stream.cumulative.size();
+  const int r = std::min(
+    n - 1,
+    static_cast<int>(
+      std::upper_bound(stream.cumulative.begin(), stream.cumulative.end(), u) -
+      stream.cumulative.begin()
+    )
+  );
+  const bool female = stream.female[r];
+  const int i = static_cast<int>(people.size());
+  people.push_back(
+    {++next_id, now - stream.age[r], NA_REAL, NA_REAL, NA_REAL,
+     -std::numeric_limits<double>::infinity(), female, 0}
+  );
+  mother_of.push_back(-1);
+  father_of.push_back(-1);
+  kids.emplace_back();
+  parity.push_back(0);
+  cats.resize(static_cast<size_t>(i + 1) * dimensions);
+  const size_t row = static_cast<size_t>(i) * ancestry_components;
+  ancestry.resize(row + ancestry_components);
+  for (size_t g = 0; g < ancestry_components; ++g) {
+    ancestry[row + g] = stream.ancestry(r, g);
+  }
+  for (int d = 0; d < dimensions; ++d) {
+    int c = stream.categories(r, d);
+    if (c < 0) {
+      NumericMatrix probs = stream.assignment[d];
+      const double draw = R::runif(0, 1);
+      double cumulative = 0;
+      c = -1;
+      for (int j = 0; j < probs.ncol(); ++j) {
+        if (probs(r, j) > 0) {
+          c = j;  // protect the final positive category against rounding
+          cumulative += probs(r, j);
+          if (draw < cumulative) {
+            break;
+          }
+        }
+      }
+      if (c < 0) {
+        stop("Invalid migrant assignment probabilities.");
+      }
+      const InheritanceRule& rule = inheritance_rules[d];
+      if (rule.size) {
+        for (size_t g = 0; g < rule.size; ++g) {
+          ancestry[row + rule.offset + g] = 0;
+        }
+        ancestry[row + category_component[d][c]] = 1;
+      }
+    }
+    cats[static_cast<size_t>(i) * dimensions + d] = c;
+  }
+  const int group = person_stratum(matching_spec, i);
+  people[i].group = group;
+  kinship->append(-1, -1);
+  if (!female) {
+    pool.add(i, group, people[i].born);
+    if (calibrator) {
+      calibrator->add_man(group, people[i].born, 1);
+    }
+  }
+  person_unions.emplace_back();
+  current_partner.push_back(-1);
+  previous_union.push_back(0);
+  legal_previous.push_back(0);
+  previous_union_end.push_back(NA_REAL);
+  if (calibrator) {
+    counted_woman.push_back(0);
+    add_counted_woman(i, now);
+  }
+  // Without transition history, group duration runs from birth.
+  for (auto& tp : tprocs) {
+    tp.entry.push_back(people[i].born);
+  }
+  arrival_person.push_back(people[i].id);
+  arrival_time.push_back(now);
+  arrival_stream.push_back(k);
+  refresh_person(i, now);
+  draw_arrival(stream, now);
+}
+
+// The stream's next arrival under its intensity at now; none while zero.
+void Simulation::draw_arrival(ImmigrationStream& stream, double now) {
+  double rate = 0;
+  for (size_t j = 0; j < stream.intensity.size(); ++j) {
+    if (stream.time_start[j] <= now && now < stream.time_end[j]) {
+      rate = stream.intensity[j];
+      break;
+    }
+  }
+  stream.next = rate > 0 ? now + draw_threshold() / rate : R_PosInf;
+}
+
 // A newborn's ancestry is the average of the parents'. A missing father
 // contributes his half to each dimension's unknown share; supplied parental
 // unknown shares transmit through the same rule.
@@ -3381,7 +3591,11 @@ List Simulation::results() {
     _["draw_approximate"] = draw_approximate, _["unrealized"] = unrealized,
     _["cells_consistent"] = cells_consistent,
     _["hetfert"] = wrap(fertility_weights),
-    _["diagnostic_log_weights"] = log_weights
+    _["diagnostic_log_weights"] = log_weights,
+    _["arrivals"] = List::create(
+      _["person_id"] = wrap(arrival_person), _["time"] = wrap(arrival_time),
+      _["stream"] = wrap(arrival_stream)
+    )
   );
 }
 
@@ -3422,6 +3636,7 @@ List simulate_cpp(
   Nullable<List> model_schedule_input = R_NilValue,
   Nullable<List> weight_input = R_NilValue,
   Nullable<List> group_input = R_NilValue,
+  Nullable<List> immigration_input = R_NilValue,
   Nullable<Function> progress = R_NilValue
 ) {
   Simulation simulation(
@@ -3430,7 +3645,8 @@ List simulate_cpp(
     union_rates, father_matching, cancel_birth_if_no_match, diagnostics,
     initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob,
     conversion_rates, cohab_matching, counts_cohab, check_cells, hetfert,
-    transition_input, model_schedule_input, weight_input, group_input
+    transition_input, model_schedule_input, weight_input, group_input,
+    immigration_input
   );
   return simulation.run(progress);
 }

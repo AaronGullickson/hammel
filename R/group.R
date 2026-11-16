@@ -168,7 +168,8 @@ reserved_group_names <- c(
   "mother_id", "father_id",
   "union_type", "previous_union", "parity", "partnered",
   "age_difference",
-  "origin", "destination", "hetfert", "unknown", "time", "rate"
+  "origin", "destination", "hetfert", "unknown", "time", "rate",
+  "arrival_time", "stream"
 )
 
 # HELPER FUNCTIONS ---------------------------------------------------------

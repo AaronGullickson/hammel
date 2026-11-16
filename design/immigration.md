@@ -1,7 +1,7 @@
 # External immigration design
 
-Planning discussion, November 12 and 16, 2026. External immigration is not
-implemented. This document consolidates the approach selected in D177–D182
+Planning discussion, November 12 and 16, 2026. Phase 1 of external
+immigration is implemented; later phases are not. This document consolidates the approach selected in D177–D182
 and D184 for design review on the `external-migration` branch. Behavior
 depending on the unresolved modeling choices below requires further user
 decisions before implementation. Illustrative field names do not establish
@@ -46,6 +46,7 @@ remain separate responsibilities. The public interface is described in
 | Imported histories | Arrivals bring their birth, union and transition histories, with dates shifted by the age offset; referenced non-members go in `external_relatives` | D184 |
 | Eligibility | No one arrives without their current partner | D184 |
 | Phasing | Individual arrivals without histories, then imported histories, then household parties | D184 |
+| Phase 1 contract | Unpartnered eligibility, per-stream clocks, arrival columns, observation from arrival, group compatibility, `migrant_assignment()`, ancestry fallback | D185 |
 | Selective migration | A weight model selects among a stream's eligible template people; intensity is unchanged | D180, D184 |
 | Migration histories | Separate personal/family facts from reusable, named classifications | D181 |
 | Rate schedules | Stratify by personal immigration status and stream; generation rules stay outside the required rate-table schema | D182 |
@@ -275,15 +276,102 @@ Proposed order (D184):
    destination, entry into cells and matching pools, arrival records, and
    arrival-aware accounting and observation. Every migrant arrives
    unrelated, never partnered and at parity zero. This is scaffolding and
-   not a releasable immigration feature. Whether source people with a
-   current partner are eligible in this phase is open.
+   not a releasable immigration feature. Source people with a current
+   partner are not eligible (D185).
 2. **Imported histories.** Histories, date translation, derived state,
    carried-over group duration and `external_relatives`.
 3. **Household parties.** Party sampling under D140's membership rule;
    arriving children become links instead of external relatives.
 
-Where classifications (D181), rate strata (D182) and selective migration
-enter is decided when implementation begins.
+Weight-model selection is part of phase 1 (D185). Template schedules,
+D182 rate strata and D181 classifications follow once arrivals and
+observation work.
+
+## Phase 1 specification
+
+User decisions, November 16, 2026 (D185). Implemented November 16, 2026;
+see [testing](testing.md#external-immigration-phase-1-november-16-2026).
+
+**Scope.** Phase 1 adds `immigration()`, `immigration_stream()`,
+`set_immigration()` and `migrant_assignment()`; constant or calendar-varying
+intensity; optional weight models; group assignment for dimensions the
+template lacks; arrival records; and arrival-aware observation. It excludes
+imported histories and external relatives (phase 2), household parties
+(phase 3), calendar-scheduled templates, weight models and assignments,
+D182 rate strata and D181 classifications.
+
+**Eligibility.** A template person is eligible when alive at the template's
+`end_time` and without a current partner: they have no union, married or
+cohabiting, without an end time. Their relationships are otherwise ignored.
+
+**Arrival times.** Each stream has its own exponential clock at its current
+intensity (D128's one clock per process). At an intensity boundary the
+stream's clock is redrawn at the new intensity; by memorylessness this
+preserves the piecewise-constant Poisson process. The intensity column is
+`intensity`. Same-time events are ordered death, birth, dissolution,
+conversion, search, group transition, then arrival. A model without streams
+makes no immigration random draws, so existing seeded runs are unchanged.
+
+**Selection.** Conditional on an arrival, one eligible template person is
+selected with probability proportional to the stream's weight model, or
+uniformly without one. In phase 1 weight models may use age at the template
+endpoint (equal to age at arrival), sex and the groups the template
+supplies; assigned groups are not available, because assignment follows
+selection. Template and weights are fixed for the run, so selection
+probabilities are computed once per stream. A stream with no eligible
+person, or with zero total eligible weight, is an error before the run
+starts.
+
+**The arriving person.** The destination record has a fresh ID, the
+selected person's sex, and birth time equal to the arrival time minus the
+selected person's age at `end_time`. Parent IDs are unknown (`NA`). They
+arrive with no union history, parity zero, no last birth and no transition
+history; group duration therefore falls back to birth time under the
+existing rule. They then enter every applicable rate cell, fertility cell,
+matching pool and calibration count, and the affected process clocks are
+redrawn.
+
+**Groups.**
+
+- A dimension declared by both template and destination must declare the
+  same categories; otherwise it is an error. The migrant takes the
+  template value.
+- Template dimensions the destination does not declare are ignored.
+- A destination dimension the template lacks needs a
+  `migrant_assignment()` for that dimension in the stream's `assignment`
+  argument, a list named by dimension; without one it is an error. An
+  assignment for a dimension the template declares is an error: assignment
+  does not override template values.
+
+`migrant_assignment()` methods:
+
+| Method | Assigns |
+| --- | --- |
+| `"fixed"` | One category to every migrant on the stream |
+| `"probability"` | A category drawn from fixed probabilities over the dimension's categories |
+| `"custom"` | A category drawn from probabilities returned by a user function of the migrant's age, sex and template-supplied groups |
+
+Argument names and validation for each method are specified with the R
+interface draft.
+
+**Ancestry.** For each destination dimension that tracks ancestry, a
+migrant takes the selected person's ancestry shares when the template
+tracks ancestry for that dimension. Otherwise, because the template lacks
+the dimension or does not track its ancestry, the migrant has 100% ancestry
+in their category for that dimension, whether supplied by the template or
+assigned.
+
+**Arrival records.** `persons` gains `arrival_time` and `stream`, `NA` for
+people who did not immigrate. The columns appear only when the model has
+immigration streams or the input population already has them, so restarts
+retain them and simulations without immigration are unchanged.
+
+**Observation.** A person is observed from the later of birth and arrival.
+Exposure, events and population counts before arrival are excluded, so a
+migrant's own birth is not a destination birth, and their age-specific
+exposure begins at their age at arrival. Every calculation and observation
+function applies this rule; a population without arrival columns is
+treated as having no arrivals.
 
 ## Migration facts, family history and classifications
 
@@ -380,16 +468,16 @@ The following choices are open; listing an option does not select it.
 
 | Area | Decisions still needed |
 | --- | --- |
-| Source sampling | Eligible source records beyond the current-partner rule; weight-model variables for template people; empty templates and zero eligible weight |
-| Imported state | Phase 1 eligibility of source people with a current partner; last-observed column name; whether kin extraction includes external relatives (proposed default: excluded); `external_relatives` restart representation |
-| Compatibility | Source/destination group declarations, categories and ancestry components; handling future templates' categories |
-| Calendar inputs | Intensity column name; template and weight-model schedules: interval columns, coverage, gaps and exact boundaries |
+| Source sampling | Weight-model variables beyond age, sex and groups in later phases |
+| Imported state | Last-observed column name; whether kin extraction includes external relatives (proposed default: excluded); `external_relatives` restart representation |
+| Compatibility | Categories of future scheduled templates; calendar-scheduled assignments |
+| Calendar inputs | Template and weight-model schedules: interval columns, coverage, gaps and exact boundaries |
 | Households | Party membership, selection probabilities, rate units and reconstruction of internal person/union links |
 | Migration history | Stored facts, source provenance, history depth, starting-population unknowns and restart persistence |
 | Classifications | Rule interface, output types, update timing, custom-model inputs and imported-history inputs |
 | Rate strata | Declared group versus built-in migration variable, process support and coverage rules |
-| Observation | Entry-aware risk/exposure windows, immigrant versus destination-born events, historical support records and population accounting |
-| Timing and interface | Arrival tie priority, clock organization, `immigration_stream()` arguments and the non-immigrant label |
+| Observation | Pre-migration imported events and external relatives (phase 2) |
+| Timing and interface | Remaining `immigration_stream()` and `migrant_assignment()` arguments; the non-immigrant label |
 
 No implementation milestone or scientific acceptance threshold is established
 here. Household implementation can remain deferred while the individual-arrival
@@ -427,6 +515,18 @@ time 2035.4.
 None of these records adds destination births, deaths or exposure, and her
 destination exposure begins at 2035.4.
 
+**Phase 1 arrival.** The destination declares `ethnicity` (tracking
+ancestry) and `region`. A stream's template ends at 2000 and declares
+`ethnicity`, with ancestry, and `education`; its `assignment` gives `region`
+a `"probability"` rule of 0.6 west and 0.4 south. An unpartnered woman born
+in 1975 is selected for an arrival at 2050.3. Her destination record has a
+fresh ID, birth time 2025.3 (age 25), unknown parents, `arrival_time`
+2050.3 and the stream's name. She keeps her template ethnicity and its
+ancestry shares; education is dropped; her region is west with probability
+0.6. If the destination tracked region ancestry, she would have 100% of her
+assigned region. A life table over 2050–2060 counts her exposure from
+2050.3, beginning at age 25; her birth is not a destination birth.
+
 **Personal status versus family origin.** An immigrant through stream A and
 a locally born person with immigrant parents from stream B have a child in
 the destination. The child has not personally immigrated and does not inherit
@@ -449,6 +549,13 @@ with a valid, nonempty source, the initial analytical and accounting cases are:
 | Imported histories | Historical source births/deaths are excluded from destination event counts and pre-entry destination exposure |
 | Imported state | Arrivals' parity, last birth, previous-union status and end, and group duration equal their template-endpoint values, with dates shifted by the offset |
 | External relatives | References resolve; external relatives never enter cells, pools, exposure, event counts or population totals |
+| Phase 1 selection | Across replications, selection frequencies match normalized weights; scaling all weights leaves them unchanged |
+| Phase 1 arrivals | Age at arrival equals template age at `end_time`; parents unknown; never partnered; parity zero |
+| Phase 1 groups | Shared dimensions copy template values; ignored dimensions are absent; assigned categories follow fixed, probability or custom rules across replications |
+| Phase 1 ancestry | Template shares are copied where tracked; otherwise 100% of the migrant's category |
+| Phase 1 observation | No exposure, events or population count before arrival; a migrant's own birth is not a destination birth |
+| No streams | Seeded output identical to a run without the immigration code, with no arrival columns |
+| Piecewise intensity | Expected arrivals equal the integral of intensity; 100 per year for 10 years then 50 for 10 years gives 1,500 |
 
 Additional tests should cover multiple streams, age preservation, template
 schedule boundaries, future group categories, mixed-stream pedigrees,
