@@ -13,7 +13,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hammel</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -48,12 +48,19 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="hammel-development-version">hammel (development version)<a class="anchor" aria-label="anchor" href="#hammel-development-version"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.2.0" id="hammel-020">hammel 0.2.0<a class="anchor" aria-label="anchor" href="#hammel-020"></a></h2>
+<p>This release focuses on improvements to user facing output.</p>
+<div class="section level3">
+<h3 id="new-features-0-2-0">New Features<a class="anchor" aria-label="anchor" href="#new-features-0-2-0"></a></h3>
 <ul><li>Update warning/error reporting with more detail on the source of the warning/error and information for correction (<a href="https://github.com/AaronGullickson/hammel/issues/16" class="external-link">#16</a>)</li>
 <li>Add summary and print methods for all hammel custom objects. (<a href="https://github.com/AaronGullickson/hammel/issues/23" class="external-link">#23</a>)</li>
 <li>Add optional progress bar to <code><a href="../reference/run_simulation.html">run_simulation()</a></code> with <code>progress = TRUE</code>. Defaults to FALSE. (<a href="https://github.com/AaronGullickson/hammel/issues/31" class="external-link">#31</a>)</li>
-<li>Custom weight functions that return anything other than a numeric vector now raise an error instead of crashing R or being silently coerced. (<a href="https://github.com/AaronGullickson/hammel/issues/36" class="external-link">#36</a>)</li>
 </ul></div>
+<div class="section level3">
+<h3 id="bug-fixes-0-2-0">Bug Fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-0"></a></h3>
+<ul><li>Custom weight functions that return anything other than a numeric vector now raise an error instead of crashing R or being silently coerced. (<a href="https://github.com/AaronGullickson/hammel/issues/36" class="external-link">#36</a>)</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.0" id="hammel-010">hammel 0.1.0<a class="anchor" aria-label="anchor" href="#hammel-010"></a></h2>
 <p>First public release.</p>
