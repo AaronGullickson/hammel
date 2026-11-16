@@ -197,21 +197,40 @@ age_gap_matching_model <- function(
     value <- get(name)
     if (!is.numeric(value) || length(value) != 1L || !is.null(dim(value)) ||
           !is.finite(value)) {
-      stop("`", name, "` must be a finite numeric scalar.", call. = FALSE)
+      abort_hammel(
+        c(
+          "{.arg {name}} must be a single finite number of years.",
+          "x" = "It is {describe_value(value)}."
+        ),
+        "argument",
+        argument = name
+      )
     }
   }
   if (half_weight_distance <= 0) {
-    stop("`half_weight_distance` must be positive.", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg half_weight_distance} must be positive.",
+        "x" = "It is {half_weight_distance}."
+      ),
+      "argument",
+      argument = "half_weight_distance"
+    )
   }
   quadratic <- -(sqrt(log(2)) / half_weight_distance)^2
   linear <- -2 * (preferred_age_gap * quadratic)
   if (!is.finite(quadratic) || quadratic >= 0 || !is.finite(linear)) {
-    stop(
-      paste0(
-        "Inputs must yield finite coefficients with a negative ",
-        "quadratic term."
+    abort_hammel(
+      c(
+        "These age-gap preferences give coefficients that can't be used.",
+        "x" = paste(
+          "{.arg preferred_age_gap} is {preferred_age_gap} and",
+          "{.arg half_weight_distance} is {half_weight_distance}."
+        ),
+        "i" = "Use a smaller preferred gap or a larger half-weight distance."
       ),
-      call. = FALSE
+      "argument",
+      argument = "half_weight_distance"
     )
   }
   matching_model(
@@ -225,7 +244,162 @@ age_gap_matching_model <- function(
   )
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a matching model
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_matching_model"`
+#'
+#' @details
+#'
+#' When the formula is exactly `~ age_difference + I(age_difference^2)` with a
+#' negative quadratic coefficient, as built by [age_gap_matching_model()], the
+#' summary also reports the implied preferred age gap and half-weight
+#' distance.
+#'
+#' @param object A `hammel_matching_model` object returned by
+#'   [matching_model()] or [age_gap_matching_model()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_matching_model`
+#' containing:
+#' \describe{
+#'   \item{formula}{The utility formula.}
+#'   \item{coefficients}{The named utility coefficients.}
+#'   \item{age_gap}{`NULL`, or a list with the implied `preferred_age_gap`
+#'     and `half_weight_distance`, in years, of a quadratic age-gap model.}
+#'   \item{group_exogamy}{The `group_exogamy` specification, or `NULL`.}
+#'   \item{delta}{The `delta` specification, or `NULL`.}
+#' }
+#'
+#' @seealso [matching_model()], [age_gap_matching_model()]
+#' @examples
+#' matching <- age_gap_matching_model(
+#'   preferred_age_gap = 3,
+#'   half_weight_distance = 5,
+#'   group_exogamy = list(race = c("W:B" = -3, "W:O" = NA), region = NA)
+#' )
+#' summary(matching)
+#' @export
+summary.hammel_matching_model <- function(object, ...) {
+  structure(
+    list(
+      formula = object$formula,
+      coefficients = object$coefficients,
+      age_gap = implied_age_gap(object),
+      group_exogamy = object$group_exogamy,
+      delta = object$delta
+    ),
+    class = "summary.hammel_matching_model"
+  )
+}
+
+#' @rdname summary.hammel_matching_model
+#' @param x A `summary.hammel_matching_model` object returned by
+#'   `summary.hammel_matching_model()`.
+#' @export
+print.summary.hammel_matching_model <- function(x, ...) {
+  print_model_summary("Matching model", x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
+
+# The preferred age gap and half-weight distance implied by a quadratic
+# age-gap model, inverting age_gap_matching_model(); NULL for other models.
+implied_age_gap <- function(model) {
+  terms <- c("age_difference", "I(age_difference^2)")
+  beta <- model$coefficients
+  quadratic <- identical(
+    attr(stats::terms(model$formula), "term.labels"),
+    terms
+  )
+  if (!quadratic || !setequal(names(beta), terms) ||
+        beta[["I(age_difference^2)"]] >= 0) {
+    return(NULL)
+  }
+  linear <- beta[["age_difference"]]
+  square <- beta[["I(age_difference^2)"]]
+  list(
+    preferred_age_gap = -linear / (2 * square),
+    half_weight_distance = sqrt(-log(2) / square)
+  )
+}
+
+# Lines describing a matching model summary; see model_summary_lines().
+matching_summary_lines <- function(x) {
+  lines <- c(
+    Formula = deparse1(x$formula),
+    Coefficients = format_named_values(x$coefficients)
+  )
+  if (!is.null(x$age_gap)) {
+    lines[["Preferred age gap"]] <- paste(
+      signif(x$age_gap$preferred_age_gap, 4), "years"
+    )
+    lines[["Half-weight distance"]] <- paste(
+      signif(x$age_gap$half_weight_distance, 4), "years"
+    )
+  }
+  c(
+    lines,
+    format_dimension_values(
+      "Group exogamy",
+      x$group_exogamy,
+      format_exogamy_values
+    ),
+    format_dimension_values("Delta", x$delta, format_named_values)
+  )
+}
+
+# Lines for a setting given as a bare value (the only dimension) or a list
+# keyed by dimension; a table of group exogamy pairs is one line.
+format_dimension_values <- function(label, x, formatter) {
+  if (is.null(x)) {
+    return(character())
+  }
+  if (is.data.frame(x)) {
+    dimensions <- exogamy_table_dimensions(x)
+    return(stats::setNames(
+      format_exogamy_table(x, dimensions),
+      paste0(label, " (", paste(dimensions, collapse = "|"), ")")
+    ))
+  }
+  if (!is_dimension_list(x)) {
+    return(stats::setNames(formatter(x), label))
+  }
+  stats::setNames(
+    vapply(x, formatter, character(1)),
+    paste0(label, " (", names(x), ")")
+  )
+}
+
+# One dimension's group exogamy: named pair effects, NA prohibiting a pair,
+# or a bare NA prohibiting every pair.
+format_exogamy_values <- function(x) {
+  if (is.null(names(x))) {
+    return("all pairs prohibited")
+  }
+  values <- ifelse(is.na(x), "prohibited", signif(x, 4))
+  paste(paste0(names(x), " = ", values), collapse = ", ")
+}
+
+# A group exogamy table, as combination pairs joined like "W|S:B|S".
+format_exogamy_table <- function(x, dimensions, max = 10L) {
+  side <- function(suffix) {
+    do.call(paste, c(x[paste0(dimensions, suffix)], sep = "|"))
+  }
+  values <- ifelse(is.na(x$log_odds), "prohibited", signif(x$log_odds, 4))
+  text <- paste0(side("_x"), ":", side("_y"), " = ", values)
+  if (length(text) <= max) {
+    return(paste(text, collapse = ", "))
+  }
+  paste0(
+    paste(text[seq_len(max)], collapse = ", "),
+    ", and ", length(text) - max, " more"
+  )
+}
 
 # Male-group formula effects can be absorbed by calibrated target weights.
 warn_absorbed_group_formula <- function(model) {
@@ -233,23 +407,24 @@ warn_absorbed_group_formula <- function(model) {
   if (!length(male)) {
     return(invisible(FALSE))
   }
-  warning(
-    sprintf(
+  warn_hammel(
+    c(
       paste(
-        "Formula terms using %s are absorbed by calibrated group weights:",
-        paste0(
-          "main effects have no effect and interactions are ",
-          "only partly reflected."
-        ),
-        "Use delta to adjust male-group targets."
-      ), paste0("`", male, "`", collapse = ", ")
+        "Formula terms using {.code {male}} are absorbed by calibrated group",
+        "weights."
+      ),
+      "i" = paste(
+        "Their main effects have no effect, and interactions are only partly",
+        "reflected. Use {.arg delta} to adjust male-group targets."
+      )
     ),
-    call. = FALSE
+    "no_effect",
+    variables = male
   )
   invisible(TRUE)
 }
 
-validate_delta <- function(x) {
+validate_delta <- function(x, call = rlang::caller_env()) {
   if (is.null(x)) {
     return(invisible(x))
   }
@@ -259,12 +434,15 @@ validate_delta <- function(x) {
            (is.null(names(x)) || anyNA(names(x)) ||
               any(!nzchar(trimws(names(x)))) ||
               anyDuplicated(names(x))))) {
-    stop(
-      paste0(
-        "`delta` must be a finite numeric vector with ",
-        "unique nonempty group names."
+    abort_hammel(
+      c(
+        "{.arg delta} must be finite numbers named by unique categories.",
+        "x" = "It is {describe_value(x)}.",
+        "i" = "For example, {.code delta = c(A = 0.1, B = -0.1)}."
       ),
-      call. = FALSE
+      "specification",
+      argument = "delta",
+      call = call
     )
   }
   invisible(x)
@@ -273,9 +451,21 @@ validate_delta <- function(x) {
 # A public matching model: predictors and settings named by dimension. Checks
 # that need the declaration (coefficient names of group predictors, setting
 # categories) happen when it is translated at simulation.
-validate_matching_model <- function(model) {
+validate_matching_model <- function(model, call = rlang::caller_env()) {
   if (!inherits(model, "hammel_matching_model") || !is.list(model)) {
-    stop("`matching` must be created with matching_model().", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg matching} must be a matching model.",
+        "x" = "It is {describe_value(model)}.",
+        "i" = paste(
+          "Create one with {.fn matching_model} or",
+          "{.fn age_gap_matching_model}."
+        )
+      ),
+      "specification",
+      argument = "matching",
+      call = call
+    )
   }
   formula <- model$formula
   vars <- if (inherits(formula, "formula")) all.vars(formula) else character()
@@ -283,19 +473,32 @@ validate_matching_model <- function(model) {
         any(
           vars != "age_difference" & !grepl("^(female|male|same)_.+", vars)
         )) {
-    stop(
-      paste(
-        paste0(
-          "Use a one-sided matching formula with ",
-          "`age_difference` and group predictors"
-        ),
-        "`female_<group>`, `male_<group>` or `same_<group>`."
+    abort_hammel(
+      c(
+        "{.arg formula} must be a one-sided matching formula.",
+        "x" = if (inherits(formula, "formula")) {
+          "It is {.code {deparse1(formula)}}."
+        } else {
+          "It is {describe_value(formula)}."
+        },
+        "i" = paste(
+          "Use {.code age_difference} and group predictors",
+          "{.code female_<group>}, {.code male_<group>} or",
+          "{.code same_<group>}."
+        )
       ),
-      call. = FALSE
+      "specification",
+      argument = "formula",
+      call = call
     )
   }
   if (length(attr(stats::terms(formula), "offset"))) {
-    stop("Matching formula offsets are not supported.", call. = FALSE)
+    abort_hammel(
+      "Matching formulas can't contain offsets.",
+      "specification",
+      argument = "formula",
+      call = call
+    )
   }
   beta <- model$coefficients
   if (!is.numeric(beta) || is.complex(beta) || !is.null(dim(beta)) ||
@@ -304,16 +507,18 @@ validate_matching_model <- function(model) {
         anyNA(names(beta)) ||
         any(!nzchar(names(beta))) ||
         anyDuplicated(names(beta))) {
-    stop(
-      paste0(
-        "`coefficients` must be a finite numeric vector ",
-        "with unique nonempty names."
+    abort_hammel(
+      c(
+        "{.arg coefficients} must be finite numbers with unique names.",
+        "x" = "It is {describe_value(beta)}."
       ),
-      call. = FALSE
+      "specification",
+      argument = "coefficients",
+      call = call
     )
   }
   if (is.data.frame(model$group_exogamy)) {
-    validate_exogamy_table(model$group_exogamy)
+    validate_exogamy_table(model$group_exogamy, call = call)
   }
   for (field in c("group_exogamy", "delta")) {
     x <- model[[field]]
@@ -323,12 +528,17 @@ validate_matching_model <- function(model) {
     values <- if (is_dimension_list(x)) {
       if (is.null(names(x)) || anyNA(names(x)) || any(!nzchar(names(x))) ||
             anyDuplicated(names(x))) {
-        stop(
-          sprintf(
-            "A list `%s` must be named by group dimension, once each.",
-            field
+        abort_hammel(
+          c(
+            paste(
+              "A list {.arg {field}} must be named by group dimension, once",
+              "each."
+            ),
+            "x" = "Its names are {.val {names(x)}}."
           ),
-          call. = FALSE
+          "specification",
+          argument = field,
+          call = call
         )
       }
       x
@@ -337,40 +547,37 @@ validate_matching_model <- function(model) {
     }
     for (v in values) {
       if (is.data.frame(v)) {
-        stop(
-          paste(
-            paste0(
-              "A dimension's `group_exogamy` entry is a named ",
-              "vector or NA; give pair tables"
+        abort_hammel(
+          c(
+            paste(
+              "Each dimension's {.arg group_exogamy} entry must be a named",
+              "vector or {.code NA}."
             ),
-            paste0(
-              "as the whole `group_exogamy` (with ",
-              "`<group>_x`/`<group>_y` columns)."
+            "i" = paste(
+              "Give a pair table as the whole {.arg group_exogamy}, with",
+              "{.field <group>_x} and {.field <group>_y} columns."
             )
           ),
-          call. = FALSE
+          "specification",
+          argument = "group_exogamy",
+          call = call
         )
       }
       switch(
         field,
-        group_exogamy = split_group_exogamy(v),
-        delta = validate_delta(v)
+        group_exogamy = split_group_exogamy(v, call = call),
+        delta = validate_delta(v, call = call)
       )
     }
   }
   # Without group predictors, coefficient names can be checked now.
   if (!any(grepl("^(female|male|same)_.+", vars))) {
     design <- matching_design_matrix(
-      formula, data.frame(age_difference = seq(- 50, 50, length.out = 101))
+      formula, data.frame(age_difference = seq(- 50, 50, length.out = 101)),
+      call = call
     )
     if (!setequal(colnames(design), names(beta))) {
-      stop(
-        paste0(
-          "Coefficient names must match all non-intercept ",
-          "model-matrix columns."
-        ),
-        call. = FALSE
-      )
+      abort_matching_coefficients(beta, colnames(design), call = call)
     }
   }
   invisible(model)
@@ -378,25 +585,18 @@ validate_matching_model <- function(model) {
 
 # The internal one-dimension form (predictors `female_group`, `male_group`,
 # `same_group` and explicit `group_levels`), built at simulation.
-validate_internal_matching <- function(model) {
-  validate_delta(model$delta)
+validate_internal_matching <- function(model, call = rlang::caller_env()) {
+  validate_delta(model$delta, call = call)
   formula <- model$formula
   if (!inherits(formula, "formula") || length(formula) != 2L ||
         any(
           !all.vars(formula) %in%
              c("age_difference", "female_group", "male_group", "same_group")
         )) {
-    stop(
-      paste0(
-        "Use a one-sided matching formula with ",
-        "`age_difference`, `female_group`, `male_group`, ",
-        "or `same_group`."
-      ),
-      call. = FALSE
-    )
+    abort_internal("Translated matching formula uses unknown predictors.")
   }
   if (length(attr(stats::terms(formula), "offset"))) {
-    stop("Matching formula offsets are not supported.", call. = FALSE)
+    abort_internal("Translated matching formula contains an offset.")
   }
   beta <- model$coefficients
   if (!is.numeric(beta) || is.complex(beta) || !is.null(dim(beta)) ||
@@ -405,34 +605,29 @@ validate_internal_matching <- function(model) {
         anyNA(names(beta)) ||
         any(!nzchar(names(beta))) ||
         anyDuplicated(names(beta))) {
-    stop(
-      paste0(
-        "`coefficients` must be a finite numeric vector ",
-        "with unique nonempty names."
-      ),
-      call. = FALSE
-    )
+    abort_internal("Translated matching coefficients are invalid.")
   }
-  expand_group_exogamy(model$group_exogamy)
-  expand_prevent_exogamy(model$prevent_exogamy)
+  expand_group_exogamy(model$group_exogamy, call = call)
+  expand_prevent_exogamy(model$prevent_exogamy, call = call)
   levels <- model$group_levels
   if (!is.null(levels)) {
-    labels <- matching_group_labels(levels, "group_levels")
+    labels <- matching_group_labels(levels, "group_levels", call = call)
     if (!length(labels) || anyDuplicated(labels)) {
-      stop(
-        "`group_levels` must be unique nonempty group labels.",
-        call. = FALSE
-      )
+      abort_internal("Matching group levels must be unique labels.")
     }
   }
   categorical <- any(all.vars(formula) %in% c("female_group", "male_group"))
   if (categorical && length(levels) < 2L) {
-    stop(
-      paste0(
-        "Categorical matching predictors require a group ",
-        "dimension with at least two categories."
+    abort_hammel(
+      c(
+        paste(
+          "{.code female_} and {.code male_} matching predictors need a",
+          "dimension with at least two categories."
+        ),
+        "i" = "Use a {.code same_} predictor instead."
       ),
-      call. = FALSE
+      "groups",
+      call = call
     )
   }
   # A fixed validation grid covers both sexes' group levels, equality, and gaps.
@@ -447,46 +642,77 @@ validate_internal_matching <- function(model) {
       model, rep(data$age_difference, length.out = size), female, male
     )
   }
-  design <- matching_design_matrix(formula, data)
+  design <- matching_design_matrix(formula, data, call = call)
   if (!setequal(colnames(design), names(beta))) {
-    stop(
-      "Coefficient names must match all non-intercept model-matrix columns.",
-      call. = FALSE
-    )
+    abort_internal("Translated matching coefficients don't match the formula.")
   }
   invisible(model)
 }
 
-matching_design_matrix <- function(formula, data) {
-  design <- withCallingHandlers(
-    {
-      frame <- stats::model.frame(
-        formula,
-        data = data,
-        na.action = stats::na.pass,
-        drop.unused.levels = FALSE
-      )
-      factors <- frame[vapply(frame, is.factor, logical(1))]
-      contrasts <- if (length(factors)) {
-        lapply(
-          factors, function(x) {
-            stats::contr.treatment(levels(x))
-          }
+matching_design_matrix <- function(formula, data, call = rlang::caller_env()) {
+  # Evaluation errors, such as an unknown function in the formula, and
+  # warnings, which the handler raises as errors, are specification errors.
+  design <- tryCatch(
+    withCallingHandlers(
+      {
+        frame <- stats::model.frame(
+          formula,
+          data = data,
+          na.action = stats::na.pass,
+          drop.unused.levels = FALSE
         )
-      } else {
-        NULL
+        factors <- frame[vapply(frame, is.factor, logical(1))]
+        contrasts <- if (length(factors)) {
+          lapply(
+            factors, function(x) {
+              stats::contr.treatment(levels(x))
+            }
+          )
+        } else {
+          NULL
+        }
+        stats::model.matrix(formula, data = frame, contrasts.arg = contrasts)
+      },
+      warning = function(w) {
+        abort_hammel(
+          c(
+            "The matching formula gave a warning when evaluated.",
+            "x" = "{conditionMessage(w)}",
+            "i" = "Check {.code {deparse1(formula)}}."
+          ),
+          "specification",
+          argument = "formula",
+          call = call
+        )
       }
-      stats::model.matrix(formula, data = frame, contrasts.arg = contrasts)
-    },
-    warning = function(w) {
-      stop("Matching formula evaluation: ", conditionMessage(w), call. = FALSE)
+    ),
+    error = function(e) {
+      if (inherits(e, "hammel_error")) {
+        stop(e)
+      }
+      abort_hammel(
+        c(
+          "The matching formula can't be evaluated.",
+          "i" = "Check {.code {deparse1(formula)}}."
+        ),
+        "specification",
+        argument = "formula",
+        parent = e,
+        call = call
+      )
     }
   )
   design <- design[, colnames(design) != "(Intercept)", drop = FALSE]
   if (nrow(design) != nrow(data) || any(!is.finite(design))) {
-    stop(
-      "Matching formula must produce finite values for every candidate.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "The matching formula must give finite values for every candidate.",
+        "x" = "{.code {deparse1(formula)}} gives missing or infinite values.",
+        "i" = "For example, avoid {.code log()} of a gap that can be zero."
+      ),
+      "specification",
+      argument = "formula",
+      call = call
     )
   }
   design
@@ -498,33 +724,43 @@ calculate_matching_utilities <- function(
   age_difference,
   female_group = NULL,
   male_group = NULL,
-  add_group_exogamy = TRUE
+  add_group_exogamy = TRUE,
+  call = rlang::caller_env()
 ) {
-  check_numeric_column(age_difference, "age_difference")
+  check_numeric_column(age_difference, "age_difference", call = call)
   if (!length(age_difference)) {
     return(numeric())
   }
   data <- matching_predictor_data(
     matching, age_difference, female_group, male_group
   )
-  design <- matching_design_matrix(matching$formula, data)
+  design <- matching_design_matrix(matching$formula, data, call = call)
   if (!setequal(colnames(design), names(matching$coefficients))) {
-    stop(
-      "Matching formula columns changed for the supplied candidates.",
-      call. = FALSE
-    )
+    abort_internal("Matching formula columns changed for these candidates.")
   }
   utility <- drop(design %*% matching$coefficients[colnames(design)])
   if (add_group_exogamy && nrow(expand_group_exogamy(matching$group_exogamy))) {
     if (is.null(female_group) || is.null(male_group)) {
-      stop("Pair effects require female and male group data.", call. = FALSE)
+      abort_internal("Pair effects need female and male groups.")
     }
     utility <- utility + matching_pair_offsets(
       matching, female_group, male_group
     )
   }
   if (any(!is.finite(utility))) {
-    stop("Matching utilities must be finite.", call. = FALSE)
+    abort_hammel(
+      c(
+        "Matching utilities must be finite.",
+        "x" = paste(
+          "The matching model gives infinite utilities for some",
+          "candidates."
+        ),
+        "i" = "Check the formula and coefficients for extreme age gaps."
+      ),
+      "runtime",
+      process = "matching",
+      call = call
+    )
   }
   unname(utility)
 }
@@ -546,10 +782,7 @@ calculate_matching_probabilities <- function(
   allowed <- rep(TRUE, length(utility))
   if (restrictions$all || nrow(restrictions$pairs)) {
     if (is.null(female_group) || is.null(male_group)) {
-      stop(
-        "Group restrictions require female and male group data.",
-        call. = FALSE
-      )
+      abort_internal("Group restrictions need female and male groups.")
     }
     allowed <- matching_group_allowed(matching, female_group, male_group)
   }
@@ -563,8 +796,12 @@ calculate_matching_probabilities <- function(
 
 # Use an exact native path for the common linear/raw quadratic specification.
 # All other formulas retain model.matrix semantics through an R evaluator.
-prepare_matching_model <- function(matching, population_groups = NULL) {
-  validate_matching_groups(matching, population_groups)
+prepare_matching_model <- function(
+  matching,
+  population_groups = NULL,
+  call = rlang::caller_env()
+) {
+  validate_matching_groups(matching, population_groups, call = call)
   beta <- matching$coefficients
   columns <- gsub("[[:space:]]", "", names(beta))
   native <- all(columns %in% c("age_difference", "I(age_difference^2)"))
@@ -629,7 +866,8 @@ prepare_matching_model <- function(matching, population_groups = NULL) {
         matching, age_difference,
         if (is.null(female_group)) NULL else labels[female_group + 1L],
         if (is.null(male_group)) NULL else labels[male_group + 1L],
-        add_group_exogamy = FALSE
+        add_group_exogamy = FALSE,
+        call = call
       )
     }
   )

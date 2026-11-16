@@ -68,15 +68,31 @@ test_that("all scheduled models and interval bounds validate before execution", 
   for (bad in bad_intervals) expect_error(model_choice_fixture("matching", bad))
   bad <- s
   bad$model[[2]]$coefficients[1] <- NA_real_
-  expect_error(model_choice_fixture("matching", bad), "matching\\$model\\[\\[2\\]\\]")
+  error <- expect_error(
+    model_choice_fixture("matching", bad),
+    class = "hammel_error_specification"
+  )
+  expect_match(conditionMessage(error), "In row 2 of the matching schedule.")
   bad <- model_calendar(group_inheritance("mother"))
   bad$model[2] <- list(mm)
-  expect_error(model_inheritance_fixture(bad), "inheritance\\$model")
+  error <- expect_error(
+    model_inheritance_fixture(bad),
+    class = "hammel_error_specification"
+  )
+  expect_match(conditionMessage(error), "In row 2 of the inheritance schedule.")
   bad$model[2] <- list("father")
-  expect_error(model_inheritance_fixture(bad), "complete model")
+  expect_error(
+    model_inheritance_fixture(bad),
+    "complete model",
+    class = "hammel_error_specification"
+  )
   edited <- model_choice_fixture("matching", s)
   edited$processes$union_formation$matching$model[[2]]$coefficients[1] <- NA_real_
-  expect_error(run_simulation(edited, 0), "matching\\$model")
+  error <- expect_error(
+    run_simulation(edited, 0),
+    class = "hammel_error_specification"
+  )
+  expect_match(conditionMessage(error), "In row 2 of the matching schedule.")
 })
 
 test_that("coverage applies to all four arguments and zero-year starts", {
@@ -85,14 +101,21 @@ test_that("coverage applies to all four arguments and zero-year starts", {
     source <- if (role == "inheritance") group_inheritance("mother") else mm
     s <- model_calendar(source, boundary = .5, start = .1, end = 1)
     m <- if (role == "inheritance") model_inheritance_fixture(s) else model_choice_fixture(role, s)
-    expect_error(run_simulation(m, 0), paste0(role, ".*coverage gap"))
+    expect_error(run_simulation(m, 0), role, class = "hammel_error_coverage")
     m$population$end_time <- .1
     expect_s3_class(run_simulation(m, .9, seed = 3), "hammel_population")
-    expect_error(run_simulation(m, 1, seed = 3), paste0(role, ".*coverage gap"))
+    expect_error(
+      run_simulation(m, 1, seed = 3),
+      role,
+      class = "hammel_error_coverage"
+    )
     s$time_start[1] <- 0
     s$time_start[2] <- .7
     m <- if (role == "inheritance") model_inheritance_fixture(s) else model_choice_fixture(role, s)
-    expect_error(run_simulation(m, 1, seed = 3), "coverage gap")
+    expect_error(
+      run_simulation(m, 1, seed = 3),
+      class = "hammel_error_coverage"
+    )
     expect_s3_class(run_simulation(m, .4, seed = 3), "hammel_population")
   }
 })
@@ -199,7 +222,11 @@ test_that("future custom identities use a common registry and require complete m
   bad <- m
   bad$processes$union_formation$matching <- matching_model(~ female_group,
     c(female_groupB = 0))
-  expect_error(run_simulation(bad, .1), "coefficient names.*female_groupC")
+  expect_error(
+    run_simulation(bad, .1),
+    "female_groupC",
+    class = "hammel_error_specification"
+  )
 })
 
 test_that("inheritance boundaries do not call custom functions without a birth", {

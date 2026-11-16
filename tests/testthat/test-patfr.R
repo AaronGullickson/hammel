@@ -110,19 +110,23 @@ test_that("PATFR omits open ages and warns on known nonzero omitted rates", {
 
 test_that("PATFR validates age/parity coverage and invalid values", {
   rates <- patfr_schedule()
-  expect_error(calculate_patfr(rates[-1, ]),"start at zero")
-  expect_error(calculate_patfr(rates[-3, ]),"open final")
-  expect_error(calculate_patfr(rbind(rates,rates[1, ])),"exactly once")
+  expect_error(calculate_patfr(rates[-1, ]),"start at 0", class = "hammel_error_rates")
+  expect_error(calculate_patfr(rates[-3, ]),"open band", class = "hammel_error_rates")
+  expect_error(calculate_patfr(rbind(rates,rates[1, ])),"exactly one rate", class = "hammel_error_rates")
   bad <- rates
   bad$parity_start[2] <- 1.5
-  expect_error(calculate_patfr(bad),"integer")
+  expect_error(
+    calculate_patfr(bad),
+    "whole-number",
+    class = "hammel_error_rates"
+  )
   bad <- rates
   bad$parity_start[2] <- 2
   bad$parity_end[2] <- 3
-  expect_error(calculate_patfr(bad),"exactly once")
+  expect_error(calculate_patfr(bad),"exactly one rate", class = "hammel_error_rates")
   bad <- rates
   bad$age_end[2] <- 20.5
-  expect_error(calculate_patfr(bad),"exactly once")
+  expect_error(calculate_patfr(bad),"exactly one rate", class = "hammel_error_rates")
   bad <- rates
   bad$rate[2] <- -1
   expect_error(calculate_patfr(bad),"nonnegative")

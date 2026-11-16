@@ -61,7 +61,7 @@ extract_kin <- function(
   generations = 2,
   relative_ids = NULL
 ) {
-  validate_population(population)
+  check_population(population)
   validate_kinship_generations(generations, "generations")
   ids <- population$persons$person_id
   if (is.null(relative_ids)) {
@@ -71,18 +71,25 @@ extract_kin <- function(
     values <- get(name)
     check_numeric_column(values, name, id = TRUE)
     if (anyDuplicated(values) || any(!values %in% ids)) {
-      stop(
-        sprintf(
-          "`%s` must contain unique IDs present in the population.",
-          name
+      unknown <- setdiff(values, ids)
+      abort_hammel(
+        c(
+          "{.arg {name}} must contain unique IDs of persons in the population.",
+          "x" = if (length(unknown)) "Unknown IDs: {.val {unknown}}.",
+          "x" = if (anyDuplicated(values)) {
+            "Repeated IDs: {.val {unique(values[duplicated(values)])}}."
+          }
         ),
-        call. = FALSE
+        "argument",
+        argument = name
       )
     }
   }
-  kin <- extract_kin_cpp(
-    population$persons, ego_ids, relative_ids,
-    as.integer(generations)
+  kin <- call_native(
+    extract_kin_cpp(
+      population$persons, ego_ids, relative_ids,
+      as.integer(generations)
+    )
   )
   kin$relationship <- kin_relationship(kin$ego_distance, kin$relative_distance)
   tibble::as_tibble(
@@ -168,21 +175,18 @@ count_kin <- function(
 ) {
   if (!is.numeric(times) || !is.null(dim(times)) || !length(times) ||
         any(!is.finite(times))) {
-    stop(
-      "`times` must be a nonempty numeric vector of finite times in years.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg times} must be finite times in years.",
+        "x" = "It is {describe_value(times)}."
+      ),
+      "argument",
+      argument = "times"
     )
   }
-  if (!inherits(population, "hammel_population")) {
-    stop("`population` must be a hammel_population.", call. = FALSE)
-  }
-  validate_population(population)
-  if (max(times) > population$end_time) {
-    stop(
-      "Observation requires a known endpoint and cannot extend beyond it.",
-      call. = FALSE
-    )
-  }
+  check_analysis_population(population)
+  check_population(population)
+  check_observation_end(population, max(times))
   validate_kinship_generations(generations, "generations")
   dims <- names(population$groups)
   by <- check_by(by, c("sex", dims), "count_kin")
@@ -194,12 +198,17 @@ count_kin <- function(
           anyNA(relationships) ||
           anyDuplicated(relationships) ||
           any(!relationships %in% types)) {
-      stop(
-        paste0(
-          "`relationships` must contain unique relationship names ",
-          "available within `generations`."
+      abort_hammel(
+        c(
+          paste(
+            "{.arg relationships} must name distinct relationships within",
+            "{.arg generations}."
+          ),
+          "x" = "It is {describe_value(relationships)}.",
+          "i" = "Available relationships: {.val {types}}."
         ),
-        call. = FALSE
+        "argument",
+        argument = "relationships"
       )
     }
     types <- types[types %in% relationships]
@@ -245,8 +254,10 @@ count_kin <- function(
     stratum[!alive] <- 0L
     strata[, i] <- as.integer(stratum)
   }
-  counts <- count_kin_cpp(
-    persons, as.integer(generations), lookup, strata, n_strata, n_types
+  counts <- call_native(
+    count_kin_cpp(
+      persons, as.integer(generations), lookup, strata, n_strata, n_types
+    )
   )
   grid <- expand.grid(
     time = seq_along(times),
@@ -365,7 +376,8 @@ living_kin_categories <- function(population, name) {
 
 validate_kinship_generations <- function(
   generations,
-  name = "kinship_generations"
+  name = "kinship_generations",
+  call = rlang::caller_env()
 ) {
   if (!is.numeric(generations) || length(generations) != 1L ||
         !is.null(dim(generations)) ||
@@ -373,11 +385,14 @@ validate_kinship_generations <- function(
         generations < 0 ||
         generations != floor(generations) ||
         generations > .Machine$integer.max) {
-    stop(
-      sprintf(
-        "`%s` must be a nonnegative whole number within integer range.", name
+    abort_hammel(
+      c(
+        "{.arg {name}} must be a single nonnegative whole number.",
+        "x" = "It is {describe_value(generations)}."
       ),
-      call. = FALSE
+      "argument",
+      argument = name,
+      call = call
     )
   }
   invisible(generations)

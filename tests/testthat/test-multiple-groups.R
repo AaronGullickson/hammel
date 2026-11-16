@@ -30,16 +30,25 @@ test_that("rates stratify by any combination of declared dimensions", {
   expect_identical(!is.na(out$persons$death_time), persons$region == "N")
   # Every combination must be covered, and categories must be known.
   partial <- rates[!(rates$race == "B" & rates$region == "N"), ]
-  expect_error(run_simulation(set_mortality(model, partial), 0),
-    "missing schedules.*race=B, region=N")
+  expect_error(
+    run_simulation(set_mortality(model, partial), 0),
+    "race=B, region=N",
+    class = "hammel_error_groups"
+  )
   declared <- set_groups(model, race = group(categories = c("A", "B")), region = group())
-  expect_error(run_simulation(set_mortality(declared, rbind(rates, transform(
-    rates[1:2, ], race = "C"))), 0),
-               "not categories of group `race`: C")
+  error <- expect_error(
+    run_simulation(
+      set_mortality(declared, rbind(rates, transform(rates[1:2, ], race = "C"))),
+      0
+    ),
+    class = "hammel_error_groups"
+  )
+  expect_identical(error$group, "race")
+  expect_identical(error$categories, "C")
   # A rate table may use a dimension's column only once declared.
   undeclared <- set_groups(model, race = group())
   expect_error(run_simulation(set_mortality(undeclared, rates), 0),
-    "`region`.*not a declared group")
+    "region, which isn't declared", class = "hammel_error_groups")
 })
 
 test_that("union rates stratify by either partner's categories in any dimension", {
@@ -53,8 +62,11 @@ test_that("union rates stratify by either partner's categories in any dimension"
   out <- run_simulation(set_union_dissolution(model, rates), .1, seed = 2)
   expect_identical(out$unions$end_reason %in% "dissolution",
                    wives$race == "A" & husbands$region == "S")
-  expect_error(run_simulation(set_union_dissolution(model, transform(rates,
-    race = "A")), 0), "_w`")
+  error <- expect_error(
+    run_simulation(set_union_dissolution(model, transform(rates, race = "A")), 0),
+    class = "hammel_error_groups"
+  )
+  expect_identical(error$columns, "race")
 })
 
 test_that("newborns get a category in every dimension from its own rule", {
@@ -162,16 +174,17 @@ test_that("matching group effects use one named dimension among several", {
     "hammel_population")
   wrong <- matching_model(~ female_race:age_difference, c("female_raceA:age_difference" = 1))
   expect_error(run_simulation(matching_pair_model(wrong), 0),
-    "coefficient names.*female_raceB:age_difference")
+    "female_raceB:age_difference", class = "hammel_error_specification")
 })
 
 test_that("matching settings must name declared dimensions", {
   bare <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1))
   expect_error(run_simulation(matching_pair_model(bare), 0),
-               "Name the dimension.*group_exogamy = list\\(race")
+               "group_exogamy = list\\(race", class = "hammel_error_groups")
   expect_error(run_simulation(matching_pair_model(matching_model(~
     same_education,
-    c(same_education = 1))), 0), "`education`, which is not a declared group dimension")
+    c(same_education = 1))), 0), "education, which isn't declared",
+    class = "hammel_error_groups")
   expect_error(matching_model(~ age_difference, c(age_difference = 0),
     group_exogamy = list(c("A:B" = 1))), "named by group dimension")
   expect_error(matching_model(~ age_difference, c(age_difference = 0),
@@ -194,7 +207,8 @@ test_that("a single dimension may have any name, including in analysis", {
   expect_true("region" %in% names(rates))
   expect_equal(rates$deaths[rates$region == "S"], c(0, 0))
   expect_gt(sum(rates$deaths[rates$region == "N"]), 0)
-  expect_error(calculate_mortality_rates(out, c(0, 2), c(0, Inf), by = "group"), "`region`")
+  expect_error(calculate_mortality_rates(out, c(0, 2), c(0, Inf), by = "group"),
+    "\"region\"", class = "hammel_error_argument")
   sizes <- calculate_population_size(out, 2, by = "region")
   expect_named(sizes, c("time", "region", "population"))
   # Also when the dimension tracks ancestry.
@@ -209,7 +223,7 @@ test_that("remaining single-dimension features and ancestry inputs are checked",
   w <- weight_model(~ group, c(groupB = 1))
   expect_error(run_simulation(set_mortality(model,
     model$processes$mortality$rates, weights = w), 0),
-               "not available for this process: group")
+               "can't use group", class = "hammel_error_specification")
   # Analysis without group splits works with several dimensions.
   expect_s3_class(calculate_mortality_rates(run_simulation(model, 1, seed = 8),
     c(0, 1), c(0, Inf)), "tbl_df")
@@ -272,7 +286,11 @@ test_that("each dimension has its own transition process, history and duration",
                      rate = c(.3, .3))
   region <- data.frame(origin = c("N", "S"), destination = c("S", "N"), dur_start = c(0, 1),
                        dur_end = c(Inf, Inf), rate = c(.4, 1e8))
-  expect_error(set_group_transition(model, race), "Name the dimension.*\"race\", \"region\"")
+  expect_error(
+    set_group_transition(model, race),
+    '"race" and "region"',
+    class = "hammel_error_groups"
+  )
   model <- set_group_transition(model, race, group = "race")
   model <- set_group_transition(model, region, group = "region")
   expect_named(model$processes$group_transition, c("race", "region"))
@@ -315,7 +333,7 @@ test_that("each dimension has its own transition process, history and duration",
   broken$transitions$destination[which(tx$group == "region")[1]] <- "A"
   expect_error(set_population(model, broken), "chain")
   # Transition rates are counted per dimension.
-  expect_error(calculate_transition_rates(out, c(0, 4), age_breaks = c(0, Inf)), "Name the dimension")
+  expect_error(calculate_transition_rates(out, c(0, 4), age_breaks = c(0, Inf)), "must name the dimension", class = "hammel_error_groups")
   counts <- calculate_transition_rates(out, c(0, 4), dur_breaks = c(0, 1, Inf), group = "region")
   expect_named(counts, c("time_start", "time_end", "dur_start", "dur_end", "origin", "destination",
                          "person_years", "transitions", "rate_transition"))
@@ -343,13 +361,18 @@ test_that("transition rates can be stratified by another dimension", {
   # The transition's own dimension is not a stratum; other names must be declared.
   bad <- set_group_transition(model, data.frame(origin = "A", destination = "B", race = "A",
     age_start = 0, age_end = Inf, rate = 2), group = "race")
-  expect_error(run_simulation(bad, 0), "cannot be stratified by `race` itself")
+  error <- expect_error(run_simulation(bad, 0), class = "hammel_error_groups")
+  expect_identical(error$group, "race")
   undeclared <- set_group_transition(model, data.frame(origin = "A", destination = "B",
     age_start = 0, age_end = Inf, rate = 2), group = "education")
-  expect_error(run_simulation(undeclared, 0),
-    "`education`, which is not a declared group dimension")
+  error <- expect_error(
+    run_simulation(undeclared, 0),
+    "isn't declared",
+    class = "hammel_error_groups"
+  )
+  expect_identical(error$group, "education")
   expect_error(group_transition(data.frame(group_origin = "A", group_dest = "B", age_start = 0,
-    age_end = Inf, rate = 1)), "`origin` and `destination`")
+    age_end = Inf, rate = 1)), "origin and destination", class = "hammel_error_rates")
 })
 
 test_that("transition weights and custom weight functions are per dimension", {
@@ -393,9 +416,14 @@ test_that("each dimension's inheritance can follow its own calendar schedule", {
   expect_identical(kids$region[!early], out$persons$region[fathers][!early])
   expect_identical(kids$race, out$persons$race[fathers])
   gap <- tibble::tibble(time_start = .5, time_end = Inf, model = list(group_inheritance("mother")))
-  expect_error(run_simulation(set_groups(model, race = group(), region = group(
-    inheritance = gap)), 1),
-               "`region` inheritance model schedule has a coverage gap")
+  expect_error(
+    run_simulation(
+      set_groups(model, race = group(), region = group(inheritance = gap)),
+      1
+    ),
+    "`region` inheritance model schedule",
+    class = "hammel_error_coverage"
+  )
 })
 
 test_that("detailed unions replay transitions in every dimension", {
@@ -423,7 +451,10 @@ test_that("detailed unions replay transitions in every dimension", {
 test_that("transition settings and histories are checked against the declaration", {
   model <- transition_pair_model()
   moves <- data.frame(origin = "A", destination = "B", age_start = 0, age_end = Inf, rate = 1)
-  expect_error(group_transition(moves, group = c("race", "region")), "`group` must be NULL")
+  expect_error(
+    group_transition(moves, group = c("race", "region")),
+    class = "hammel_error_argument"
+  )
   # A process stored before the declaration resolves at simulation.
   early <- set_group_transition(hammel_model(), moves)
   expect_named(early$processes$group_transition, ".default")
@@ -438,15 +469,17 @@ test_that("transition settings and histories are checked against the declaration
   persons <- model$population$persons
   tx <- data.frame(person_id = 1, time = -1, origin = "B", destination = "A")
   expect_error(hammel_population(persons, end_time = 0, transitions = tx, groups = c("race", "region")),
-               "`group` column")
+               "group column", class = "hammel_error_population")
   expect_no_error(hammel_population(persons, end_time = 0, transitions = tx, groups = "race"))
   expect_error(hammel_population(persons, end_time = 0, transitions = transform(tx, group = "education"),
-                                 groups = c("race", "region")), "not declared: education")
+                                 groups = c("race", "region")),
+    "declared dimensions", class = "hammel_error_groups")
   expect_error(hammel_population(persons, end_time = 0,
     transitions = data.frame(person_id = 1, time = -1, group_origin = "B", group_dest = "A"),
-    groups = "race"), "`origin` and `destination`")
+    groups = "race"), "origin and destination",
+    class = "hammel_error_population")
   expect_error(hammel_population(persons, end_time = 0, transitions = transform(tx, group = "race")),
-               "require a declared group")
+               "need a declared group", class = "hammel_error_groups")
   expect_error(calculate_transition_rates(run_simulation(model, 0), c(0, 1),
     age_breaks = c(0, Inf),
                                           group = "education"), "must name one declared")
@@ -608,7 +641,7 @@ test_that("transition rates split by another dimension count only their own move
                 c("person_years", "transitions"))
   expect_equal(sum(ours$transitions), sum(out$transitions$group == "race"))
   expect_error(calculate_transition_rates(out, c(0, 4), age_breaks = c(0, Inf), by = "race", group = "race"),
-               "not by `race` in `by`")
+               "can't also be split", class = "hammel_error_argument")
 })
 
 test_that("durations by another dimension count from entering this dimension's category", {
@@ -645,7 +678,7 @@ test_that("summaries keep group dimension columns and errors name the dimensions
   expect_error(calculate_dissolution_rates(out, c(0, 3), c(0, Inf), by = "race"),
                "accepts \"race_w\", \"region_w\", \"race_h\", \"region_h\"")
   expect_error(calculate_mortality_rates(out, c(0, 3), c(0, Inf), by = "group"),
-               "not `group`")
+               "not \"group\"", class = "hammel_error_argument")
 })
 
 test_that("weight models use any dimension's variables", {
@@ -669,7 +702,8 @@ test_that("weight models use any dimension's variables", {
   expect_true(all(out$persons$region[match(movers, out$persons$person_id)] == "S"))
   expect_error(run_simulation(set_mortality(model, rates, weights =
     weight_model(~ ancestry_race_A,
-    c(ancestry_race_A = 1))), 0), "not available for this process: ancestry_race_A")
+    c(ancestry_race_A = 1))), 0), "can't use ancestry_race_A",
+    class = "hammel_error_specification")
   # Union variables by dimension: dissolutions only where regions differ.
   persons <- data.frame(person_id = 1:400, sex = rep(c("f", "m"), 200), birth_time = -30,
     death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_,
@@ -688,7 +722,7 @@ test_that("weight models use any dimension's variables", {
   expect_gt(sum(ended), 20)
   expect_true(all(out$unions$union_id[ended] > 100))
   expect_error(set_union_dissolution(couples, data.frame(dur_start = 0, dur_end = Inf, rate = .1),
-    weights = weight_model(~ partnered, c(partnered = 1))), "not available")
+    weights = weight_model(~ partnered, c(partnered = 1))), "can't use", class = "hammel_error_specification")
 })
 
 test_that("custom weight functions see every dimension in members and cells", {
@@ -811,13 +845,14 @@ test_that("pair effects, prohibitions and delta combine across dimensions as spe
     c("female_raceA:same_region" = 1, "female_raceB:same_region" = 2)))
   expect_equal(calculate_matching_utilities(x$internal, rep(0, 4), "B|S", x$labels), c(0, 0, 2, 2))
   expect_error(step2_tables(matching_model(~ female_race + same_region, c(same_region = 1))),
-               "coefficient names.*female_raceB")
+               "female_raceB", class = "hammel_error_specification")
   # Example 4: delta adds per combination.
   x <- step2_tables(age_gap_matching_model(0, 5,
     delta = list(race = c(B = .5), region = c(S = .2))))
   expect_equal(x$prepared$delta, c(0, .5, .2, .7))
   expect_error(step2_tables(age_gap_matching_model(0, 5,
-    delta = list(race = c(C = 1), region = c(S = .2)))), "categories of `race`")
+    delta = list(race = c(C = 1), region = c(S = .2)))), "categories of race",
+    class = "hammel_error_groups")
 })
 
 step2_model <- function(matching, father_matching = NULL, cohab = FALSE) {
@@ -979,7 +1014,7 @@ test_that("group_exogamy tables are validated", {
   # Dimensions are checked against the declaration at simulation.
   expect_error(run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
     group_exogamy = data.frame(caste_x = "A", caste_y = "B", log_odds = -1))), 0),
-    "`caste`, which is not a declared group dimension")
+    "caste, which isn't declared", class = "hammel_error_groups")
   # Rows naming absent categories are unused.
   x <- step2_tables(age_gap_matching_model(0, 5,
     group_exogamy = data.frame(race_x = c("A", "Z"), race_y = c("B", "A"), log_odds = c(-1, -9))))
@@ -999,12 +1034,18 @@ test_that("review regressions: absent-category schedules, dimensions named group
   pop$groups$race["categories"] <- list(NULL)
   model <- set_mortality(base(pop), data.frame(sex = c("m", "f"), race = "B", age_start = 0, age_end = Inf,
                                                rate = 1e8))
-  expect_error(run_simulation(model, 1, seed = 2),
-    "missing schedules for group\\(s\\): A")
+  expect_error(
+    run_simulation(model, 1, seed = 2),
+    "No rates for A",
+    class = "hammel_error_groups"
+  )
   calendar <- data.frame(sex = c("m", "f", "m", "f"), race = c("A", "A", "B", "B"), age_start = 0,
     age_end = Inf, rate = .01, time_start = c(-10, -10, 1, 1), time_end = c(1, 1, Inf, Inf))
-  expect_error(run_simulation(set_mortality(base(pop), calendar), 2, seed = 2),
-    "missing schedules.*A")
+  expect_error(
+    run_simulation(set_mortality(base(pop), calendar), 2, seed = 2),
+    "No rates for A",
+    class = "hammel_error_groups"
+  )
   # A dimension named `group` alongside another.
   set.seed(1)
   pop <- generate_uniform_population(200, groups = list(group = c(A = .5, B =

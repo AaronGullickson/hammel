@@ -211,7 +211,11 @@ test_that("future identities are checked against rates and categorical matching 
   expect_warning(matching <- matching_model(~ male_group, c(male_groupB = 0)), "male_group` are absorbed")
   model$processes$union_formation$matching <- matching
   # Declared categories include AB, so its coefficient is required.
-  expect_error(run_simulation(model, 0), "coefficient names.*male_groupAB")
+  expect_error(
+    run_simulation(model, 0),
+    "male_groupAB",
+    class = "hammel_error_specification"
+  )
   # Positive reference shares also infer identities; zero-only columns do not.
   model <- inheritance_test_model()
   model <- set_population(model, hammel_population(model$population$persons, end_time = 0, groups = if ("group" %in% names(model$population$persons)) "group"))
@@ -246,7 +250,11 @@ test_that("inheritance validates edited specifications and configuration", {
   expect_error(group_inheritance("other"), "method")
   expect_error(group_inheritance("custom"), "fun")
   expect_error(group_inheritance("hierarchy"), "order")
-  expect_error(group_inheritance("hierarchy", order = c("A", "A")), "unique")
+  expect_error(
+    group_inheritance("hierarchy", order = c("A", "A")),
+    "once",
+    class = "hammel_error_specification"
+  )
   expect_error(group_inheritance("mother", passing = 0.1), "hierarchy")
   for (passing in list(-1, 2, NA, "0", c(0, 1)))
     expect_error(group_inheritance("hierarchy", order = c("A", "B"), passing = passing), "passing")
@@ -378,4 +386,26 @@ test_that("fixed inheritance supports numeric categories and calendar switches",
   expect_identical(children$group, ifelse(children$birth_time < .5, "none", "primary"))
   model$groups$group$inheritance$model[[2]] <- group_inheritance("fixed", fixed_value = "other")
   expect_error(run_simulation(model, .1), "undeclared")
+})
+
+test_that("inheritance summaries report method-specific settings", {
+  result <- summary(
+    group_inheritance("hierarchy", order = c("B", "W"), passing = 0.05)
+  )
+  expect_s3_class(result, "summary.hammel_group_inheritance")
+  expect_identical(result$order, c("B", "W"))
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Order: B > W", text, fixed = TRUE)))
+  expect_true(any(grepl("Passing probability: 0.05", text, fixed = TRUE)))
+
+  result <- summary(group_inheritance("fixed", fixed_value = "none"))
+  expect_null(result$order)
+  expect_null(result$passing)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("Fixed value: none", text, fixed = TRUE)))
+  expect_identical(
+    inheritance_summary_lines(summary(group_inheritance("mother"))),
+    c(Method = "mother")
+  )
 })

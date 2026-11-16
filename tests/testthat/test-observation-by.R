@@ -80,13 +80,13 @@ test_that("transitions split by previous union and union type", {
 test_that("by is validated and rows follow the documented order", {
   pop <- by_history()
   expect_error(calculate_mortality_rates(pop, c(0, 40), c(0, Inf), by = "sex"),
-               "cannot split by \"sex\".*accepts \"group\", \"union_type\", \"previous_union\"")
+               "can't split by \"sex\"", class = "hammel_error_argument")
   expect_error(calculate_mortality_rates(pop, c(0, 40), c(0, Inf), by = c("group", "group")), "distinct")
   expect_error(
     calculate_mortality_rates(pop$persons, c(0, 40), c(0, Inf),
       by = "union_type"
     ),
-    "must be a hammel_population"
+    "must be a Hammel population"
   )
   expect_error(calculate_mortality_rates(pop, c(0, 40), c(0, Inf), use_detailed_previous_union = FALSE), "previous_union")
   x <- calculate_mortality_rates(pop, c(0, 20, 40), c(0, 30, Inf), by = c("union_type", "group"))
@@ -105,12 +105,12 @@ test_that("by is validated and rows follow the documented order", {
 test_that("observation inputs are validated before splitting", {
   expect_error(
     calculate_mortality_rates(list(1), c(0, 1), c(0, Inf)),
-    "must be a hammel_population"
+    "must be a Hammel population"
   )
   pop <- by_history()
   pop$persons$group <- NULL
   pop$groups <- NULL
   pop$transitions <- NULL
   expect_error(calculate_dissolution_rates(pop, c(0, 40), c(0, Inf), by = "group_w"),
-               "declared group dimension")
+               "declared dimension", class = "hammel_error_groups")
 })

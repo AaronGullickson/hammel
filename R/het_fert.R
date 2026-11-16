@@ -49,7 +49,7 @@
 #'   amount of variation in fertility. Zero indicates no variance.
 #' @param alpha Finite scalar in `[0,1]` that defines degree of inheritability.
 #'   Zero gives independent daughters; one copies maternal weights exactly.
-#' @return A `hammel_het_fert` specification for [enable_het_fert()].
+#' @return A `hammel_het_fert` specification for `enable_het_fert()`.
 #' @noRd
 het_fert <- function(cv, alpha) {
   model <- structure(list(cv = cv, alpha = alpha), class = "hammel_het_fert")
@@ -62,7 +62,7 @@ het_fert <- function(cv, alpha) {
 enable_het_fert <- function(model, hetfert) {
   check_model(model)
   if (is.null(model$processes$fertility)) {
-    stop("Hetfert requires a fertility process.", call. = FALSE)
+    abort_hammel("Hetfert requires a fertility process.", "internal")
   }
   validate_het_fert(hetfert)
   model$processes$fertility$hetfert <- hetfert
@@ -76,9 +76,9 @@ validate_het_fert <- function(model) {
     return(invisible(NULL))
   }
   if (!inherits(model, "hammel_het_fert") || !is.list(model)) {
-    stop(
+    abort_hammel(
       "`hetfert` must be NULL or a het_fert(cv, alpha) object.",
-      call. = FALSE
+      "internal"
     )
   }
   scalar <- function(x) {
@@ -86,10 +86,16 @@ validate_het_fert <- function(model) {
       is.finite(x)
   }
   if (!scalar(model$cv) || model$cv < 0) {
-    stop("`cv` must be a finite nonnegative numeric scalar.", call. = FALSE)
+    abort_hammel(
+      "`cv` must be a finite nonnegative numeric scalar.",
+      "internal"
+    )
   }
   if (!scalar(model$alpha) || model$alpha < 0 || model$alpha > 1) {
-    stop("`alpha` must be a finite numeric scalar in [0, 1].", call. = FALSE)
+    abort_hammel(
+      "`alpha` must be a finite numeric scalar in [0, 1].",
+      "internal"
+    )
   }
   invisible(model)
 }
@@ -103,12 +109,12 @@ validate_fertility_weights <- function(persons) {
     return(invisible(NULL))
   }
   if (!"sex" %in% names(persons) || anyNA(persons$sex)) {
-    stop(
+    abort_hammel(
       paste0(
         "Fertility weight validation requires nonmissing ",
         "`persons$sex` values."
       ),
-      call. = FALSE
+      "internal"
     )
   }
   w <- persons$hetfert
@@ -116,14 +122,14 @@ validate_fertility_weights <- function(persons) {
   # unused placeholder in male-only/empty histories, but not for women.
   if (!is.null(dim(w)) ||
         !(is.numeric(w) || (is.logical(w) && all(is.na(w))))) {
-    stop(
+    abort_hammel(
       "`persons$hetfert` must be a numeric column; male entries may be NA.",
-      call. = FALSE
+      "internal"
     )
   }
   female <- which(persons$sex == "f")
   if (any(!is.finite(w[female]) | w[female] <= 0)) {
-    stop(
+    abort_hammel(
       paste(
         paste0(
           "Female `persons$hetfert` values must be finite and ",
@@ -131,7 +137,7 @@ validate_fertility_weights <- function(persons) {
         ),
         "Remove the column to draw fresh weights for all women."
       ),
-      call. = FALSE
+      "internal"
     )
   }
   invisible(NULL)

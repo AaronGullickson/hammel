@@ -45,35 +45,56 @@ set_process <- function(model, process) {
 # Validate and store a process without user-facing advisory warnings; used by
 # set_process() and by run_simulation()'s re-validation of edited
 # specifications.
-attach_process <- function(model, process) {
-  check_model(model)
+attach_process <- function(model, process, call = rlang::caller_env()) {
+  check_model(model, call = call)
   if (!inherits(process, "hammel_process") || !is.list(process)) {
-    stop("`process` must be a hammel_process object.", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg process} must be a Hammel process.",
+        "x" = "It is {describe_value(process)}.",
+        "i" = paste(
+          "Create processes with {.fn mortality}, {.fn fertility},",
+          "{.fn union_formation}, {.fn union_dissolution} or",
+          "{.fn group_transition}."
+        )
+      ),
+      "specification",
+      argument = "process",
+      call = call
+    )
   }
   name <- process$name
   if (!is.character(name) || length(name) != 1L || is.na(name) ||
         !nzchar(trimws(name))) {
-    stop("`name` must be a single nonempty string.", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg process} must have a process name.",
+        "x" = "Its {.field name} is {describe_value(name)}."
+      ),
+      "specification",
+      argument = "process",
+      call = call
+    )
   }
   if (name %in% c("mortality", "fertility")) {
-    validate_rates(process$rates, mortality = name == "mortality")
-    validate_process_weights(process$weights, "person")
+    validate_rates(process$rates, mortality = name == "mortality", call = call)
+    validate_process_weights(process$weights, "person", call = call)
     if (name == "fertility") {
-      validate_birth_interval(process$birth_interval)
+      validate_birth_interval(process$birth_interval, call = call)
       if (!"ffab" %in% names(process)) {
         process$ffab <- 0.4886
       }
-      validate_ffab(process$ffab)
+      validate_ffab(process$ffab, call = call)
       validate_het_fert(process$hetfert)
       # Specifications saved while midpoint compensation existed (before D101
       # became the only method) may carry a spacing_method field.
       if (identical(process$spacing_method, "midpoint")) {
-        warning(
-          paste(
-            '`spacing_method = "midpoint"` is no longer available;',
-            "cell-accounted fertility is used."
+        warn_hammel(
+          c(
+            '{.code spacing_method = "midpoint"} is no longer available.',
+            "i" = "Cell-accounted fertility is used instead."
           ),
-          call. = FALSE
+          "deprecated"
         )
       }
       process$spacing_method <- NULL
@@ -81,9 +102,9 @@ attach_process <- function(model, process) {
     process$rates <- tibble::as_tibble(process$rates)
   }
   if (name == "union_formation") {
-    validate_union_formation(process)
-    validate_process_weights(process$weights_conversion, "union")
-    validate_process_weights(process$weights, "person")
+    validate_union_formation(process, call = call)
+    validate_process_weights(process$weights_conversion, "union", call = call)
+    validate_process_weights(process$weights, "person", call = call)
     if (!is.null(process$rates)) {
       process$rates <- tibble::as_tibble(process$rates)
     }
@@ -92,14 +113,14 @@ attach_process <- function(model, process) {
     }
   }
   if (name == "group_transition") {
-    validate_group_transition(process)
-    validate_process_weights(process$weights, "transition")
+    validate_group_transition(process, call = call)
+    validate_process_weights(process$weights, "transition", call = call)
     process$rates <- tibble::as_tibble(process$rates)
-    return(store_transition_process(model, process))
+    return(store_transition_process(model, process, call = call))
   }
   if (name == "union_dissolution") {
-    validate_union_dissolution(process)
-    validate_process_weights(process$weights, "union")
+    validate_union_dissolution(process, call = call)
+    validate_process_weights(process$weights, "union", call = call)
     process$rates <- tibble::as_tibble(process$rates)
   }
   model$processes[name] <- list(process)

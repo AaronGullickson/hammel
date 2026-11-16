@@ -98,7 +98,17 @@
 #' )
 weight_model <- function(formula = NULL, coefficients = numeric(), fun = NULL) {
   if (is.null(formula) == is.null(fun)) {
-    stop("Supply exactly one of `formula` or `fun`.", call. = FALSE)
+    abort_hammel(
+      c(
+        "Supply exactly one of {.arg formula} or {.arg fun}.",
+        "x" = if (is.null(formula)) {
+          "Neither was supplied."
+        } else {
+          "Both were supplied."
+        }
+      ),
+      "argument"
+    )
   }
   model <- structure(
     list(formula = formula, coefficients = coefficients, fun = fun),
@@ -106,6 +116,53 @@ weight_model <- function(formula = NULL, coefficients = numeric(), fun = NULL) {
   )
   validate_weight_model(model)
   model
+}
+
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a weight model
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_weight_model"`
+#'
+#' @param object A `hammel_weight_model` object returned by [weight_model()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_weight_model`
+#' containing:
+#' \describe{
+#'   \item{custom}{Whether the model uses a custom function rather than a
+#'     formula.}
+#'   \item{formula}{The weight formula, or `NULL` for a custom function.}
+#'   \item{coefficients}{The named log hazard ratios of a formula model.}
+#' }
+#'
+#' `print()` also shows each coefficient's hazard ratio, `exp(coefficient)`.
+#'
+#' @seealso [weight_model()]
+#' @examples
+#' partnered_mortality <- weight_model(~partnered, c(partnered = log(0.9)))
+#' summary(partnered_mortality)
+#' @export
+summary.hammel_weight_model <- function(object, ...) {
+  structure(
+    list(
+      custom = !is.null(object$fun),
+      formula = object$formula,
+      coefficients = object$coefficients
+    ),
+    class = "summary.hammel_weight_model"
+  )
+}
+
+#' @rdname summary.hammel_weight_model
+#' @param x A `summary.hammel_weight_model` object returned by
+#'   `summary.hammel_weight_model()`.
+#' @export
+print.summary.hammel_weight_model <- function(x, ...) {
+  print_model_summary("Weight model", x)
 }
 
 # INTERNAL CONSTANTS -------------------------------------------------------
@@ -135,6 +192,18 @@ weight_variable_codes <- c(
 )
 
 # HELPER FUNCTIONS ---------------------------------------------------------
+
+# Lines describing a weight model summary; see model_summary_lines().
+weight_summary_lines <- function(x) {
+  if (x$custom) {
+    return(c(Type = "custom function"))
+  }
+  ratios <- paste("hazard ratio", signif(exp(x$coefficients), 4))
+  c(
+    Formula = deparse1(x$formula),
+    Coefficients = format_named_values(x$coefficients, ratios)
+  )
+}
 
 # Built-in weight variables of a process type, with engine codes and, for
 # categorical variables, their levels (the first is the reference) and the
@@ -258,41 +327,80 @@ weight_group_name_possible <- function(name, type) {
       (type == "transition" && name == "destination")
 }
 
-validate_weight_model <- function(model) {
+validate_weight_model <- function(model, call = rlang::caller_env()) {
   if (!inherits(model, "hammel_weight_model")) {
-    stop("`weights` must be created with weight_model().", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg weights} must be a weight model.",
+        "x" = "It is {describe_value(model)}.",
+        "i" = "Create one with {.fn weight_model}."
+      ),
+      "specification",
+      argument = "weights",
+      call = call
+    )
   }
   if (!is.null(model$fun)) {
     if (!is.function(model$fun)) {
-      stop("`fun` must be a function.", call. = FALSE)
+      abort_hammel(
+        c(
+          "{.arg fun} must be a function.",
+          "x" = "It is {describe_value(model$fun)}."
+        ),
+        "specification",
+        argument = "fun",
+        call = call
+      )
     }
     return(invisible(model))
   }
   formula <- model$formula
   if (!inherits(formula, "formula") || length(formula) != 2L) {
-    stop("Use a one-sided weight formula.", call. = FALSE)
+    abort_hammel(
+      c(
+        paste(
+          "{.arg formula} must be a one-sided formula, such as",
+          "{.code ~ partnered}."
+        ),
+        "x" = "It is {describe_value(formula)}."
+      ),
+      "specification",
+      argument = "formula",
+      call = call
+    )
   }
   tt <- stats::terms(formula)
   if (attr(tt, "intercept") != 1L) {
-    stop(
-      "Weight formulas cannot remove the intercept; it has no effect.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "Weight formulas can't remove the intercept.",
+        "i" = "Weights are normalized within each cell, so it has no effect."
+      ),
+      "specification",
+      argument = "formula",
+      call = call
     )
   }
   if (!is.null(attr(tt, "offset"))) {
-    stop("Weight formula offsets are not supported.", call. = FALSE)
+    abort_hammel(
+      "Weight formulas can't contain offsets.",
+      "specification",
+      argument = "formula",
+      call = call
+    )
   }
   factors <- attr(tt, "factors")
   if (length(factors) && any(!rownames(factors) %in% all.vars(formula))) {
-    stop(
-      paste(
-        "Weight formulas use variables and their interactions only;",
-        paste0(
-          "use a custom function (`fun`) for transformations ",
-          "such as I()."
-        )
+    terms <- rownames(factors)[!rownames(factors) %in% all.vars(formula)]
+    abort_hammel(
+      c(
+        "Weight formulas can use only variables and their interactions.",
+        "x" = "Transformed terms: {.code {terms}}.",
+        "i" = "Use a custom function, {.arg fun}, for transformations."
       ),
-      call. = FALSE
+      "specification",
+      argument = "formula",
+      call = call
     )
   }
   coefficients <- model$coefficients
@@ -301,12 +409,18 @@ validate_weight_model <- function(model) {
            (is.null(names(coefficients)) || anyNA(names(coefficients)) ||
               any(!nzchar(names(coefficients))) ||
               anyDuplicated(names(coefficients))))) {
-    stop(
-      paste0(
-        "`coefficients` must be a finite numeric vector ",
-        "with unique nonempty names."
+    abort_hammel(
+      c(
+        "{.arg coefficients} must be finite numbers with unique names.",
+        "x" = "It is {describe_value(coefficients)}.",
+        "i" = paste(
+          "Name each coefficient by its model-matrix column, such as",
+          "{.val raceB}."
+        )
       ),
-      call. = FALSE
+      "specification",
+      argument = "coefficients",
+      call = call
     )
   }
   invisible(model)
@@ -318,7 +432,12 @@ validate_weight_model <- function(model) {
 # 2 = all levels) and checks the names against model.matrix().
 # Without `context` (before the declaration is known), returns NULL when the
 # formula uses variables that may be group variables, deferring the check.
-weight_design <- function(model, type, context = NULL) {
+weight_design <- function(
+  model,
+  type,
+  context = NULL,
+  call = rlang::caller_env()
+) {
   formula <- model$formula
   vars <- all.vars(formula)
   info <- lapply(
@@ -333,13 +452,23 @@ weight_design <- function(model, type, context = NULL) {
     return(NULL)
   }
   if (length(bad)) {
-    stop(
-      "Weight variables not available for this process: ", paste(
-        bad,
-        collapse = ", "
+    process <- c(
+      person = "person processes",
+      transition = "group transitions",
+      union = "union processes"
+    )[[type]]
+    abort_hammel(
+      c(
+        "Weight formulas for {process} can't use {.field {bad}}.",
+        "i" = paste(
+          "See {.help hammel::weight_model} for the variables each process",
+          "can use. Group variables are named by declared dimensions."
+        )
       ),
-      ".",
-      call. = FALSE
+      "specification",
+      argument = "formula",
+      variables = bad,
+      call = call
     )
   }
   levels <- Filter(Negate(is.null), lapply(info, `[[`, "levels"))
@@ -398,29 +527,37 @@ weight_design <- function(model, type, context = NULL) {
   # Defensive: the decoding follows R's coding rules, so names should agree.
   if (!identical(names_found, expected)) {
     # nocov start
-    stop(
-      paste0(
-        "This weight formula structure is not supported; ",
-        "use a custom function (`fun`)."
+    abort_hammel(
+      c(
+        "This weight formula structure isn't supported.",
+        "i" = "Use a custom function, {.arg fun}."
       ),
-      call. = FALSE
+      "specification",
+      argument = "formula",
+      call = call
     )
   } # nocov end
   coefficients <- model$coefficients
   missing <- setdiff(expected, names(coefficients))
   extra <- setdiff(names(coefficients), expected)
   if (length(missing) || length(extra)) {
-    stop(
-      "Weight coefficients must be named for each model column: ",
-      paste(expected, collapse = ", "),
-      if (length(missing)) {
-        paste0("; missing ", paste(missing, collapse = ", "))
-      },
-      if (length(extra)) paste0("; unknown ", paste(extra, collapse = ", ")),
-      ".",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg coefficients} must be named for each model column.",
+        "x" = if (length(missing)) "Missing: {.val {missing}}.",
+        "x" = if (length(extra)) "Unknown: {.val {extra}}.",
+        "i" = if (length(expected)) {
+          "The model columns are {.val {expected}}."
+        } else {
+          "The formula has no model columns, so give no coefficients."
+        }
+      ),
+      "specification",
+      argument = "coefficients",
+      call = call
     )
   }
+
   for (k in seq_along(columns)) {
     columns[[k]]$coefficient <- unname(coefficients[columns[[k]]$name])
   }
@@ -431,27 +568,36 @@ weight_design <- function(model, type, context = NULL) {
 # A schedule is a tibble with time_start, time_end and a model list column (as
 # for matching and inheritance models); its models must all be formulas or all
 # custom functions.
-validate_process_weights <- function(weights, type) {
+validate_process_weights <- function(
+  weights,
+  type,
+  call = rlang::caller_env()
+) {
   if (is.null(weights)) {
     return(invisible(NULL))
   }
-  one <- function(model) {
-    validate_weight_model(model)
+  one <- function(model, call) {
+    validate_weight_model(model, call = call)
     if (is.null(model$fun)) {
-      weight_design(model, type)
+      weight_design(model, type, call = call)
     }
     invisible(model)
   }
-  validate_model_argument(weights, one, "weights")
+  validate_model_argument(weights, one, "weights", call = call)
   if (is_model_schedule(weights)) {
     kinds <- vapply(weights$model, function(m) is.null(m$fun), logical(1))
     if (length(unique(kinds)) > 1L) {
-      stop(
-        paste0(
-          "A weight schedule's models must all be formulas ",
-          "or all be custom functions."
+      abort_hammel(
+        c(
+          paste(
+            "The models in a {.arg weights} schedule must all be formulas or",
+            "all be custom functions."
+          ),
+          "x" = "Custom functions in {format_rows(which(!kinds))}."
         ),
-        call. = FALSE
+        "specification",
+        argument = "weights",
+        call = call
       )
     }
   }
@@ -480,17 +626,16 @@ warn_cancelled_weight_terms <- function(weights, strata, process) {
     }
   }
   for (term in cancelled) {
-    warning(
-      sprintf(
-        paste(
-          "The %s weight term `%s` has no effect: the input rates already",
-          paste0(
-            paste0("stratify by it, and weights are ", "normalized within "),
-            "each cell."
-          )
-        ), process, term
+    warn_hammel(
+      c(
+        "The {process} weight term {.code {term}} has no effect.",
+        "i" = paste(
+          "The input rates already stratify by it, and weights are",
+          "normalized within each cell."
+        )
       ),
-      call. = FALSE
+      "no_effect",
+      term = term
     )
   }
   invisible(length(cancelled) > 0L)
@@ -533,7 +678,13 @@ weight_strata <- function(process, rates, group = NULL) {
 # Engine specification of a weight model: NULL, a custom function, or columns
 # of (variable code, level code, component) factors with coefficients.
 # `context` is described at weight_variable().
-prepare_weight_model <- function(weights, type, process, context) {
+prepare_weight_model <- function(
+  weights,
+  type,
+  process,
+  context,
+  call = rlang::caller_env()
+) {
   if (is_model_schedule(weights)) {
     rows <- order(weights$time_start)
     return(
@@ -546,15 +697,22 @@ prepare_weight_model <- function(weights, type, process, context) {
           weights$model[rows], prepare_weight_model,
           type = type,
           process = process,
-          context = context
+          context = context,
+          call = call
         )
       )
     )
   }
   if (!is.null(weights$fun)) {
-    return(list(custom = TRUE, fun = weights$fun, process = process))
+    return(
+      list(
+        custom = TRUE,
+        fun = checked_weight_function(weights$fun, process, call = call),
+        process = process
+      )
+    )
   }
-  columns <- weight_design(weights, type, context)
+  columns <- weight_design(weights, type, context, call = call)
   active <- Filter(function(x) x$coefficient != 0, columns)
   encode <- function(f) {
     info <- weight_variable(f$var, type, context)
@@ -576,4 +734,35 @@ prepare_weight_model <- function(weights, type, process, context) {
       active, function(x) do.call(rbind, lapply(x$factors, encode))
     )
   )
+}
+
+# Wrap a custom weight function so the engine only receives a plain numeric
+# vector. Other types would fail native conversion; the engine checks the
+# vector's length and values.
+checked_weight_function <- function(
+  fun,
+  process,
+  call = rlang::caller_env()
+) {
+  force(fun)
+  force(process)
+  function(members, bin) {
+    result <- fun(members, bin)
+    if (!is.numeric(result) || !is.null(dim(result))) {
+      abort_hammel(
+        c(
+          "A custom {process} weight function must return log weights.",
+          "x" = "It returned {describe_value(result)}.",
+          "i" = paste(
+            "Return a numeric vector with one log weight per row of",
+            "{.code members}."
+          )
+        ),
+        "runtime",
+        process = process,
+        call = call
+      )
+    }
+    result
+  }
 }

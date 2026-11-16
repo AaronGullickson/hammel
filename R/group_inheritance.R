@@ -103,7 +103,70 @@ group_inheritance <- function(
   model
 }
 
+# SUMMARY AND PRINT FUNCTIONS ----------------------------------------------
+
+#' Summarize a group inheritance model
+#'
+#' @description
+#'
+#' Summary method for class `"hammel_group_inheritance"`
+#'
+#' @param object A `hammel_group_inheritance` object returned by
+#'   [group_inheritance()].
+#' @param ... Additional arguments, currently unused.
+#'
+#' @return
+#' `summary()` returns an object of class `summary.hammel_group_inheritance`
+#' containing:
+#' \describe{
+#'   \item{method}{The inheritance method.}
+#'   \item{order}{For `"hierarchy"`, the group labels, highest-ranked first;
+#'     otherwise `NULL`.}
+#'   \item{passing}{For `"hierarchy"`, the probability of reversing the
+#'     order; otherwise `NULL`.}
+#'   \item{fixed_value}{For `"fixed"`, the category every newborn receives;
+#'     otherwise `NULL`.}
+#' }
+#'
+#' @seealso [group_inheritance()], [group()]
+#' @examples
+#' summary(group_inheritance("hierarchy", order = c("B", "W"), passing = 0.05))
+#' @export
+summary.hammel_group_inheritance <- function(object, ...) {
+  hierarchy <- identical(object$method, "hierarchy")
+  structure(
+    list(
+      method = object$method,
+      order = if (hierarchy) object$order else NULL,
+      passing = if (hierarchy) object$passing else NULL,
+      fixed_value = object$fixed_value
+    ),
+    class = "summary.hammel_group_inheritance"
+  )
+}
+
+#' @rdname summary.hammel_group_inheritance
+#' @param x A `summary.hammel_group_inheritance` object returned by
+#'   `summary.hammel_group_inheritance()`.
+#' @export
+print.summary.hammel_group_inheritance <- function(x, ...) {
+  print_model_summary("Group inheritance model", x)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
+
+# Lines describing an inheritance model summary; see model_summary_lines().
+inheritance_summary_lines <- function(x) {
+  lines <- c(Method = x$method)
+  if (!is.null(x$order)) {
+    lines[["Order"]] <- paste(x$order, collapse = " > ")
+    lines[["Passing probability"]] <- format(x$passing)
+  }
+  if (!is.null(x$fixed_value)) {
+    lines[["Fixed value"]] <- format(x$fixed_value)
+  }
+  lines
+}
 
 inheritance_methods <- function() {
   c(
@@ -112,47 +175,81 @@ inheritance_methods <- function() {
   )
 }
 
-normalize_group_inheritance <- function(model) {
+normalize_group_inheritance <- function(model, call = rlang::caller_env()) {
   if (is_model_schedule(model)) {
-    validate_model_argument(model, validate_group_inheritance, "inheritance")
+    validate_model_argument(
+      model, validate_group_inheritance, "inheritance",
+      call = call
+    )
     return(normalize_model_argument(model))
   }
   if (is.null(model)) {
     model <- group_inheritance()
   }
   if (is.character(model)) {
+    if (length(model) != 1L || is.na(model) ||
+          !model %in% inheritance_methods()) {
+      abort_inheritance_method(model, call = call)
+    }
     model <- group_inheritance(method = model)
   }
-  validate_group_inheritance(model)
+  validate_group_inheritance(model, call = call)
   model
 }
 
-validate_group_inheritance <- function(model) {
+# Report an unknown inheritance method.
+abort_inheritance_method <- function(method, call = rlang::caller_env()) {
+  methods <- inheritance_methods()
+  abort_hammel(
+    c(
+      "The inheritance method must be one of {.or {.val {methods}}}.",
+      "x" = "It is {describe_value(method)}."
+    ),
+    "specification",
+    argument = "method",
+    call = call
+  )
+}
+
+validate_group_inheritance <- function(model, call = rlang::caller_env()) {
   # Missing inheritance fields use the current default.
   if (is.null(model)) {
     return(invisible(model))
   }
   if (!inherits(model, "hammel_group_inheritance") || !is.list(model)) {
-    stop(
-      "`inheritance` must be created with group_inheritance().",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg inheritance} must be an inheritance rule.",
+        "x" = "It is {describe_value(model)}.",
+        "i" = paste(
+          "Create one with {.fn group_inheritance}, or give a method name",
+          "such as {.val mother}."
+        )
+      ),
+      "specification",
+      argument = "inheritance",
+      call = call
     )
   }
-  if (!is.character(model$method) || length(model$method) != 1L ||
-        is.na(model$method) ||
-        !model$method %in% inheritance_methods()) {
-    stop("Invalid group inheritance method.", call. = FALSE)
+  method <- model$method
+  if (!is.character(method) || length(method) != 1L || is.na(method) ||
+        !method %in% inheritance_methods()) {
+    abort_inheritance_method(method, call = call)
   }
-  for (field in "order") {
-    value <- model[[field]]
-    if (!is.null(value)) {
-      check_groups(tibble::tibble(group = value), field)
-      if (anyDuplicated(as.character(value))) {
-        stop(
-          sprintf("Inheritance `%s` must have unique labels.", field),
-          call. = FALSE
-        )
-      }
+  value <- model$order
+  if (!is.null(value)) {
+    check_group_labels(value, "order", call = call)
+    if (anyDuplicated(as.character(value))) {
+      repeated <- unique(as.character(value)[duplicated(as.character(value))])
+      abort_hammel(
+        c(
+          "{.arg order} must list each category once.",
+          "x" = "Repeated: {.val {repeated}}."
+        ),
+        "specification",
+        argument = "order",
+        call = call
+      )
     }
   }
   passing <- model$passing
@@ -161,29 +258,60 @@ validate_group_inheritance <- function(model) {
         !is.finite(passing) ||
         passing < 0 ||
         passing > 1) {
-    stop(
-      "`passing` must be a finite probability between 0 and 1.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "{.arg passing} must be a single probability between 0 and 1.",
+        "x" = "It is {describe_value(passing)}."
+      ),
+      "argument",
+      argument = "passing",
+      call = call
     )
   }
-  if (model$method == "hierarchy") {
+  unused <- function(argument, applies) {
+    abort_hammel(
+      c(
+        "{.arg {argument}} applies only to {applies} inheritance.",
+        "x" = "The method is {.val {method}}."
+      ),
+      "specification",
+      argument = argument,
+      call = call
+    )
+  }
+  if (method == "hierarchy") {
     if (!length(model$order)) {
-      stop("Hierarchy inheritance requires an `order` vector.", call. = FALSE)
+      abort_hammel(
+        c(
+          "Hierarchy inheritance needs an {.arg order}.",
+          "i" = "List the categories from highest to lowest rank."
+        ),
+        "specification",
+        argument = "order",
+        call = call
+      )
     }
-  } else if (!is.null(model$order) || passing != 0) {
-    stop(
-      "`order` and nonzero `passing` apply only to hierarchy inheritance.",
-      call. = FALSE
-    )
+  } else if (!is.null(model$order)) {
+    unused("order", "hierarchy")
+  } else if (passing != 0) {
+    unused("passing", "hierarchy")
   }
-  if (model$method == "custom") {
+  if (method == "custom") {
     if (!is.function(model$fun)) {
-      stop("Custom inheritance requires a function in `fun`.", call. = FALSE)
+      abort_hammel(
+        c(
+          "Custom inheritance needs a function in {.arg fun}.",
+          "x" = "It is {describe_value(model$fun)}."
+        ),
+        "specification",
+        argument = "fun",
+        call = call
+      )
     }
   } else if (!is.null(model$fun)) {
-    stop("`fun` applies only to custom inheritance.", call. = FALSE)
+    unused("fun", "custom")
   }
-  if (model$method == "fixed") {
+  if (method == "fixed") {
     value <- model$fixed_value
     if (!(is.character(value) || is.numeric(value)) || is.complex(value) ||
           !is.null(dim(value)) ||
@@ -191,16 +319,18 @@ validate_group_inheritance <- function(model) {
           anyNA(value) ||
           !nzchar(trimws(as.character(value))) ||
           (is.numeric(value) && !is.finite(value))) {
-      stop(
-        paste0(
-          "Fixed inheritance requires one nonmissing category in ",
-          "`fixed_value`."
+      abort_hammel(
+        c(
+          "Fixed inheritance needs one category in {.arg fixed_value}.",
+          "x" = "It is {describe_value(value)}."
         ),
-        call. = FALSE
+        "specification",
+        argument = "fixed_value",
+        call = call
       )
     }
   } else if (!is.null(model$fixed_value)) {
-    stop("`fixed_value` applies only to fixed inheritance.", call. = FALSE)
+    unused("fixed_value", "fixed")
   }
   invisible(model)
 }
@@ -228,8 +358,13 @@ extend_identity_groups <- function(values, additions) {
 # Engine form of one dimension's inheritance rule. `values` are the
 # dimension's categories and `components` its ancestry columns (categories
 # with shares, then unknown), empty when ancestry is not tracked.
-prepare_group_inheritance <- function(model, values, components = character()) {
-  model <- normalize_group_inheritance(model)
+prepare_group_inheritance <- function(
+  model,
+  values,
+  components = character(),
+  call = rlang::caller_env()
+) {
+  model <- normalize_group_inheritance(model, call = call)
   labels <- as.character(values)
   fixed <- if (model$method == "fixed") {
     match(as.character(model$fixed_value), labels) - 1L
@@ -237,12 +372,19 @@ prepare_group_inheritance <- function(model, values, components = character()) {
     -1L
   }
   if (is.na(fixed)) {
-    stop(
-      paste0(
-        "Fixed inheritance `fixed_value` is an undeclared ",
-        "group identity; declare it in group(categories = ...)."
+    fixed_value <- model$fixed_value
+    abort_hammel(
+      c(
+        "Fixed inheritance gives newborns an undeclared category.",
+        "x" = "{.arg fixed_value} is {.val {fixed_value}}.",
+        "i" = paste(
+          "Declare it with {.code group(categories = ...)}. Categories are",
+          "{.val {labels}}."
+        )
       ),
-      call. = FALSE
+      "groups",
+      categories = as.character(fixed_value),
+      call = call
     )
   }
   ranks <- match(labels, as.character(model$order)) - 1L
@@ -278,16 +420,28 @@ prepare_group_inheritance <- function(model, values, components = character()) {
           length(result) != 1L ||
           anyNA(result) ||
           (is.numeric(result) && !is.finite(result))) {
-      stop(
-        "Custom inheritance must return one nonmissing group identity.",
-        call. = FALSE
+      abort_hammel(
+        c(
+          "A custom inheritance function must return one category.",
+          "x" = "It returned {describe_value(result)}."
+        ),
+        "runtime",
+        process = "inheritance",
+        call = call
       )
     }
     code <- match(as.character(result), labels) - 1L
     if (is.na(code)) {
-      stop(
-        "Custom inheritance returned an undeclared group identity.",
-        call. = FALSE
+      abort_hammel(
+        c(
+          "A custom inheritance function returned an undeclared category.",
+          "x" = "It returned {.val {result}}.",
+          "i" = "Declared categories are {.val {labels}}."
+        ),
+        "runtime",
+        process = "inheritance",
+        call = call,
+        categories = as.character(result)
       )
     }
     as.integer(code)

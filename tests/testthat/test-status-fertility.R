@@ -30,8 +30,16 @@ test_that("conditional fertility validates labels, completeness and per-status b
 
 test_that("on-demand rejects status schedules, rate overall warns exactly once", {
   model <- set_fertility(make_model(), status_rates())
-  expect_error(run_simulation(model, 0), "overall fertility schedule")
-  expect_error(run_simulation(model, 1), "overall fertility schedule")
+  expect_error(
+    run_simulation(model, 0),
+    "without union_type",
+    class = "hammel_error_specification"
+  )
+  expect_error(
+    run_simulation(model, 1),
+    "without union_type",
+    class = "hammel_error_specification"
+  )
   model <- make_rate_model(1, search_rate = 0)
   model <- set_fertility(model, data.frame(age_start = 15, age_end = 50, rate = 20),
                          birth_interval = 0)
@@ -42,11 +50,15 @@ test_that("on-demand rejects status schedules, rate overall warns exactly once",
     invokeRestart("muffleWarning")
   })
   expect_length(warnings, 1)
-  expect_match(warnings, "overall fertility schedule.*union_type")
+  expect_match(warnings, "one fertility schedule")
   expect_gt(count_run_events(result, "births"), 0)
   expect_true(all(is.na(result$persons$father_id)))
   expect_equal(nrow(result$unions), 0)
-  expect_warning(run_simulation(model, 0), "overall fertility schedule")
+  expect_warning(
+    run_simulation(model, 0),
+    "one fertility schedule",
+    class = "hammel_warning_no_effect"
+  )
 })
 
 test_that("unpartnered births select fathers without triggering unions", {

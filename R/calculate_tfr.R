@@ -55,9 +55,11 @@
 #' # TFR stratified by union type
 #' calculate_tfr(usa_2000_fertility_union)
 calculate_tfr <- function(rates) {
+  # Errors raised while summarizing each stratum name this function.
+  call <- rlang::current_env()
   if (inherits(rates, "hammel_process")) {
     if (!identical(rates$name, "fertility")) {
-      stop("TFR requires a fertility process.", call. = FALSE)
+      abort_process_kind("fertility")
     }
     rates <- rates$rates
   }
@@ -67,13 +69,13 @@ calculate_tfr <- function(rates) {
   check_columns(rates, c("age_start", "age_end"), "rates")
   if (!"rate_fertility" %in% names(rates)) {
     if (!"rate" %in% names(rates)) {
-      stop("Supply `rate_fertility` or fertility `rate`.", call. = FALSE)
+      abort_rate_column(c("rate_fertility", "rate"))
     }
     rates$rate_fertility <- rates$rate
   }
   check_groups(rates, "rates")
   if (!nrow(rates)) {
-    stop("A rate table needs at least one age band.", call. = FALSE)
+    abort_no_bands()
   }
   unknown <- attr(rates, "unassigned_births")
   if ("sex" %in% names(rates)) {
@@ -82,12 +84,14 @@ calculate_tfr <- function(rates) {
   }
   check_numeric_column(rates$age_start, "rates$age_start")
   if (!is.numeric(rates$age_end) || anyNA(rates$age_end)) {
-    stop(
-      paste0(
-        "`age_end` must contain numeric age boundaries without ",
-        "missing values."
+    abort_hammel(
+      c(
+        "Column {.field age_end} of {.arg rates} must contain numbers.",
+        "x" = "It is {describe_value(rates$age_end)}.",
+        "i" = "Use {.code Inf} for an open-ended band."
       ),
-      call. = FALSE
+      "table",
+      argument = "rates$age_end"
     )
   }
   check_numeric_column(
@@ -95,32 +99,23 @@ calculate_tfr <- function(rates) {
     missing = TRUE
   )
   if (any(rates$rate_fertility < 0, na.rm = TRUE)) {
-    stop("ASFRs must be nonnegative.", call. = FALSE)
+    check_nonnegative(rates$rate_fertility, "rates$rate_fertility")
   }
   if (any(
         !is.finite(rates$age_end) & rates$rate_fertility != 0,
         na.rm = TRUE
       )) {
-    warning(
-      paste0(
-        "TFR omits an open age band with non-zero ",
-        "fertility; TFR is underestimated over the full age range."
-      ),
-      call. = FALSE
-    )
+    warn_open_fertility_band("TFR")
   }
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
   groups <- summary_strata(rates)
   if (!nrow(rates)) {
-    stop(
-      "TFR needs at least one female age band with a finite end.",
-      call. = FALSE
-    )
+    abort_no_finite_bands("TFR")
   }
   tables <- lapply(
     summary_rows(rates), function(rows) {
       r <- rates[rows, , drop = FALSE]
-      check_summary_intervals(r, strata = groups)
+      check_summary_intervals(r, strata = groups, call = call)
       key <- r[1, groups, drop = FALSE]
       cbind(
         key, data.frame(
@@ -141,9 +136,11 @@ calculate_tfr <- function(rates) {
 #' @order 2
 #' @export
 calculate_patfr <- function(rates) {
+  # Errors raised while summarizing each stratum name this function.
+  call <- rlang::current_env()
   if (inherits(rates, "hammel_process")) {
     if (!identical(rates$name, "fertility")) {
-      stop("PATFR requires a fertility process.", call. = FALSE)
+      abort_process_kind("fertility")
     }
     rates <- rates$rates
   }
@@ -152,13 +149,13 @@ calculate_patfr <- function(rates) {
   )
   if (!"rate_fertility" %in% names(rates)) {
     if (!"rate" %in% names(rates)) {
-      stop("Supply `rate_fertility` or fertility `rate`.", call. = FALSE)
+      abort_rate_column(c("rate_fertility", "rate"))
     }
     rates$rate_fertility <- rates$rate
   }
   check_groups(rates, "rates")
   if (!nrow(rates)) {
-    stop("A rate table needs at least one age band.", call. = FALSE)
+    abort_no_bands()
   }
   unknown <- attr(rates, "unassigned_births")
   if ("sex" %in% names(rates)) {
@@ -169,9 +166,16 @@ calculate_patfr <- function(rates) {
   if (!is.numeric(rates$age_end) || !is.null(dim(rates$age_end)) ||
         anyNA(rates$age_end) ||
         any(rates$age_start < 0 | rates$age_end <= rates$age_start)) {
-    stop(
-      "Age bands need nonnegative starts and greater ends, possibly Inf.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        paste(
+          "Age bands in {.arg rates} must have nonnegative starts and",
+          "greater ends."
+        ),
+        "i" = "Use {.code Inf} for an open-ended band."
+      ),
+      "rates",
+      argument = "rates"
     )
   }
   check_numeric_column(rates$parity_start, "rates$parity_start")
@@ -183,12 +187,16 @@ calculate_patfr <- function(rates) {
         ) ||
         any(end <= rates$parity_start) ||
         any(is.finite(end) & end != floor(end))) {
-    stop(
-      paste0(
-        "Parity bands need nonnegative integer starts and ",
-        "greater integer ends or Inf."
+    abort_hammel(
+      c(
+        paste(
+          "Parity bands in {.arg rates} must have nonnegative whole-number",
+          "starts and greater whole-number ends."
+        ),
+        "i" = "Use {.code Inf} for the open-ended last parity band."
       ),
-      call. = FALSE
+      "rates",
+      argument = "rates"
     )
   }
   check_numeric_column(
@@ -196,28 +204,18 @@ calculate_patfr <- function(rates) {
     missing = TRUE
   )
   if (any(rates$rate_fertility < 0, na.rm = TRUE)) {
-    stop("Fertility rates must be nonnegative.", call. = FALSE)
+    check_nonnegative(rates$rate_fertility, "rates$rate_fertility")
   }
   if (any(
         !is.finite(rates$age_end) & rates$rate_fertility != 0,
         na.rm = TRUE
       )) {
-    warning(
-      paste0(
-        "PATFR omits an open age band with non-zero ",
-        "fertility; PATFR is underestimated over the full ",
-        "age range."
-      ),
-      call. = FALSE
-    )
+    warn_open_fertility_band("PATFR")
   }
   rates <- rates[is.finite(rates$age_end), , drop = FALSE]
   groups <- summary_strata(rates)
   if (!nrow(rates)) {
-    stop(
-      "PATFR needs at least one female age band with a finite end.",
-      call. = FALSE
-    )
+    abort_no_finite_bands("PATFR")
   }
   tables <- lapply(
     summary_rows(rates), function(rows) {
@@ -228,12 +226,14 @@ calculate_patfr <- function(rates) {
         unique(c(r$parity_start, r$parity_end[is.finite(r$parity_end)]))
       )
       if (!any(is.infinite(r$parity_end)) || min(parity) != 0) {
-        stop(
-          paste0(
-            "Parity coverage must start at zero and include an ",
-            "open final category."
+        abort_hammel(
+          c(
+            "Parity bands must start at 0 and end with an open band.",
+            "x" = "The parity boundaries are {.val {parity}}."
           ),
-          call. = FALSE
+          "rates",
+          argument = "rates",
+          call = call
         )
       }
       top <- max(parity)
@@ -254,12 +254,14 @@ calculate_patfr <- function(rates) {
               r$parity_start <= states[k] & r$parity_end > states[k]
           )
           if (length(cell) != 1L) {
-            stop(
-              paste0(
-                "Each age/parity cell must be covered exactly ",
-                "once, without gaps or overlaps."
+            abort_hammel(
+              c(
+                "Each age and parity combination must have exactly one rate.",
+                "i" = "Age and parity bands must meet without gaps or overlaps."
               ),
-              call. = FALSE
+              "rates",
+              argument = "rates",
+              call = call
             )
           }
           hazard[a, k] <- r$rate_fertility[cell]
@@ -268,7 +270,7 @@ calculate_patfr <- function(rates) {
       value <- if (anyNA(hazard)) {
         NA_real_
       } else {
-        patfr_midpoint(hazard, diff(ages))
+        patfr_midpoint(hazard, diff(ages), call = call)
       }
       key <- r[1, groups, drop = FALSE]
       cbind(key, data.frame(age_start = lower, age_end = upper, patfr = value))
@@ -281,7 +283,7 @@ calculate_patfr <- function(rates) {
 
 # HELPER FUNCTIONS ---------------------------------------------------------
 
-patfr_midpoint <- function(hazard, widths) {
+patfr_midpoint <- function(hazard, widths, call = rlang::caller_env()) {
   n <- ncol(hazard)
   state <- c(1, rep(0, n - 1L))
   total <- 0
@@ -293,12 +295,17 @@ patfr_midpoint <- function(hazard, widths) {
       incoming <- outgoing + 1L
       q <- d * hazard[a, outgoing] / (1 + d * hazard[a, outgoing] / 2)
       if (any(!is.finite(q)) || any(q > 1)) {
-        stop(
-          paste0(
-            "Rates are too large for valid HFD midpoint ",
-            "progression probabilities."
+        abort_hammel(
+          c(
+            "Fertility rates are too large for PATFR.",
+            "i" = paste(
+              "Midpoint parity-progression probabilities would exceed 1;",
+              "check the rates and band widths."
+            )
           ),
-          call. = FALSE
+          "rates",
+          argument = "rates",
+          call = call
         )
       }
       exposure[outgoing] <- state[outgoing] * d * (1 - q / 2)

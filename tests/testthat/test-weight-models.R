@@ -31,14 +31,19 @@ test_that("weight models validate formulas, coefficients and variables", {
   # Names that could be group variables are checked against the declaration
   # at simulation; others fail when the model is set.
   education <- set_mortality(model, mortality_rates, weights = weight_model(~ education, c(education = 1)))
-  expect_error(run_simulation(education, 0),
-    "not available for this process: education")
+  error <- expect_error(
+    run_simulation(education, 0),
+    class = "hammel_error_specification"
+  )
+  expect_identical(error$variables, "education")
   expect_error(set_mortality(model, mortality_rates,
-    weights = weight_model(~ parity, c(paritx = 1))), "missing parity; unknown paritx")
+    weights = weight_model(~ parity, c(paritx = 1))),
+    "Missing: \"parity\".*Unknown: \"paritx\"",
+    class = "hammel_error_specification")
   expect_error(set_mortality(model, mortality_rates,
-    weights = weight_model(~ same_group, c(same_group = 1))), "not available")
+    weights = weight_model(~ same_group, c(same_group = 1))), "can't use", class = "hammel_error_specification")
   expect_error(set_union_dissolution(model, data.frame(dur_start = 0, dur_end = Inf, rate = .1),
-    weights = weight_model(~ partnered, c(partnered = 1))), "not available")
+    weights = weight_model(~ partnered, c(partnered = 1))), "can't use", class = "hammel_error_specification")
   expect_error(set_mortality(model, mortality_rates, weights = list()), "weight_model")
   # Interactions follow R's model-matrix coding and names.
   w <- weight_model(~ union_type * parity,
@@ -143,6 +148,43 @@ test_that("custom functions receive members and the cell, without exact times", 
     seed = 8))
 })
 
+test_that("custom weight functions must return plain numeric vectors", {
+  model <- weighted_mortality_model(20)
+  returns <- list(
+    character = function(n) rep("a", n),
+    logical = function(n) rep(TRUE, n),
+    factor = function(n) factor(rep("a", n)),
+    complex = function(n) rep(1i, n),
+    list = function(n) as.list(rep(0, n)),
+    data_frame = function(n) data.frame(x = rep(0, n)),
+    matrix = function(n) matrix(0, n, 1),
+    null = function(n) NULL,
+    fun = function(n) function() 0
+  )
+  for (r in returns) {
+    weights <- weight_model(fun = function(members, bin) r(nrow(members)))
+    error <- expect_hammel_error(
+      run_simulation(
+        set_mortality(model, mortality_rates, weights = weights),
+        1,
+        seed = 3
+      ),
+      "runtime",
+      "run_simulation"
+    )
+    expect_identical(error$process, "mortality")
+  }
+  integer <- weight_model(fun = function(members, bin) rep(0L, nrow(members)))
+  expect_identical(
+    run_simulation(
+      set_mortality(model, mortality_rates, weights = integer),
+      1,
+      seed = 3
+    ),
+    run_simulation(model, 1, seed = 3)
+  )
+})
+
 test_that("missing variables contribute zero with one warning", {
   model <- weighted_mortality_model(200, groups = c("A", "B"))
   w <- weight_model(~ partner_group + partnered,
@@ -161,7 +203,8 @@ test_that("missing variables contribute zero with one warning", {
   grouped <- weighted_mortality_model(20, groups = c("A", "B"))
   expect_error(run_simulation(set_mortality(grouped, mortality_rates, weights =
     partial), 1),
-    "groupB; missing groupB; unknown groupC")
+    "Missing: \"groupB\".*Unknown: \"groupC\"",
+    class = "hammel_error_specification")
 })
 
 # Women aged 25 (one fertility cell for a year), with birth interval zero.
@@ -404,10 +447,10 @@ test_that("weight schedules are validated like model schedules", {
     time_start = c(0, .5), time_end = c(1, Inf), model = list(half, half))), "overlap")
   expect_error(set_mortality(model, mortality_rates, weights = tibble::tibble(
     time_start = 0, time_end = Inf, model = list(weight_model(~ parity, c(paritx = 1))))),
-    "weights\\$model\\[\\[1\\]\\]")
+    class = "hammel_error_specification")
   gap <- set_mortality(model, mortality_rates, weights = tibble::tibble(time_start = 1, time_end = Inf,
     model = list(half)))
-  expect_error(run_simulation(gap, 2, seed = 1), "coverage gap")
+  expect_error(run_simulation(gap, 2, seed = 1), class = "hammel_error_coverage")
   expect_s3_class(set_mortality(model, mortality_rates, weights = data.frame(time_start = 0, time_end = Inf,
     model = I(list(half))))$processes$mortality$weights, "tbl_df")
 })
@@ -455,13 +498,14 @@ test_that("remaining validation rules for weight models", {
   grouped_formula <- weight_model(~ group, c(groupB = 1))
   expect_error(run_simulation(set_mortality(model, mortality_rates, weights =
     grouped_formula), 1, seed = 1),
-               "not available for this process: group")
+               "can't use group", class = "hammel_error_specification")
   # Group levels are the dimension's categories; coefficients must name them.
   grouped <- weighted_mortality_model(200, groups = c("A", "B"))
   extra <- weight_model(~ group, c(groupB = log(2), groupC = log(5)))
   expect_error(run_simulation(set_mortality(grouped, mortality_rates, weights =
     extra), 1, seed = 1),
-               "unknown groupC")
+               "Unknown: \"groupC\"",
+               class = "hammel_error_specification")
   declared <- set_groups(grouped, group = group(categories = c("A", "B", "C")))
   expect_s3_class(run_simulation(set_mortality(declared, mortality_rates,
     weights = extra), 1, seed = 1),
@@ -470,7 +514,8 @@ test_that("remaining validation rules for weight models", {
   missing <- weight_model(~ ancestry_group_C, c(ancestry_group_C = 1))
   expect_error(run_simulation(set_mortality(grouped, mortality_rates, weights =
     missing), 1, seed = 1),
-               "not available for this process: ancestry_group_C")
+               "can't use ancestry_group_C",
+               class = "hammel_error_specification")
 })
 
 # Couples in two groups: half the unions are exogamous. No mortality or fertility.
@@ -610,4 +655,45 @@ test_that("custom functions receive members and cells for every process", {
   expect_gt(count_run_events(run_simulation(fert, 1, seed = 68), "births"), 0)
   expect_identical(seen$fertility$bin$process, "fertility")
   expect_true(all(c("parity_start", "parity_end", "age_start", "age_end") %in% names(seen$fertility$bin)))
+})
+
+test_that("weight model summaries report formulas and hazard ratios", {
+  result <- summary(weight_model(~partnered, c(partnered = log(0.9))))
+  expect_s3_class(result, "summary.hammel_weight_model")
+  expect_false(result$custom)
+  expect_identical(result$coefficients, c(partnered = log(0.9)))
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Formula: ~partnered", text, fixed = TRUE)))
+  expect_true(any(grepl("(hazard ratio 0.9)", text, fixed = TRUE)))
+
+  custom <- summary(weight_model(fun = function(members, bin) 0))
+  expect_true(custom$custom)
+  expect_null(custom$formula)
+  text <- cli::cli_fmt(print(custom))
+  expect_true(any(grepl("Type: custom function", text, fixed = TRUE)))
+})
+
+test_that("process summaries nest weight models and schedules", {
+  weights <- weight_model(~partnered, c(partnered = log(0.9)))
+  result <- summary(mortality(usa_2000_mortality, weights = weights))
+  expect_s3_class(result$weights, "summary.hammel_weight_model")
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("Weight model: ~partnered", text, fixed = TRUE)))
+  expect_true(any(grepl("^ +\\S+ Coefficients:", text)))
+
+  text <- cli::cli_fmt(print(summary(fertility(usa_2000_fertility))))
+  expect_true(any(grepl("Weight model: none", text, fixed = TRUE)))
+
+  schedule <- tibble::tibble(
+    time_start = c(0, 10),
+    time_end = c(10, Inf),
+    model = list(weights, weight_model(~partnered, c(partnered = 0)))
+  )
+  result <- summary(mortality(usa_2000_mortality, weights = schedule))
+  expect_s3_class(result$weights, "summary.hammel_model_schedule")
+  expect_equal(nrow(result$weights$periods), 2L)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("Weight model: calendar schedule", text, fixed = TRUE)))
+  expect_true(any(grepl("Years [10, Inf): ~partnered", text, fixed = TRUE)))
 })

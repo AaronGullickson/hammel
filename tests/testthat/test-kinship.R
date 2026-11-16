@@ -84,9 +84,9 @@ test_that("kinship extraction preserves IDs, query order, deaths, and empty sche
   expect_equal(nrow(extract_kin(population, 80, relative_ids = numeric())), 0)
   expect_equal(nrow(extract_kin(generate_uniform_population(0), numeric())), 0)
   expect_equal(nrow(extract_kin(population, 80, relative_ids = 80)), 0)
-  expect_error(extract_kin(population, 999), "present")
+  expect_error(extract_kin(population, 999), "in the population")
   expect_error(extract_kin(population, c(80, 80)), "unique")
-  expect_error(extract_kin(population, 80, relative_ids = 999), "present")
+  expect_error(extract_kin(population, 80, relative_ids = 999), "in the population")
   for (value in list(-1, NA_real_, Inf, 2.5, "2", c(1, 2)))
     expect_error(extract_kin(population, 80, generations = value), "generations")
 })
@@ -219,7 +219,7 @@ test_that("living kin split by the ego's sex and group at each time", {
 test_that("living kin validate inputs", {
   population <- living_kin_population()
   expect_error(count_kin(population$persons, 0), "hammel_population")
-  expect_error(count_kin(population, 1), "endpoint")
+  expect_error(count_kin(population, 1), "extend beyond", class = "hammel_error_argument")
   expect_error(count_kin(population, numeric()), "times")
   expect_error(count_kin(population, NA_real_), "times")
   expect_error(count_kin(population, 0, generations = -1),

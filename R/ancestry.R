@@ -17,90 +17,145 @@ tracked_ancestry <- function(declaration) {
 }
 
 # Accept one bare table when exactly one dimension tracks ancestry.
-as_ancestry_list <- function(ancestry, declaration) {
+as_ancestry_list <- function(
+  ancestry,
+  declaration,
+  call = rlang::caller_env()
+) {
   if (is.null(ancestry) || !is.data.frame(ancestry)) {
     return(ancestry)
   }
   tracked <- tracked_ancestry(declaration)
   if (length(tracked) != 1L) {
-    stop(
-      paste0(
-        "`ancestry` must be a named list of tables, one ",
-        "per group dimension tracking ancestry."
+    abort_hammel(
+      c(
+        "{.arg ancestry} must be a named list of tables, one per dimension.",
+        "x" = paste(
+          "It is a single table, but {length(tracked)} dimensions track",
+          "ancestry."
+        ),
+        "i" = paste(
+          "A single table is allowed only when exactly one dimension tracks",
+          "ancestry."
+        )
       ),
-      call. = FALSE
+      "population",
+      argument = "ancestry",
+      call = call
     )
   }
   stats::setNames(list(ancestry), tracked)
 }
 
-validate_ancestry <- function(ancestry, persons, declaration = NULL) {
+validate_ancestry <- function(
+  ancestry,
+  persons,
+  declaration = NULL,
+  call = rlang::caller_env()
+) {
   if (is.null(ancestry)) {
     return(invisible(ancestry))
   }
-  ancestry <- as_ancestry_list(ancestry, declaration)
+  ancestry <- as_ancestry_list(ancestry, declaration, call = call)
   if (!is.list(ancestry) || is.null(names(ancestry)) ||
         anyNA(names(ancestry)) ||
         any(!nzchar(names(ancestry))) ||
         anyDuplicated(names(ancestry)) ||
         !all(vapply(ancestry, is.data.frame, logical(1)))) {
-    stop(
-      paste0(
-        "`ancestry` must be a named list of tables, one ",
-        "per group dimension tracking ancestry."
+    abort_hammel(
+      c(
+        paste(
+          "{.arg ancestry} must be a list of tables named by the dimensions",
+          "that track ancestry."
+        ),
+        "x" = "It is {describe_value(ancestry)}."
       ),
-      call. = FALSE
+      "population",
+      argument = "ancestry",
+      call = call
     )
   }
   for (name in names(ancestry)) {
-    validate_ancestry_table(ancestry[[name]], persons)
+    with_error_context(
+      validate_ancestry_table(ancestry[[name]], persons, call = call),
+      paste0("In the ancestry table for ", name, ".")
+    )
   }
   invisible(ancestry)
 }
 
-validate_ancestry_table <- function(ancestry, persons) {
-  check_columns(ancestry, c("person_id", "unknown"), "ancestry")
-  check_numeric_column(ancestry$person_id, "ancestry$person_id", id = TRUE)
-  if (anyDuplicated(ancestry$person_id) || nrow(ancestry) != nrow(persons) ||
-        !setequal(ancestry$person_id, persons$person_id)) {
-    stop(
-      paste0(
-        "`ancestry` must have exactly one row per person, ",
-        "with matching person IDs."
+validate_ancestry_table <- function(
+  ancestry,
+  persons,
+  call = rlang::caller_env()
+) {
+  check_columns(ancestry, c("person_id", "unknown"), "ancestry", call = call)
+  check_numeric_column(
+    ancestry$person_id, "ancestry$person_id",
+    id = TRUE,
+    call = call
+  )
+  check_unique_ids(ancestry$person_id, "ancestry$person_id", call = call)
+  absent <- setdiff(persons$person_id, ancestry$person_id)
+  extra <- setdiff(ancestry$person_id, persons$person_id)
+  if (length(absent) || length(extra)) {
+    absent <- cli::cli_vec(absent, list("vec-trunc" = 5))
+    extra <- cli::cli_vec(extra, list("vec-trunc" = 5))
+    abort_hammel(
+      c(
+        "{.arg ancestry} must have exactly one row per person.",
+        "x" = if (length(absent)) "No row for persons {.val {absent}}.",
+        "x" = if (length(extra)) "Rows for unknown persons {.val {extra}}."
       ),
-      call. = FALSE
+      "population",
+      argument = "ancestry",
+      call = call
     )
   }
   columns <- setdiff(names(ancestry), c("person_id", "unknown"))
   if (any(!nzchar(trimws(columns)))) {
-    stop(
-      "Known ancestry columns must be named by nonempty category labels.",
-      call. = FALSE
+    abort_hammel(
+      "Ancestry columns must be named by nonempty category labels.",
+      "population",
+      argument = "ancestry",
+      call = call
     )
   }
   for (column in c(columns, "unknown")) {
     values <- ancestry[[column]]
-    if (!is.numeric(values) || is.complex(values) || !is.null(dim(values)) ||
-          anyNA(values) ||
-          any(!is.finite(values)) ||
-          any(values < 0 | values > 1)) {
-      stop(
-        paste0(
-          "Ancestry proportions must be finite numeric ",
-          "values between 0 and 1, without missing values."
+    check_numeric_column(values, paste0("ancestry$", column), call = call)
+    rows <- which(values < 0 | values > 1)
+    if (length(rows)) {
+      abort_hammel(
+        c(
+          "Ancestry shares must be between 0 and 1.",
+          "x" = paste(
+            "Column {.field {column}} is out of range at",
+            "{format_rows(rows)}."
+          )
         ),
-        call. = FALSE
+        "population",
+        argument = "ancestry",
+        rows = rows,
+        call = call
       )
     }
   }
   sums <- rowSums(as.matrix(ancestry[c(columns, "unknown")]))
-  if (any(abs(sums - 1) > 1e-8)) {
-    stop(
-      paste0(
-        "Ancestry proportions, including `unknown`, must ",
-        "sum to 1 for each person."
+  rows <- which(abs(sums - 1) > 1e-8)
+  if (length(rows)) {
+    abort_hammel(
+      c(
+        paste(
+          "Each person's ancestry shares, including {.field unknown}, must",
+          "sum to 1."
+        ),
+        "x" = "Other sums at {format_rows(rows)}."
       ),
-      call. = FALSE
+      "population",
+      argument = "ancestry",
+      rows = rows,
+      call = call
     )
   }
   invisible(ancestry)

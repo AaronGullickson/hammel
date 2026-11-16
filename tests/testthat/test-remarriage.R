@@ -6,7 +6,7 @@ previous_rates <- function(none = 0, dissolved = 0, widowed = 0) {
 test_that("previous-union schedules require complete valid strata within groups", {
   rates <- previous_rates(.1, .2, .3)
   expect_s3_class(union_formation("rate", rates = rates)$rates, "tbl_df")
-  expect_error(union_formation("rate", rates = rates[-1, ]), "all three")
+  expect_error(union_formation("rate", rates = rates[-1, ]), "pooled or detailed", class = "hammel_error_rates")
   for (value in list(c("none", "separated", NA), c("none", "divorced", "widowed"),
                      factor(rates$previous_union), matrix(rates$previous_union))) {
     bad <- rates
@@ -14,14 +14,14 @@ test_that("previous-union schedules require complete valid strata within groups"
     expect_error(union_formation("rate", rates = bad), "previous_union")
   }
   grouped <- rbind(transform(rates, group = "A"), transform(rates, group = "B"))
-  expect_error(union_formation("rate", rates = grouped[-1, ]), "all three")
+  expect_error(union_formation("rate", rates = grouped[-1, ]), "pooled or detailed", class = "hammel_error_rates")
   expect_error(union_formation("rate", rates = rbind(rates, rates[1, ])), "overlap")
   # Gaps and different age bands in different categories are valid.
   rates$age_start <- c(15, 20, 30)
   expect_silent(union_formation("rate", rates = rates))
   model <- make_rate_model()
   model$processes$union_formation$rates <- rates[-1, ]
-  expect_error(run_simulation(model, 0), "all three")
+  expect_error(run_simulation(model, 0), "pooled or detailed", class = "hammel_error_rates")
 })
 
 test_that("latest recorded union selects the search schedule on restart", {

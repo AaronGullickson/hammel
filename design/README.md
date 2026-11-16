@@ -47,6 +47,7 @@ moves (D140).** See [multiple group dimensions](multiple-groups.md) and the
 | [Cell-accounted fertility](fertility-cell-accounting.md) | Birth-spacing mechanism (D101): cells, unrealized births, validation |
 | [Parity spacing investigation](parity-spacing-investigation.md) | Evidence that led to D101, including the SOCSIM reference |
 | [Testing and validation](testing.md) | Test commands, evidence, and remaining validation |
+| [Error and warning messages](error-messages.md) | Message style, function naming, condition classes and native message translation (D183) |
 | [Current handoff](session-handoff.md) | Recent findings, active work, and deferred issues |
 
 Read the brief, design, and scientific contract before consequential changes.

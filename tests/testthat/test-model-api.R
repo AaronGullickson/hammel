@@ -393,10 +393,12 @@ test_that("union wife and husband columns enforce female and male roles", {
   expect_equal(population$unions$wife_id, 10)
   expect_equal(population$unions$husband_id, 40)
   swapped <- transform(unions, wife_id = 40, husband_id = 10)
-  expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"), "wife_id.*female")
+  expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"),
+    "wife_id must refer to a woman", class = "hammel_error_population")
   swapped$end_time <- -0.5
   swapped$end_reason <- "dissolution"
-  expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"), "wife_id.*female")
+  expect_error(hammel_population(persons, swapped, end_time = 0, groups = if ("group" %in% names(persons)) "group"),
+    "wife_id must refer to a woman", class = "hammel_error_population")
   expect_identical(names(generate_uniform_population(0)$unions), names(unions))
 })
 
@@ -410,10 +412,11 @@ test_that("population reference times are required and validated everywhere", {
     0 + 0i, matrix(0), array(0)
   )
   for (time in bad_times) {
-    expect_error(
+    error <- expect_error(
       hammel_population(persons, end_time = time),
-      "end_time.*single finite numeric"
+      class = "hammel_error_argument"
     )
+    expect_identical(error$argument, "end_time")
     invalid <- population
     invalid["end_time"] <- list(time)
     expect_error(validate_population(invalid), "end_time")
@@ -427,6 +430,194 @@ test_that("population reference times are required and validated everywhere", {
   }
   expect_error(
     hammel_population(persons, end_time = 1900),
-    "Recorded events.*reference time"
+    "Recorded events must not occur after end_time",
+    class = "hammel_error_population"
   )
+})
+
+test_that("model summaries combine components and report readiness", {
+  empty <- summary(hammel_model())
+  expect_s3_class(empty, "summary.hammel_model")
+  expect_null(empty$population)
+  expect_length(empty$processes, 0L)
+  expect_identical(
+    empty$missing,
+    c("population", "mortality", "fertility", "union_formation")
+  )
+  text <- cli::cli_fmt(value <- print(empty))
+  expect_identical(value, empty)
+  expect_true(any(grepl("needs the following", text, fixed = TRUE)))
+  expect_true(any(grepl("set_union_formation()", text, fixed = TRUE)))
+
+  model <- hammel_model() |>
+    set_population(generate_uniform_population(50)) |>
+    set_union_formation("on_demand") |>
+    set_mortality(usa_2000_mortality)
+  partial <- summary(model)
+  expect_s3_class(partial$population, "summary.hammel_population")
+  expect_named(partial$processes, c("mortality", "union_formation"))
+  expect_identical(partial$missing, "fertility")
+  expect_error(run_simulation(model, years = 1), "fertility")
+
+  ready <- summary(set_fertility(model, usa_2000_fertility))
+  expect_named(
+    ready$processes,
+    c("mortality", "fertility", "union_formation")
+  )
+  expect_length(ready$missing, 0L)
+  text <- cli::cli_fmt(print(ready))
+  expect_true(any(grepl("Fertility process", text, fixed = TRUE)))
+  expect_true(any(grepl("elements needed to run", text, fixed = TRUE)))
+})
+
+test_that("model summaries combine group declarations and transitions", {
+  population <- generate_uniform_population(
+    60,
+    groups = list(ethnicity = c(A = 1, B = 1), region = c(n = 1, s = 1))
+  )
+  rates <- tibble::tribble(
+    ~age_start, ~age_end, ~origin, ~destination, ~rate,
+    0,          Inf,      "n",     "s",          0.05
+  )
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_groups(ethnicity = group(ancestry = TRUE), region = group()) |>
+    set_group_transition(rates, group = "region")
+  result <- summary(model)
+  expect_named(result$groups, c("ethnicity", "region"))
+  expect_identical(result$groups$ethnicity$group$categories, c("A", "B"))
+  expect_true(result$groups$ethnicity$group$ancestry)
+  expect_null(result$groups$ethnicity$transition)
+  expect_s3_class(
+    result$groups$region$transition,
+    "summary.hammel_group_transition"
+  )
+  expect_named(result$population$group_counts, c("ethnicity", "region"))
+  text <- cli::cli_fmt(print(result))
+  groups <- grep("Groups", text, fixed = TRUE)
+  expect_gt(groups, grep("Living population by age", text, fixed = TRUE))
+  expect_true(any(grepl("Transition process: none", text, fixed = TRUE)))
+  expect_s3_class(result$groups$region$group, "summary.hammel_group")
+  expect_true(any(grepl("Inheritance: random_parent", text, fixed = TRUE)))
+  expect_true(any(grepl("(1 of 2 possible): n", text, fixed = TRUE)))
+
+  expect_null(summary(hammel_model())$groups)
+})
+
+test_that("model readiness requires declared transition dimensions", {
+  population <- generate_uniform_population(
+    60,
+    groups = list(region = c(n = 1, s = 1, w = 1))
+  )
+  rates <- tibble::tribble(
+    ~age_start, ~age_end, ~origin, ~destination, ~rate,
+    0,          Inf,      "n",     "s",          0.05
+  )
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(usa_2000_mortality) |>
+    set_fertility(usa_2000_fertility) |>
+    set_union_formation("on_demand") |>
+    set_group_transition(rates)
+  result <- summary(model)
+  expect_length(result$missing, 0L)
+  expect_equal(nrow(result$groups$region$transition$missing_transitions), 5L)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("(1 of 6 possible)", text, fixed = TRUE)))
+  expect_no_error(run_simulation(model, years = 1, seed = 1))
+
+  model$processes$group_transition$ethnicity <- group_transition(
+    rates,
+    group = "ethnicity"
+  )
+  result <- summary(model)
+  expect_identical(result$missing, "transition:ethnicity")
+  expect_null(result$groups$ethnicity$group)
+  text <- cli::cli_fmt(print(result))
+  expect_true(any(grepl("dimension ethnicity", text, fixed = TRUE)))
+  expect_error(run_simulation(model, years = 1), "ethnicity")
+
+  unassigned <- hammel_model() |> set_group_transition(rates)
+  expect_identical(
+    summary(unassigned)$missing,
+    c(missing_model_elements(unassigned), "transition:.default")
+  )
+  text <- cli::cli_fmt(print(summary(unassigned)))
+  expect_true(any(grepl("Unassigned dimension", text, fixed = TRUE)))
+  expect_true(any(grepl("set_group_transition()", text, fixed = TRUE)))
+})
+
+test_that("population summaries match the simulated histories", {
+  set.seed(7)
+  population <- generate_uniform_population(300)
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(usa_2000_mortality) |>
+    set_fertility(usa_2000_fertility) |>
+    set_union_formation("on_demand")
+  result <- run_simulation(model, years = 10, seed = 11)
+  persons <- result$persons
+  alive <- is.na(persons$death_time)
+  out <- summary(result)
+
+  expect_s3_class(out, "summary.hammel_population")
+  expect_identical(out$first_time, min(persons$birth_time))
+  expect_identical(out$end_time, 10)
+  expect_identical(out$persons_alive, sum(alive))
+  expect_identical(out$n_births, nrow(persons))
+  expect_identical(out$n_deaths, sum(!alive))
+  expect_identical(out$n_unions, nrow(result$unions))
+  expect_identical(
+    out$n_dissolutions,
+    sum(result$unions$end_reason %in% "dissolution")
+  )
+  expect_identical(
+    is.na(out$n_births_u),
+    is.null(result$unrealized_births)
+  )
+  expect_s3_class(out$age_counts, "tbl_df")
+  expect_equal(sum(out$age_counts$male), sum(alive & persons$sex == "m"))
+  expect_equal(sum(out$age_counts$female), sum(alive & persons$sex == "f"))
+  expect_identical(out$simulation$start, 0)
+  expect_identical(out$simulation$end, 10)
+  expect_identical(out$simulation$pop_size_start, 300L)
+  expect_identical(out$simulation$pop_size_end, sum(alive))
+  expect_null(out$group_counts)
+
+  text <- cli::cli_fmt(value <- print(out))
+  expect_identical(value, out)
+  expect_true(any(grepl("Latest simulation run", text, fixed = TRUE)))
+  expect_true(any(grepl("Time period: 0-10", text, fixed = TRUE)))
+  expect_true(any(grepl(
+    paste("Persons alive at end time:", sum(alive)), text, fixed = TRUE
+  )))
+  expect_identical(
+    any(grepl("Total unrealized births", text, fixed = TRUE)),
+    !is.na(out$n_births_u)
+  )
+
+  start <- summary(population)
+  expect_null(start$simulation)
+  expect_true(is.na(start$n_births_u))
+  text <- cli::cli_fmt(print(start))
+  expect_false(any(grepl("Latest simulation run", text, fixed = TRUE)))
+  expect_false(any(grepl("unrealized", text, fixed = TRUE)))
+})
+
+test_that("population summaries count declared categories without members", {
+  population <- generate_uniform_population(
+    40,
+    groups = list(region = c(n = 1, s = 1))
+  )
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_groups(region = group(categories = c("n", "s", "w")))
+  counts <- summary(model$population)$group_counts$region
+  expect_s3_class(counts, "tbl_df")
+  expect_identical(counts$category, c("n", "s", "w"))
+  expect_equal(sum(counts$count), 40)
+  expect_equal(counts$count[3], 0)
+  expect_equal(sum(counts$percent), 100)
+  text <- cli::cli_fmt(print(summary(model$population)))
+  expect_true(any(grepl("w 0 (0.0%)", text, fixed = TRUE)))
 })

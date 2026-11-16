@@ -70,7 +70,7 @@ Generated native wrappers; continue to generate rather than hand-edit.
 
 Shared history preparation, stratification, and output construction for demographic analysis. Used by rate calculators, population counts, and relationship extraction.
 
-- Functions: `observation_groups()`, `prepare_group_observations()`, `check_by()`, `check_detailed_previous_union()`, `previous_labels()`, `person_observation()`, `union_type_labels()`, `build_rows()`, `dim_of()`, `label_dim()`, `person_by_dims()`, `finish_rows()`, `observation_alias()`, `combine_dimensions()`, `finish_strata()`, `rename_group_columns()`.
+- Functions: `observation_groups()`, `prepare_group_observations()`, `check_by()`, `check_detailed_previous_union()`, `previous_labels()`, `person_observation()`, `union_type_labels()`, `build_rows()`, `dim_of()`, `label_dim()`, `person_by_dims()`, `finish_rows()`, `observation_alias()`, `combine_dimensions()`, `finish_strata()`, `rename_group_columns()`, `check_analysis_population()`, `check_observation_end()`, `abort_one_of_breaks()`.
 
 ### `R/ancestry.R`
 
@@ -112,13 +112,20 @@ Calculate TFR and PATFR from rate schedules.
 
 Small, general checks for table columns and numeric/time values.
 
-- Functions: `check_time()`, `check_columns()`, `check_numeric_column()`.
+- Functions: `check_time()`, `check_columns()`, `check_numeric_column()`, `check_nonnegative()`, `check_labels()`, `check_flag()`.
 
 ### `R/cohabitation.R`
 
 Cohabitation and conversion settings within union formation, including preparation.
 
-- Functions: `validate_cohabitation()`, `validate_conversion_rates()`, `prepare_cohabitation()`.
+- Functions: `validate_cohabitation()`, `validate_conversion_rates()`, `validate_conversion_schedules()`, `prepare_cohabitation()`.
+
+### `R/errors.R`
+
+Raise classified errors and warnings with cli messages (D183); see [error and warning messages](error-messages.md).
+
+- Functions: `abort_hammel()`, `warn_hammel()`, `abort_internal()`, `with_error_context()`, `format_rows()`, `format_band()`, `describe_column()`, `describe_value()`, `condition_classes()`, `upper_first()`, `call_native()`, `abort_native()`, `parse_native_message()`, `escape_cli()`.
+- Constants: `error_kinds`, `warning_kinds`, `native_tags`.
 
 ### `R/extract_kin.R`
 
@@ -131,7 +138,7 @@ shared with matching.
 
 Construct and attach fertility processes; validate fertility settings and feasibility.
 
-- Functions: **`set_fertility()`**, **`fertility()`**, `unreachable_parity_cells()`, `warn_unreachable_parity_cells()`, `validate_ffab()`, `validate_birth_interval()`.
+- Functions: **`set_fertility()`**, **`fertility()`**, `new_fertility()`, `unreachable_parity_cells()`, `warn_unreachable_parity_cells()`, `validate_ffab()`, `validate_birth_interval()`.
 
 ### `R/generate_uniform_population.R`
 
@@ -143,7 +150,7 @@ Generate baseline persons and sample declared group categories.
 
 Retrieve HMD mortality and HFD fertility rates, convert them to Hammel tables, and preserve provenance. Include all shared and source-specific import helpers, with sections for shared support, HMD, and HFD.
 
-- Functions: **`get_mortality_hmd()`**, `mortality_from_hmd()`, **`get_fertility_hfd()`**, `hfd_age_intervals()`, `fertility_from_hfd()`, `fertility_by_parity_from_hfd()`, `select_database_year()`, `database_source()`, `check_database_request()`, `check_hmd_shape()`, `hmd_period_intervals()`, `hmd_age_intervals()`, `check_database_years()`, `combine_database_years()`, `check_hmd_open_age()`, `check_hmd_retained_rates()`, `index_hmd_pool_source()`, `pool_hmd_open_age()`.
+- Functions: **`get_mortality_hmd()`**, `mortality_from_hmd()`, **`get_fertility_hfd()`**, `hfd_age_intervals()`, `fertility_from_hfd()`, `fertility_by_parity_from_hfd()`, `select_database_year()`, `database_source()`, `check_database_request()`, `check_hmd_shape()`, `hmd_period_intervals()`, `hmd_age_intervals()`, `check_database_years()`, `combine_database_years()`, `check_hmd_open_age()`, `check_hmd_retained_rates()`, `index_hmd_pool_source()`, `pool_hmd_open_age()`, `read_database()`, `check_database_columns()`, `check_database_numeric()`, `abort_database()`.
 
 ### `R/group.R`
 
@@ -161,13 +168,13 @@ Normalize, validate, and query recorded group histories and dimension views.
 
 Construct, validate, and prepare newborn group inheritance rules.
 
-- Functions: **`group_inheritance()`**, `inheritance_methods()`, `normalize_group_inheritance()`, `validate_group_inheritance()`, `extend_identity_groups()`, `prepare_group_inheritance()`.
+- Functions: **`group_inheritance()`**, `inheritance_methods()`, `normalize_group_inheritance()`, `abort_inheritance_method()`, `validate_group_inheritance()`, `extend_identity_groups()`, `prepare_group_inheritance()`.
 
 ### `R/group_transition.R`
 
 Construct, attach, validate, and resolve transition processes and household rules.
 
-- Functions: **`group_transition()`**, **`set_group_transition()`**, **`household()`**, `check_transition_group()`, `transition_processes()`, `store_transition_process()`, `resolve_transition_processes()`, `validate_group_transition()`.
+- Functions: **`group_transition()`**, **`set_group_transition()`**, **`household()`**, `new_group_transition()`, `check_transition_group()`, `transition_processes()`, `store_transition_process()`, `resolve_transition_processes()`, `validate_group_transition()`, `check_transition_rows()`, `validate_transition_schedules()`.
 
 ### `R/hammel_model.R`
 
@@ -179,7 +186,7 @@ Construct and validate model specifications.
 
 Construct, validate, and attach population objects; normalize union tables.
 
-- Functions: `validate_union_types()`, **`hammel_population()`**, **`set_population()`**, **`validate_population()`**, `normalize_unions()`, `empty_unions()`.
+- Functions: `validate_union_types()`, **`hammel_population()`**, **`set_population()`**, **`validate_population()`**, `check_population()`, `abort_population_rows()`, `check_unique_ids()`, `check_end_reasons()`, `normalize_unions()`, `empty_unions()`.
 
 ### `R/het_fert.R`
 
@@ -191,7 +198,7 @@ Specify persistent fertility heterogeneity and initialize/check individual weigh
 
 Group pair effects, multidimension matching resolution, and engine representation.
 
-- Functions: `matching_group_labels()`, `expand_matching_pairs()`, `expand_group_exogamy()`, `matching_has_group_formula()`, `matching_predictor_data()`, `matching_pair_offsets()`, `validate_matching_groups()`, `expand_prevent_exogamy()`, `matching_group_allowed()`, `is_dimension_list()`, `split_group_exogamy()`, `exogamy_table_dimensions()`, `validate_exogamy_table()`, `matching_dimensions()`, `internal_matching_model()`, `combined_matching_model()`, `combination_labels()`, `resolve_matching_models()`.
+- Functions: `matching_group_labels()`, `expand_matching_pairs()`, `expand_group_exogamy()`, `matching_has_group_formula()`, `matching_predictor_data()`, `matching_pair_offsets()`, `validate_matching_groups()`, `expand_prevent_exogamy()`, `matching_group_allowed()`, `is_dimension_list()`, `split_group_exogamy()`, `exogamy_table_dimensions()`, `validate_exogamy_table()`, `matching_dimensions()`, `abort_matching_coefficients()`, `internal_matching_model()`, `combined_matching_model()`, `combination_labels()`, `resolve_matching_models()`.
 
 ### `R/matching_model.R`
 
@@ -209,13 +216,14 @@ Validate, select, and prepare calendar schedules of model specifications.
 
 Construct and attach mortality processes.
 
-- Functions: **`set_mortality()`**, **`mortality()`**.
+- Functions: **`set_mortality()`**, **`mortality()`**, `new_mortality()`.
 
 ### `R/rates_util.R`
 
 Shared input-rate validation, calendar coverage, group strata, and engine encoding/decoding. Keep separate sections within this file for each part of preparing rate schedules for execution.
 
-- Functions: `has_calendar_rates()`, `calendar_rate_segments()`, `calendar_rate_slices()`, `validate_calendar_rates()`, `check_time_coverage()`, `check_calendar_coverage()`, `group_registries()`, `rate_strata_columns()`, `prepare_strata_rates()`, `group_engine_input()`, `strata_spec()`, `decode_report_strata()`, `check_strata_overlap()`, `check_groups()`, `split_rate_groups()`, `validate_rates()`.
+- Functions: `has_calendar_rates()`, `calendar_rate_segments()`, `calendar_rate_slices()`, `validate_calendar_rates()`, `check_time_coverage()`, `check_calendar_coverage()`, `group_registries()`, `rate_strata_columns()`, `prepare_strata_rates()`, `group_engine_input()`, `strata_spec()`, `decode_report_strata()`, `check_strata_overlap()`, `check_groups()`, `check_group_labels()`, `split_rate_groups()`, `check_bands()`, `check_band_overlap()`, `validate_rates()`, `check_rate_rows()`, `validate_rate_schedules()`, `split_parity_schedules()`.
+- Constants: `band_axes`.
 
 ### `R/run_simulation.R`
 
@@ -239,19 +247,19 @@ Public proportional stratification of input rate tables and its checks.
 
 Shared strata and interval checks for summaries of rate schedules.
 
-- Functions: `summary_strata()`, `summary_rows()`, `check_summary_intervals()`.
+- Functions: `summary_strata()`, `summary_rows()`, `check_summary_intervals()`, `abort_no_bands()`, `abort_process_kind()`, `abort_rate_column()`, `warn_open_fertility_band()`, `abort_no_finite_bands()`.
 
 ### `R/union_dissolution.R`
 
 Construct and validate dissolution processes.
 
-- Functions: **`union_dissolution()`**, **`set_union_dissolution()`**, `validate_union_dissolution()`.
+- Functions: **`union_dissolution()`**, **`set_union_dissolution()`**, `new_union_dissolution()`, `validate_union_dissolution()`, `check_dissolution_rows()`, `validate_dissolution_schedules()`.
 
 ### `R/union_formation.R`
 
 Construct and validate union formation/search processes.
 
-- Functions: **`union_formation()`**, **`set_union_formation()`**, `validate_union_formation()`, `expand_previous_union_rates()`, `validate_union_search_rates()`.
+- Functions: **`union_formation()`**, **`set_union_formation()`**, `new_union_formation()`, `validate_union_formation()`, `expand_previous_union_rates()`, `validate_union_search_rates()`, `check_search_rows()`, `check_clock_rows()`, `validate_search_schedules()`.
 
 ### `R/weight_model.R`
 
@@ -274,6 +282,8 @@ Pkgdown reference grouping remains a separate follow-up choice. The source reorg
 Agreed by the user November 11, 2026 (D175). Native code in `src/` is C++17 with Rcpp (D019).
 
 **Style.** The `.clang-format` file at the package root enforces these conventions; run `clang-format -i` on hand-maintained sources and headers, never on generated `src/RcppExports.cpp`. The style mirrors the R rules: Google base style, at most 80 characters per line including comments, a two-space indent and two-space continuation, braces on every `if`, `else` and loop body, and one statement per line. Wrapped function signatures put one parameter per line with the closing parenthesis on its own line; wrapped calls break after the opening parenthesis and close on their own line. Wrapped `if` conditions break at logical operators, with continuation lines aligned under the first condition (clang-format cannot reproduce the extra two spaces of D164). Compact one-line member functions defined inside a class may stay on one line. Long string literals are split into adjacent literals, which compile to the same text.
+
+**Messages.** A `stop()` or warning that bad user input can cause begins with a `[tag]` from `native_tags` in `R/errors.R`, which maps it to a condition class and a hint; untagged errors are reported as internal (D183). Package R code calls native entry points through `call_native()`. See [native engine messages](error-messages.md#native-engine-messages).
 
 Start each file with a purpose comment. Give each class, struct and nontrivial function a comment saying what it represents, with its units (years, person-years) and invariants, and cite the governing decision where one exists. Larger files use `// SECTION NAME ------` headings. Group includes as `<Rcpp.h>`, standard headers, then project headers. Internal code belongs to `namespace hammel` in headers and to an anonymous namespace when file-local; `[[Rcpp::export]]` functions stay at global scope, with their default arguments on the exported definition. Keep classes used on hot paths in headers so their members can inline. Ask the user before creating a C++ file when no existing file fits, as for R scripts.
 
@@ -311,7 +321,7 @@ Review on November 9, 2026, updated after the confidence-argument rename and 80-
 | Control-flow braces | All 127 loop bodies are braced. Statement-style and multiline conditional branches are braced, as are early-return/error branches and control-flow callbacks. The 109 remaining unbraced conditionals are compact, single-line value expressions; else-if chains retain their normal chained syntax. Documentation examples follow the same rule (D150). |
 | Statement separators | No `R/` or `tests/testthat/` file uses semicolons to separate statements after D156, checked from parsed tokens so strings and comments are excluded. Historical milestone validation scripts were left unchanged. |
 | Multiline definitions | Top-level function signatures that exceed one line now use one argument per line with a two-space indent. Indentation and wrapped calls were normalized as part of D149; short definitions remain on one line. |
-| Diagnostic formatting | Existing validation uses base R errors, typically with `call. = FALSE`. Rich diagnostic bullets, condition classes, and polished summaries are deferred to an output-presentation project, likely after the first release milestone (D151). No error framework or presentation dependency is selected. |
+| Diagnostic formatting | All errors and warnings are raised through `abort_hammel()` and `warn_hammel()` (`R/errors.R`) with cli messages, condition classes and the user's calling function (D183); see [error and warning messages](error-messages.md). |
 
 The review examined all 33 hand-maintained R files (211 top-level functions); generated `RcppExports.R` was excluded. Naming and control-flow counts came from parsed R expressions; long-line counts came from source text. Argument roles, returns, and representative signature formatting were also inspected. `lintr` was not installed. D149 used styler 1.11.0 and its formatting-only dependencies from a temporary `/tmp` library and cache; no package dependency was added. This is a targeted source/API audit and width check, not certification against a complete lint rule set or an exhaustive check of every local variable and function call.
 

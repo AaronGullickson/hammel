@@ -44,6 +44,12 @@ See [the scientific contract](scientific-contract.md) and
 
 ### Fertility
 
+Summarizing a fertility process warns when any age band ends at `Inf` and
+has a positive rate. The schedule is still accepted unchanged: the warning
+highlights that fertility continues at all higher ages in that stratum.
+Zero-rate open age bands and open parity or calendar bands do not trigger
+this warning. Construction and simulation do not issue this advisory.
+
 Without `union_type`, rates apply to all women. With that column, each group
 must supply either `{unpartnered, partnered}` or
 `{unpartnered, cohab, marriage}`. Shared partnered rates apply to both partnership

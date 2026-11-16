@@ -66,7 +66,7 @@ test_that("conversion observation validates axes, histories, flags and empty dat
   pop <- conversion_rate_history()
   expect_error(calculate_cohab_convert_rate(pop,c(0,8)),"exactly one")
   expect_error(calculate_cohab_convert_rate(pop,c(0,8), dur_breaks = c(0,Inf), age_breaks = c(0,Inf)),"exactly one")
-  expect_error(calculate_cohab_convert_rate(pop,c(0,9), dur_breaks = c(0,Inf)),"endpoint")
+  expect_error(calculate_cohab_convert_rate(pop,c(0,9), dur_breaks = c(0,Inf)),"extend beyond", class = "hammel_error_argument")
   expect_error(calculate_cohab_convert_rate(pop,c(0,8), dur_breaks = c(0,1,1)),"dur_breaks")
   expect_error(calculate_cohab_convert_rate(pop,c(0,8),age_breaks=c(-1,1)),"age_breaks")
   expect_error(calculate_cohab_convert_rate(pop,c(0,8), dur_breaks = c(0,Inf), by = NA),"`by` must")

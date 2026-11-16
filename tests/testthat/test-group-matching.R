@@ -13,10 +13,18 @@ test_that("pair vectors and tables expand unordered effects symmetrically", {
   expect_equal(nrow(expand_group_exogamy(numeric())), 0)
   table <- data.frame(female_group = "A:B", male_group = "C::D", log_odds = 1)
   expect_equal(expand_group_exogamy(table)$female_group, c("A:B", "C::D"))
-  expect_error(expand_group_exogamy(rbind(table, table)), "overlapping")
+  expect_error(
+    expand_group_exogamy(rbind(table, table)),
+    "more than once",
+    class = "hammel_error_specification"
+  )
   reverse <- table
   reverse[c("female_group", "male_group")] <- reverse[c("male_group", "female_group")]
-  expect_error(expand_group_exogamy(rbind(table, reverse)), "overlapping")
+  expect_error(
+    expand_group_exogamy(rbind(table, reverse)),
+    "more than once",
+    class = "hammel_error_specification"
+  )
 })
 
 test_that("native pair offsets match analytical probabilities and R scores", {
@@ -69,10 +77,17 @@ test_that("categorical group predictors have stable treatment contrasts and inte
   on.exit(options(old))
   expect_equal(calculate_matching_utilities(matching, gaps, "B", c("A", "A")), unname(expected))
   # Categories come from the declaration and are checked when the model meets it.
-  expect_error(internal_matching_model(public, "group", c("A", "B", "C")), "coefficient names")
+  expect_error(
+    internal_matching_model(public, "group", c("A", "B", "C")),
+    "must be named for each model column",
+    class = "hammel_error_specification"
+  )
   one <- suppressWarnings(matching_model(~ male_group, numeric()))
   expect_error(internal_matching_model(one, "group", "A"), "at least two categories")
-  expect_error(prepare_matching_model(matching, c("A", "C")), "covered")
+  expect_error(
+    prepare_matching_model(matching, c("A", "C")),
+    class = "hammel_error_internal"
+  )
   expect_error(calculate_matching_utilities(matching, 1, "A", "C"), "undeclared")
 })
 
@@ -120,9 +135,17 @@ test_that("group matching validates edited models and missing identities even at
   expect_no_error(run_simulation(model, 1))
   matching <- matching_model(~ age_difference, c(age_difference = 0), group_exogamy = c("A:B" = 0))
   matching$group_exogamy <- c("A:B" = 0, "B:A" = 0)
-  expect_error(set_union_formation(make_model(0), "on_demand", matching = matching), "overlapping")
+  expect_error(
+    set_union_formation(make_model(0), "on_demand", matching = matching),
+    "more than once",
+    class = "hammel_error_specification"
+  )
   model$processes$union_formation$matching <- matching
-  expect_error(run_simulation(model, 0), "overlapping")
+  expect_error(
+    run_simulation(model, 0),
+    "more than once",
+    class = "hammel_error_specification"
+  )
 })
 
 test_that("zero or absent pair effects preserve histories and RNG consumption", {
@@ -160,7 +183,9 @@ test_that("pair tables support numeric and colon-containing group labels", {
   expect_equal(inspect_group_matching_cpp(c(0, 0), prepared, 0L, 0:1), c(0, -1))
   # The removed female_group/male_group form points to the table form.
   expect_error(matching_model(~ 1, numeric(), group_exogamy = data.frame(
-    female_group = "A", male_group = "B", log_odds = -1)), "_x` and `<group>_y")
+    female_group = "A", male_group = "B", log_odds = -1)),
+    "no longer use", class = "hammel_error_specification")
   expect_error(matching_model(~ 1, numeric(), group_exogamy = list(group = data.frame(
-    group_x = "A", group_y = "B", log_odds = -1))), "whole `group_exogamy`")
+    group_x = "A", group_y = "B", log_odds = -1))),
+    "whole `group_exogamy`", class = "hammel_error_specification")
 })

@@ -35,9 +35,12 @@ test_that("search rates and cohabitation probabilities accept the same complete 
     expect_s3_class(m,"hammel_model")
     expect_silent(run_simulation(m,0,seed=1))
   }
-  expect_error(union_formation("rate",rates=detailed[-3,]),"complete|all three")
-  expect_error(union_formation("rate",rates=rbind(pooled,detailed[3,])),"mix")
-  expect_error(union_formation("rate",rates=rbind(pooled,detailed[2:3,])),"mix")
+  expect_error(union_formation("rate",rates=detailed[-3,]),"pooled or detailed",
+    class = "hammel_error_rates")
+  expect_error(union_formation("rate",rates=rbind(pooled,detailed[3,])),"mixing",
+    class = "hammel_error_rates")
+  expect_error(union_formation("rate",rates=rbind(pooled,detailed[2:3,])),"mixing",
+    class = "hammel_error_rates")
   calendar <- rbind(transform(pooled,group="A",time_start=0,time_end=1),
     transform(detailed,group="A",time_start=1,time_end=2),
     transform(detailed,group="B",time_start=0,time_end=2))
@@ -83,5 +86,6 @@ test_that("search rates and cohabitation probabilities accept the same complete 
   inconsistent$age_start[rows] <- inconsistent$age_end[rows] <- NA_real_
   inconsistent$dur_start[rows] <- 0
   inconsistent$dur_end[rows] <- Inf
-  expect_error(union_formation("rate",rates=inconsistent),"same age or duration clock")
+  expect_error(union_formation("rate",rates=inconsistent),"one clock",
+    class = "hammel_error_rates")
 })

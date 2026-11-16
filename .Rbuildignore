@@ -4,6 +4,7 @@
 ^design$
 ^validation$
 ^\.github$
+^codecov\.yml$
 ^nvim\.log$
 ^LICENSE\.md$
 ^src/.*\.gcda$
@@ -19,3 +20,4 @@
 ^vignettes/articles/\.quarto$
 ^vignettes/articles/*_files$
 ^data-raw$
+^\.claude$

@@ -50,7 +50,10 @@ normalize_population_transitions <- function(population) {
   population
 }
 
-validate_transition_history <- function(population) {
+validate_transition_history <- function(
+  population,
+  call = rlang::caller_env()
+) {
   tx <- population$transitions
   if (is.null(tx)) {
     return(invisible(population))
@@ -58,68 +61,117 @@ validate_transition_history <- function(population) {
   p <- population$persons
   old <- intersect(c("group_origin", "group_dest"), names(tx))
   if (length(old)) {
-    stop(
-      "Transition histories use `group`, `origin` and `destination`, not ",
-      paste0("`", old, "`", collapse = " and "), ".",
-      call. = FALSE
+    abort_hammel(
+      c(
+        paste(
+          "Transition histories use {.field group}, {.field origin} and",
+          "{.field destination} columns."
+        ),
+        "x" = "Found {.field {old}}.",
+        "i" = "Rename these columns."
+      ),
+      "population",
+      argument = "transitions",
+      columns = old,
+      call = call
     )
   }
   if (nrow(tx) && !declared_group(population)) {
-    stop(
-      "Transition histories require a declared group dimension.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        "Transition histories need a declared group dimension.",
+        "i" = "Declare dimensions with {.arg groups} or {.fn set_groups}."
+      ),
+      "groups",
+      argument = "transitions",
+      call = call
     )
   }
   if (!"group" %in% names(tx) && length(population$groups) == 1L) {
     tx$group <- rep(names(population$groups), nrow(tx))
   }
   if (!"group" %in% names(tx) && nrow(tx)) {
-    stop(
-      paste0(
-        "Transition histories need a `group` column naming ",
-        "each row's dimension when several are declared."
+    dimensions <- names(population$groups)
+    abort_hammel(
+      c(
+        "Transition histories need a {.field group} column.",
+        "x" = "Several dimensions are declared: {.val {dimensions}}.",
+        "i" = "Name each row's dimension in {.field group}."
       ),
-      call. = FALSE
+      "population",
+      argument = "transitions",
+      call = call
     )
   }
   check_columns(
-    tx, c("person_id", "time", "origin", "destination"),
-    "transitions"
+    tx, c("person_id", "time", "origin", "destination"), "transitions",
+    call = call
   )
-  check_numeric_column(tx$person_id, "transitions$person_id", id = TRUE)
-  check_numeric_column(tx$time, "transitions$time")
+  check_numeric_column(
+    tx$person_id, "transitions$person_id",
+    id = TRUE,
+    call = call
+  )
+  check_numeric_column(tx$time, "transitions$time", call = call)
   for (column in intersect(c("move_id", "initiator_id"), names(tx))) {
     check_numeric_column(
       tx[[column]], paste0("transitions$", column),
-      missing = TRUE
+      missing = TRUE,
+      call = call
     )
   }
-  for (col in c("origin", "destination")) {
-    check_groups(data.frame(group = tx[[col]]), col)
+  for (column in c("origin", "destination")) {
+    check_group_labels(
+      tx[[column]], paste0("transitions$", column),
+      call = call
+    )
   }
   if (!nrow(tx)) {
     return(invisible(population))
   }
   unknown <- setdiff(unique(as.character(tx$group)), names(population$groups))
   if (anyNA(tx$group) || length(unknown)) {
-    stop(
-      sprintf(
-        "Transition histories name dimensions that are not declared: %s.",
-        paste(unknown, collapse = ", ")
+    rows <- which(is.na(tx$group) | !tx$group %in% names(population$groups))
+    abort_hammel(
+      c(
+        "Transition histories must name declared dimensions.",
+        "x" = "Undeclared or missing {.field group} at {format_rows(rows)}."
       ),
-      call. = FALSE
+      "groups",
+      argument = "transitions",
+      rows = rows,
+      call = call
     )
   }
   i <- match(tx$person_id, p$person_id)
-  if (anyNA(i) || any(tx$time < p$birth_time[i]) ||
-        any(tx$time >= p$death_time[i], na.rm = TRUE) ||
-        (!is.null(population$end_time) && any(tx$time > population$end_time)) ||
-        any(as.character(tx$origin) == as.character(tx$destination))) {
-    stop(
-      "Transition history has invalid people, dates or self-transitions.",
-      call. = FALSE
-    )
-  }
+  abort_population_rows(
+    which(is.na(i)),
+    "Transition histories must refer to persons in {.field persons}.",
+    "Unknown {.field person_id}",
+    table = "transitions",
+    call = call
+  )
+  abort_population_rows(
+    which(
+      tx$time < p$birth_time[i] |
+        (!is.na(p$death_time[i]) & tx$time >= p$death_time[i]) |
+        (!is.null(population$end_time) & tx$time > population$end_time)
+    ),
+    paste(
+      "Transitions must happen while the person is alive, by the",
+      "population's {.field end_time}."
+    ),
+    "Transitions outside a lifetime",
+    table = "transitions",
+    call = call
+  )
+  abort_population_rows(
+    which(as.character(tx$origin) == as.character(tx$destination)),
+    "Transitions must move between different categories.",
+    "{.field origin} equals {.field destination}",
+    table = "transitions",
+    call = call
+  )
   for (rows in split(
     seq_len(nrow(tx)), list(tx$person_id, tx$group),
     drop = TRUE
@@ -132,12 +184,20 @@ validate_transition_history <- function(population) {
     )
     if (anyDuplicated(tx$time[rows]) || !chained ||
           as.character(tail(tx$destination[rows], 1)) != current) {
-      stop(
-        paste0(
-          "Transition history must chain chronologically to ",
-          "each person's current category in each dimension."
+      person <- tx$person_id[rows[1]]
+      dimension <- tx$group[rows[1]]
+      abort_population_rows(
+        sort(rows),
+        paste(
+          "Each person's transitions must form a chronological chain ending",
+          "in their current category."
         ),
-        call. = FALSE
+        paste0(
+          "The ", dimension, " transitions of person ", person,
+          " don't chain"
+        ),
+        table = "transitions",
+        call = call
       )
     }
   }

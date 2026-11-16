@@ -91,41 +91,60 @@ generate_uniform_population <- function(
   if (!is.numeric(size) || length(size) != 1L || !is.finite(size) || size < 0 ||
         size != trunc(size) ||
         size > .Machine$integer.max) {
-    stop(
-      paste0(
-        "`size` must be a nonnegative whole number no ",
-        "larger than R's integer limit."
+    abort_hammel(
+      c(
+        "{.arg size} must be a single nonnegative whole number.",
+        "x" = "It is {describe_value(size)}."
       ),
-      call. = FALSE
+      "argument",
+      argument = "size"
     )
   }
-  if (!is.numeric(max_age) || is.complex(max_age) || !is.null(dim(max_age)) ||
-        length(max_age) != 1L ||
-        !is.finite(max_age) ||
-        max_age < 0) {
-    stop("`max_age` must be finite and nonnegative, in years.", call. = FALSE)
-  }
-  if (!is.numeric(min_age) || is.complex(min_age) || !is.null(dim(min_age)) ||
-        length(min_age) != 1L ||
-        !is.finite(min_age) ||
-        min_age < 0) {
-    stop("`min_age` must be finite and nonnegative, in years.", call. = FALSE)
+  for (name in c("max_age", "min_age")) {
+    age <- get(name)
+    if (!is.numeric(age) || is.complex(age) || !is.null(dim(age)) ||
+          length(age) != 1L ||
+          !is.finite(age) ||
+          age < 0) {
+      abort_hammel(
+        c(
+          "{.arg {name}} must be a single nonnegative number of years.",
+          "x" = "It is {describe_value(age)}."
+        ),
+        "argument",
+        argument = name
+      )
+    }
   }
   if (min_age > max_age) {
-    stop("`min_age` must not exceed `max_age`.", call. = FALSE)
+    abort_hammel(
+      c(
+        "{.arg min_age} must not exceed {.arg max_age}.",
+        "x" = "{.arg min_age} is {min_age} and {.arg max_age} is {max_age}."
+      ),
+      "argument",
+      argument = "min_age"
+    )
   }
   check_time(end_time, "end_time")
   if (!is.numeric(female_probability) || length(female_probability) != 1L ||
         !is.finite(female_probability) ||
         female_probability < 0 ||
         female_probability > 1) {
-    stop(
-      "`female_probability` must be a number between 0 and 1.",
-      call. = FALSE
+    abort_hammel(
+      c(
+        paste(
+          "{.arg female_probability} must be a single probability between 0",
+          "and 1."
+        ),
+        "x" = "It is {describe_value(female_probability)}."
+      ),
+      "argument",
+      argument = "female_probability"
     )
   }
 
-  draw <- baseline_group_sampler(groups)
+  draw <- baseline_group_sampler(groups, call = rlang::current_env())
   persons <- data.frame(
     person_id = seq_len(size),
     sex = as.character(
@@ -158,21 +177,26 @@ generate_uniform_population <- function(
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 # Validate baseline group weights and return a function drawing `size` people.
-baseline_group_sampler <- function(groups) {
+baseline_group_sampler <- function(groups, call = rlang::caller_env()) {
   if (is.null(groups)) {
     return(NULL)
   }
-  check_weights <- function(w, what) {
+  check_weights <- function(w, name) {
     if (!is.numeric(w) || !is.null(dim(w)) || !length(w) || anyNA(w) ||
           any(!is.finite(w)) ||
           any(w < 0) ||
           !any(w > 0)) {
-      stop(
-        sprintf(
-          "%s must be finite and nonnegative, with a positive value.",
-          what
+      abort_hammel(
+        c(
+          paste(
+            "{.field {name}} must contain finite, nonnegative weights with at",
+            "least one positive."
+          ),
+          "x" = "It is {describe_value(w)}."
         ),
-        call. = FALSE
+        "argument",
+        argument = name,
+        call = call
       )
     }
     # Scale before summation to avoid overflow for large finite weights.
@@ -182,19 +206,24 @@ baseline_group_sampler <- function(groups) {
   if (is.data.frame(groups)) {
     dimensions <- setdiff(names(groups), "weight")
     if (!"weight" %in% names(groups) || !length(dimensions) || !nrow(groups)) {
-      stop(
-        paste0(
-          "A `groups` data frame needs one column per ",
-          "dimension and a `weight` column."
+      abort_hammel(
+        c(
+          paste(
+            "A {.arg groups} data frame needs a column for each dimension and",
+            "a {.field weight} column, with at least one row."
+          ),
+          "x" = "Its columns are {.field {names(groups)}}."
         ),
-        call. = FALSE
+        "argument",
+        argument = "groups",
+        call = call
       )
     }
-    check_group_names(dimensions)
+    check_group_names(dimensions, call = call)
     for (d in dimensions) {
-      check_groups(data.frame(group = groups[[d]]), "groups")
+      check_group_labels(groups[[d]], paste0("groups$", d), call = call)
     }
-    p <- check_weights(groups$weight, "`groups$weight`")
+    p <- check_weights(groups$weight, "groups$weight")
     draw <- function(size) {
       rows <- sample.int(nrow(groups), size, replace = TRUE, prob = p)
       lapply(
@@ -207,26 +236,38 @@ baseline_group_sampler <- function(groups) {
     )
   } else {
     if (!is.list(groups) || !length(groups)) {
-      stop(
-        "`groups` must be a named list of weight vectors or a data frame.",
-        call. = FALSE
+      abort_hammel(
+        c(
+          paste(
+            "{.arg groups} must be a named list of weight vectors or a data",
+            "frame."
+          ),
+          "x" = "It is {describe_value(groups)}."
+        ),
+        "argument",
+        argument = "groups",
+        call = call
       )
     }
     dimensions <- names(groups)
-    check_group_names(dimensions)
+    check_group_names(dimensions, call = call)
     probabilities <- lapply(
       dimensions, function(d) {
         labels <- names(groups[[d]])
         if (is.null(labels) || anyNA(labels) || any(!nzchar(trimws(labels))) ||
               anyDuplicated(labels)) {
-          stop(
-            sprintf(
-              "`groups$%s` must be named by unique, nonempty categories.", d
+          name <- paste0("groups$", d)
+          abort_hammel(
+            c(
+              "{.field {name}} must be named by unique, nonempty categories.",
+              "i" = "For example, {.code race = c(A = 0.6, B = 0.4)}."
             ),
-            call. = FALSE
+            "argument",
+            argument = name,
+            call = call
           )
         }
-        check_weights(groups[[d]], sprintf("`groups$%s`", d))
+        check_weights(groups[[d]], paste0("groups$", d))
       }
     )
     draw <- function(size) {

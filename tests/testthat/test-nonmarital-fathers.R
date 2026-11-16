@@ -114,8 +114,11 @@ test_that("father_matching defaults to the general model and validates edited ob
   expect_identical(run_simulation(model, 0.5, seed = 52), run_simulation(
     explicit, 0.5, seed = 52))
   explicit$processes$union_formation$father_matching$coefficients <- c(other = 1)
-  expect_error(set_process(hammel_model(), explicit$processes$union_formation), "Coefficient names")
-  expect_error(run_simulation(explicit, 0), "Coefficient names")
+  expect_error(
+    set_process(hammel_model(), explicit$processes$union_formation),
+    class = "hammel_error_specification"
+  )
+  expect_error(run_simulation(explicit, 0), class = "hammel_error_specification")
   updated <- set_union_formation(model, "rate", general,
     rates = model$processes$union_formation$rates, father_matching = general)
   expect_identical(updated$processes$union_formation$father_matching, general)

@@ -14,7 +14,7 @@ test_that("group() validates its settings and normalizes inheritance", {
   expect_error(group(categories = c("A", "A")), "unique")
   expect_error(group(categories = character()), "nonempty")
   expect_error(group(categories = c("A", NA)), "group")
-  expect_error(group(ancestry = NA), "TRUE or FALSE")
+  expect_error(group(ancestry = NA), class = "hammel_error_argument")
   expect_error(group(inheritance = "bogus"), "method")
 })
 
@@ -23,7 +23,11 @@ test_that("declarations name dimensions, which must not be reserved", {
   expect_error(set_groups(model, sex = group()), "reserved")
   expect_error(set_groups(model, race_w = group()), "reserved")
   expect_error(set_groups(model, partner_race = group()), "reserved")
-  expect_error(set_groups(model, race = group()), "not a persons column")
+  expect_error(
+    set_groups(model, race = group()),
+    "isn't a column of persons",
+    class = "hammel_error_groups"
+  )
   expect_error(set_groups(model, group = group(), group = group()), "unique")
   model$population$persons$region <- rep(c("N", "S"), length.out = nrow(model$population$persons))
   m <- set_groups(model, group = group(), region = group())
@@ -73,7 +77,7 @@ test_that("an undeclared group column is an inert custom column", {
   stratified$processes$mortality$rates <- stratify_rates(model$processes$mortality$rates,
     list(group = c(A = 1, B = 1)))
   expect_error(run_simulation(stratified, 1),
-    "not a declared group dimension.*set_groups")
+    "isn't declared", class = "hammel_error_groups")
   expect_error(calculate_mortality_rates(out, c(0, 1), c(0, Inf), by = "group"), "declared group")
 })
 
@@ -93,7 +97,7 @@ test_that("categories fix the complete ordered list", {
   rule <- group_inheritance("custom", fun = function(...) "D")
   expect_error(run_simulation(set_groups(model, group = group(inheritance =
     rule)), 1, seed = 5),
-               "undeclared group identity")
+               "undeclared category", class = "hammel_error_runtime")
 })
 
 test_that("ancestry is tracked only when requested", {
@@ -167,4 +171,28 @@ test_that("baselines declare categories in the order given, and set_groups keeps
     set_fertility(data.frame(age_start = 15, age_end = 50, rate = .1)) |>
     set_union_formation("on_demand")
   expect_s3_class(run_simulation(model, 1, seed = 4), "hammel_population")
+})
+
+test_that("group summaries report categories, ancestry and inheritance", {
+  ethnicity <- group(
+    categories = c("W", "B"),
+    ancestry = TRUE,
+    inheritance = group_inheritance("hierarchy", order = c("B", "W"))
+  )
+  result <- summary(ethnicity)
+  expect_s3_class(result, "summary.hammel_group")
+  expect_identical(result$categories, c("W", "B"))
+  expect_true(result$ancestry)
+  expect_s3_class(result$inheritance, "summary.hammel_group_inheritance")
+  text <- cli::cli_fmt(value <- print(result))
+  expect_identical(value, result)
+  expect_true(any(grepl("Inheritance: hierarchy", text, fixed = TRUE)))
+  expect_true(any(grepl("^ +\\S+ Order: B > W", text)))
+
+  inferred <- summary(group())
+  expect_null(inferred$categories)
+  text <- cli::cli_fmt(print(inferred))
+  expect_true(any(grepl("inferred from the population", text, fixed = TRUE)))
+  text <- cli::cli_fmt(print(inferred <- summary(group(), categories = "A")))
+  expect_true(any(grepl("Categories: A", text, fixed = TRUE)))
 })

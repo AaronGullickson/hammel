@@ -100,7 +100,8 @@ std::vector<std::vector<MarriageEpisode>> marriage_histories(
       if (!NumericVector::is_na(died[i]) &&
           (starts[u] > died[i] || end > died[i])) {
         stop(
-          "Previous-union histories cannot contain union events after a "
+          "[population] Previous-union histories cannot contain union events "
+          "after a "
           "partner's death."
         );
       }
@@ -121,7 +122,8 @@ std::vector<std::vector<MarriageEpisode>> marriage_histories(
     for (size_t u = 1; u < history.size(); ++u) {
       if (history[u].start < history[u - 1].end) {
         stop(
-          context + " requires nonoverlapping union histories for each person."
+          "[population] " + context +
+          " requires nonoverlapping union histories for each person."
         );
       }
     }

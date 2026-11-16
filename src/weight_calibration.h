@@ -113,7 +113,7 @@ class WeightCalibrator {
     const long long last =
       static_cast<long long>(std::floor(max_birth / width));
     if (last - first_ + 1 > 50000000LL / std::max(1, groups)) {
-      stop("Weighted-choice calibration range is too large.");
+      stop("[limits] Weighted-choice calibration range is too large.");
     }
     bins_ = static_cast<int>(last - first_ + 1);
     men_.assign(static_cast<size_t>(groups) * bins_, 0);

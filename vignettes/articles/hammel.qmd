@@ -200,7 +200,17 @@ pop_end <- run_simulation(model, years = 100, seed = 42)
 toc()
 ```
 
-Pretty fast! Lets look at its structure.
+Pretty fast! We can get a nice summary of the population at the end.
+
+```{r}
+#| label: summarize-pop
+
+summary(pop_end)
+```
+
+The age pyramid looks like what we would expect of a low fertility, lower mortality population. We can see that our population grew by 4601 members over the time period of the simulation.
+
+Lets take a closer look at its structure.
 
 ```{r}
 #| label: get-ending-pop-structure

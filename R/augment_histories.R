@@ -37,7 +37,7 @@
 #' result |>
 #'   augment_unions()
 augment_unions <- function(population) {
-  validate_population(population)
+  check_population(population)
   persons <- population$persons
   result <- tibble::as_tibble(population$unions)
   dims <- names(population$groups)
@@ -45,12 +45,15 @@ augment_unions <- function(population) {
   added <- c(paste0(columns, "_w"), paste0(columns, "_h"))
   conflicts <- intersect(names(result), added)
   if (length(conflicts)) {
-    stop(
-      sprintf(
-        "Union columns conflict with partner fields: %s.",
-        paste(conflicts, collapse = ", ")
+    abort_hammel(
+      c(
+        "The unions table already has columns that would be added.",
+        "x" = "Conflicting columns: {.field {conflicts}}.",
+        "i" = "Rename or remove them before augmenting."
       ),
-      call. = FALSE
+      "table",
+      argument = "population",
+      columns = conflicts
     )
   }
   # Categories at each union's start, replaying each dimension's transitions.
@@ -64,8 +67,10 @@ augment_unions <- function(population) {
     view <- dimension_view(population, d)
     indexed <- prepare_group_observations(view$persons, view, TRUE)
     groups <- observation_groups(indexed, TRUE)
-    codes <- union_start_groups_cpp(
-      indexed, population$unions, match(view$persons$group, groups) - 1L
+    codes <- call_native(
+      union_start_groups_cpp(
+        indexed, population$unions, match(view$persons$group, groups) - 1L
+      )
     )
     labels <- groups
     # Histories hold labels as text; keep the persons column's type.
@@ -127,37 +132,7 @@ augment_unions <- function(population) {
 #'   augment_persons() |>
 #'   tail()
 augment_persons <- function(population) {
-  validate_population(population)
-  persons <- population$persons
-  result <- tibble::as_tibble(persons)
-  dims <- names(population$groups)
-  added <- c(
-    "age_mother", "age_father", paste0(
-      rep(dims, each = 2), c("_mother", "_father")
-    )
-  )
-  conflicts <- intersect(names(result), added)
-  if (length(conflicts)) {
-    stop(
-      sprintf(
-        "Person columns conflict with parent fields: %s.",
-        paste(conflicts, collapse = ", ")
-      ),
-      call. = FALSE
-    )
-  }
-  for (parent in c("mother", "father")) {
-    rows <- match(persons[[paste0(parent, "_id")]], persons$person_id)
-    result[[paste0("age_", parent)]] <-
-      persons$birth_time - persons$birth_time[rows]
-  }
-  for (d in dims) {
-    for (parent in c("mother", "father")) {
-      rows <- match(persons[[paste0(parent, "_id")]], persons$person_id)
-      result[[paste0(d, "_", parent)]] <- persons[[d]][rows]
-    }
-  }
-  result
+  add_parent_columns(population)
 }
 
 #' Extract births with known parents to unpartnered mothers
@@ -188,7 +163,51 @@ augment_persons <- function(population) {
 #' result <- run_simulation(model, years = 50, seed = 42)
 #' extract_unpartnered_births(result)
 extract_unpartnered_births <- function(population) {
-  parents <- augment_persons(population)
-  rows <- unpartnered_birth_rows_cpp(population$persons, population$unions)
+  parents <- add_parent_columns(population)
+  rows <- call_native(
+    unpartnered_birth_rows_cpp(population$persons, population$unions)
+  )
   parents[rows, , drop = FALSE]
+}
+
+# HELPER FUNCTIONS ---------------------------------------------------------
+
+# Add parents' ages and categories to the persons table, for augment_persons()
+# and extract_unpartnered_births(); errors name `call`.
+add_parent_columns <- function(population, call = rlang::caller_env()) {
+  check_population(population, call = call)
+  persons <- population$persons
+  result <- tibble::as_tibble(persons)
+  dims <- names(population$groups)
+  added <- c(
+    "age_mother", "age_father", paste0(
+      rep(dims, each = 2), c("_mother", "_father")
+    )
+  )
+  conflicts <- intersect(names(result), added)
+  if (length(conflicts)) {
+    abort_hammel(
+      c(
+        "The persons table already has columns that would be added.",
+        "x" = "Conflicting columns: {.field {conflicts}}.",
+        "i" = "Rename or remove them before augmenting."
+      ),
+      "table",
+      argument = "population",
+      columns = conflicts,
+      call = call
+    )
+  }
+  for (parent in c("mother", "father")) {
+    rows <- match(persons[[paste0(parent, "_id")]], persons$person_id)
+    result[[paste0("age_", parent)]] <-
+      persons$birth_time - persons$birth_time[rows]
+  }
+  for (d in dims) {
+    for (parent in c("mother", "father")) {
+      rows <- match(persons[[paste0(parent, "_id")]], persons$person_id)
+      result[[paste0(d, "_", parent)]] <- persons[[d]][rows]
+    }
+  }
+  result
 }

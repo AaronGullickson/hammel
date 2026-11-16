@@ -106,8 +106,12 @@ test_that("dependents get their own clock at the age of independence", {
 
 test_that("household rules are validated and histories continue", {
   expect_error(household(-1), "nonnegative")
-  expect_error(household(c(18, 19)), "finite")
-  expect_error(group_transition(adult_moves, household = TRUE), "created with household")
+  expect_error(household(c(18, 19)), class = "hammel_error_argument")
+  expect_error(
+    group_transition(adult_moves, household = TRUE),
+    "household rule",
+    class = "hammel_error_specification"
+  )
   expect_error(group_transition(data.frame(origin = "N", destination = "S", dur_start = 0, dur_end = Inf,
     rate = 1), household = household()), "age bands")
   # Restarts continue move identifiers; transition rates count every mover.
