@@ -704,7 +704,13 @@ prepare_weight_model <- function(
     )
   }
   if (!is.null(weights$fun)) {
-    return(list(custom = TRUE, fun = weights$fun, process = process))
+    return(
+      list(
+        custom = TRUE,
+        fun = checked_weight_function(weights$fun, process, call = call),
+        process = process
+      )
+    )
   }
   columns <- weight_design(weights, type, context, call = call)
   active <- Filter(function(x) x$coefficient != 0, columns)
@@ -728,4 +734,35 @@ prepare_weight_model <- function(
       active, function(x) do.call(rbind, lapply(x$factors, encode))
     )
   )
+}
+
+# Wrap a custom weight function so the engine only receives a plain numeric
+# vector. Other types would fail native conversion; the engine checks the
+# vector's length and values.
+checked_weight_function <- function(
+  fun,
+  process,
+  call = rlang::caller_env()
+) {
+  force(fun)
+  force(process)
+  function(members, bin) {
+    result <- fun(members, bin)
+    if (!is.numeric(result) || !is.null(dim(result))) {
+      abort_hammel(
+        c(
+          "A custom {process} weight function must return log weights.",
+          "x" = "It returned {describe_value(result)}.",
+          "i" = paste(
+            "Return a numeric vector with one log weight per row of",
+            "{.code members}."
+          )
+        ),
+        "runtime",
+        process = process,
+        call = call
+      )
+    }
+    result
+  }
 }

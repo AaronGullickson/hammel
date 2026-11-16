@@ -148,6 +148,43 @@ test_that("custom functions receive members and the cell, without exact times", 
     seed = 8))
 })
 
+test_that("custom weight functions must return plain numeric vectors", {
+  model <- weighted_mortality_model(20)
+  returns <- list(
+    character = function(n) rep("a", n),
+    logical = function(n) rep(TRUE, n),
+    factor = function(n) factor(rep("a", n)),
+    complex = function(n) rep(1i, n),
+    list = function(n) as.list(rep(0, n)),
+    data_frame = function(n) data.frame(x = rep(0, n)),
+    matrix = function(n) matrix(0, n, 1),
+    null = function(n) NULL,
+    fun = function(n) function() 0
+  )
+  for (r in returns) {
+    weights <- weight_model(fun = function(members, bin) r(nrow(members)))
+    error <- expect_hammel_error(
+      run_simulation(
+        set_mortality(model, mortality_rates, weights = weights),
+        1,
+        seed = 3
+      ),
+      "runtime",
+      "run_simulation"
+    )
+    expect_identical(error$process, "mortality")
+  }
+  integer <- weight_model(fun = function(members, bin) rep(0L, nrow(members)))
+  expect_identical(
+    run_simulation(
+      set_mortality(model, mortality_rates, weights = integer),
+      1,
+      seed = 3
+    ),
+    run_simulation(model, 1, seed = 3)
+  )
+})
+
 test_that("missing variables contribute zero with one warning", {
   model <- weighted_mortality_model(200, groups = c("A", "B"))
   w <- weight_model(~ partner_group + partnered,
