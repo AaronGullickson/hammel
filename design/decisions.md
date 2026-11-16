@@ -3604,6 +3604,7 @@ parity, birth spacing or previous/current unions initialize.
 
 **Status:** User requirements and design discussion, November 12, 2026.
 Planning only; no helper API or migration implementation is authorized here.
+The truncation requirement is deferred by D184.
 
 **Requested capabilities:**
 
@@ -3683,3 +3684,78 @@ stratifier, field/category names, starting-population unknowns, supported rate
 processes and validation/coverage rules. Arrival stream remains distinct from
 inherited origin or ancestry. General generation-specific rate stratification
 is not selected by this decision. See [external immigration](immigration.md#rate-stratification).
+
+## D184 — Migrant parties, imported histories and external relatives (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026. Planning only; no
+implementation is authorized by this record.
+
+**Decision:**
+
+- Every arrival is a party. Individual arrivals are one-person parties;
+  household parties are expected to follow D140's membership rule.
+  Relationships inside a party arrive as links between destination members.
+- No one arrives without their current partner, married or cohabiting.
+  Individual arrivals therefore sample only source people without a current
+  partner. Partners whose future is not simulated are never referenced as
+  current partners.
+- Arrivals bring their recorded births, unions and group transitions,
+  including pre-migration events. Every imported date shifts by the same
+  offset as birth time (arrival time minus template endpoint), preserving
+  age and elapsed durations at the template endpoint.
+- Parity, last-birth time, previous-union state and group duration derive
+  from imported records as for a starting population. Group duration
+  continues from the source; arrival does not restart it.
+- People referenced by an arrival's history who are not destination
+  members (previous partners and children not in the party) are recorded in
+  a separate `external_relatives` tibble with the columns of `persons` plus a
+  last-observed time. Their groups are their status at the template endpoint
+  or death, without transition history. They are never simulated and
+  contribute no exposure, events or population counts. A non-partner father
+  of such a child has an unknown parent ID.
+- Templates without histories, such as uniform generated populations, need
+  no special handling.
+- Template truncation (D180) is deferred.
+- Selective migration uses a weight model, as other processes do, in place
+  of D180's predictive-selection proposal. Conditional on a stream arrival,
+  eligible template people are selected with probability proportional to
+  weight, uniformly without a model; stream intensity is unchanged.
+- Proposed phasing: individual arrivals without histories, then imported
+  histories and external relatives, then household parties.
+- Interface: immigration is one process per model. `immigration_stream()`
+  describes a stream (template, intensity, optional weights) as a component;
+  `immigration(...)` holds named streams, with argument names as stream
+  names; `set_immigration(model, ...)` constructs and attaches it, following
+  `set_groups()`. Each call replaces the complete set of streams, and a call
+  without streams removes immigration. Names are required, unique, non-empty
+  and distinct from the non-immigrant label.
+- A stream's intensity is a non-negative number or a rate-style tibble
+  with `time_start`, `time_end` and an intensity column, under D118's
+  calendar conventions: half-open intervals, piecewise-constant values, no
+  overlaps, gaps during the run are errors, zero disables a stream, and
+  boundary changes precede same-time events. This settles D177's
+  calendar-varying intensity schema.
+
+**Rationale:** Sampled migrants do not bring all their relatives, so parity
+and previous-union state cannot be reconstructed from destination members'
+records alone. Recording the needed non-members in one table keeps those
+states derived from records under a single rule that also serves household
+parties. Disallowing a left-behind current partner avoids tracking future
+events for people who are not simulated. The user judged partner group
+history unnecessary: pre-migration partnering should be analyzed on the
+template population.
+
+**Consequences:** Individual-arrival composition is biased against partnered
+adults until household parties exist. Partner characteristics of
+pre-migration unions use the partner's endpoint or death-time groups.
+Separately sampled parties are unrelated, including repeated draws of one
+source person. Calculation and observation functions must exclude
+pre-migration events and exposure and must not count external relatives.
+
+**Open choices:** Eligibility of partnered source people in phase 1,
+the last-observed column name, kin-extraction treatment of external
+relatives, restart representation, multigenerational parties, weight-model
+variables available for template people, calendar-scheduled selection
+weights, all-zero or empty eligible sets, remaining `immigration_stream()`
+arguments, the intensity column name and the non-immigrant label. See
+[external immigration](immigration.md#arriving-parties-and-imported-histories).
