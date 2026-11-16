@@ -9,7 +9,7 @@
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/AaronGullickson/hammel/blob/master/DESCRIPTION)
+[`DESCRIPTION`](https://github.com/AaronGullickson/hammel/blob/v0.2.0/DESCRIPTION)
 
 Gullickson A (2026). *hammel: Hammel*. R package version 0.2.0,
 <https://github.com/AaronGullickson/hammel>.
