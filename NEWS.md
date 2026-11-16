@@ -1,8 +1,15 @@
 # hammel (development version)
 
+This release focuses on improvements to user facing output.
+
+## New Features
+
 - Update warning/error reporting with more detail on the source of the warning/error and information for correction (#16)
 - Add summary and print methods for all hammel custom objects. (#23)
 - Add optional progress bar to `run_simulation()` with `progress = TRUE`. Defaults to FALSE. (#31)
+
+## Bug Fixes
+
 - Custom weight functions that return anything other than a numeric vector now raise an error instead of crashing R or being silently coerced. (#36)
 
 # hammel 0.1.0
