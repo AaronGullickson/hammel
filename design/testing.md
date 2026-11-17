@@ -1620,3 +1620,24 @@ native calls on `master` (5640556) and on this branch with
 `-ffp-contract=off`, all with identical hashes. `devtools::test()` passed
 8,958 expectations with no failures or warnings and one skip (the opt-in
 live database test).
+
+## Custom migrant assignment at arrival (November 17, 2026)
+
+Under D193, `test-immigration-households.R` checks that a custom rule gives
+each arriving member their own category (generation 1.5 for children under
+13 and 1 for others within one household), the members it sees (template
+IDs in household order, roles, household variables, one household number
+per arrival, the arrival time, and no household columns on cloning
+streams), sampling once per household keeping members together and
+following the seed, and errors for results of the wrong length or with
+undeclared categories. Existing custom assignment tests now return
+categories. The offline test files other than the four immigration files
+made 1,830 native calls on `master` and this branch with
+`-ffp-contract=off`, all with identical hashes; `devtools::test()` passed
+8,979 expectations with no failures or warnings and one skip (the opt-in
+live database test).
+
+A seeded run with a household stream of intensity 800 over 50 years from a
+template of about 25,000 people (40,139 arrivals in 20,903 households) took
+8.6 seconds with a fixed `generation` assignment and 13.0 seconds with a
+custom one, about 0.21 milliseconds per arriving household.

@@ -13,8 +13,8 @@ migrant_assignment(method, fixed_value = NULL, probs = NULL, fun = NULL)
 
 \item{probs}{For \code{"probability"}, probabilities named by category.}
 
-\item{fun}{For \code{"custom"}, a function of \code{members} returning
-probabilities, as described in details.}
+\item{fun}{For \code{"custom"}, a function of \code{members} returning one category
+per member, as described in details.}
 }
 \value{
 A \code{hammel_migrant_assignment} object.
@@ -32,33 +32,46 @@ Three methods are available:
 \item \code{"probability"} draws each migrant's category from \code{probs}, a numeric
 vector of probabilities named by category. Unlisted categories have
 probability zero, and the probabilities must sum to one.
-\item \code{"custom"} draws each migrant's category from probabilities returned by
-\code{fun(members)}. \code{members} is a tibble with one row per eligible template
-person, holding \code{person_id} (the template ID), \code{age} (at the template's
-\code{end_time}), \code{sex} and the template's groups shared with the simulation.
-For household streams, the rows are household carriers, with the
-household's \code{partnered} (0/1), \code{household_size}, \code{n_dependents} and
-\code{partner_age} (\code{NA} for unpartnered carriers), and every member of a
-household receives the carrier's category.
-\code{fun} returns a data frame or matrix with one row per member and one
-column per category, named by category; each row's probabilities must
-sum to one.
+\item \code{"custom"} calls \code{fun(members)} at each arrival. \code{members} is a tibble
+with one row per arriving person, holding \code{person_id} (the template
+ID), \code{age} (at arrival, which equals age at the template's \code{end_time}),
+\code{sex}, the template's groups shared with the simulation and
+\code{arrival_time}. For household streams it also holds \code{role}
+(\code{"carrier"}, \code{"partner"} or \code{"dependent"}), \code{household} (a number
+shared by the household's members) and the household's \code{partnered}
+(0/1), \code{household_size}, \code{n_dependents} and \code{partner_age} (\code{NA} for
+unpartnered carriers). Rows come in household order, carrier first.
+\code{fun} returns one category per row, so members
+of a household can receive different categories. Random choices are
+made inside \code{fun}, for example with \code{\link[=sample]{sample()}}; to keep a household
+together, draw once and repeat the result.
 }
 
-The probabilities are computed before the simulation starts; the category
-is drawn when each migrant arrives.
+\code{"fixed"} and \code{"probability"} assign every member of a household the same
+category, drawn once per household. A \code{"custom"} function is called for
+every arriving household, so it is slower than the other methods, and is
+not needed for groups the template already declares, which members keep.
 }
 \examples{
 migrant_assignment("fixed", fixed_value = "north")
 migrant_assignment("probability", probs = c(north = 0.6, south = 0.4))
+# Generation by age at arrival, person by person.
 migrant_assignment(
   "custom",
   fun = function(members) {
-    young <- members$age < 30
-    data.frame(
-      north = ifelse(young, 0.8, 0.5),
-      south = ifelse(young, 0.2, 0.5)
+    ifelse(members$age < 13, "1.5", "1")
+  }
+)
+# One random region per household, likelier north for young carriers.
+migrant_assignment(
+  "custom",
+  fun = function(members) {
+    young <- members$age[1] < 30
+    region <- sample(
+      c("north", "south"), 1,
+      prob = if (young) c(0.8, 0.2) else c(0.5, 0.5)
     )
+    rep(region, nrow(members))
   }
 )
 }

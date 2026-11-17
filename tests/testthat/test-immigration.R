@@ -379,8 +379,7 @@ test_that("assignment probabilities are drawn per migrant", {
     template, 300,
     assignment = list(region = migrant_assignment(
       "custom", fun = function(members) {
-        young <- members$age < 40
-        cbind(n = as.numeric(young), w = as.numeric(!young))
+        ifelse(members$age < 40, "n", "w")
       }
     ))
   )

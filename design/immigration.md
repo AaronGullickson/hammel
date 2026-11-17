@@ -354,7 +354,7 @@ redrawn.
 | --- | --- |
 | `"fixed"` | One category to every migrant on the stream |
 | `"probability"` | A category drawn from fixed probabilities over the dimension's categories |
-| `"custom"` | A category drawn from probabilities returned by a user function of the migrant's age, sex and template-supplied groups |
+| `"custom"` | Under D193, the category a user function returns for each arriving member, called at arrival |
 
 Argument names and validation for each method are specified with the R
 interface draft.
@@ -503,10 +503,10 @@ template; otherwise they are independent.
 **Selection.** A stream with a household rule samples carriers, with
 replacement. The stream's weight model applies to carriers'
 characteristics, so a household's selection probability is its carrier's
-normalized weight. A `custom` assignment function receives carriers, one
-row per party. Under D189, carriers also carry their household's
+normalized weight. Under D189, carriers also carry their household's
 `partnered` (0/1), `household_size`, `n_dependents` and `partner_age` (`NA`
-when unpartnered) for weights and assignment. A formula term with a
+when unpartnered) for weights; `custom` assignment sees every member
+(D193). A formula term with a
 missing value contributes nothing to the log weight, as in the engine's
 weight models, so `partner_age` acts only on couples. Cloning streams can't
 use these variables.
@@ -522,9 +522,18 @@ variance larger than the mean: `(intensity / E[size]) * T * E[size^2]`.
 For a cloning stream, E[size] is 1.
 
 **Arrival.** Every member of a party arrives at the same time with the
-same stream and the same date offset. Each assigned dimension gets one
-draw per party, so members share their assigned categories. Shared
-dimensions and ancestry are copied for each member as in phases 1 and 2.
+same stream and the same date offset. A `"fixed"` or `"probability"`
+assignment gets one draw per party, so members share it. A `"custom"`
+assignment (D193) is called at arrival with one row per member, holding
+their own `person_id`, `age`, `sex`, shared groups and `arrival_time`, plus
+`role` (`"carrier"`, `"partner"` or `"dependent"`), a `household` number
+and the household's D189 variables. Rows come in household order, carrier
+first. It returns one category per member; random choices are made inside
+the function with R's random numbers, which follow the run's seed, so a
+household stays together only when the function gives its members the same
+category. Shared dimensions and ancestry are copied for each member as in
+phases 1 and 2; a template column is the fastest way to give members
+person-level categories.
 
 **Imported histories.** Each member imports their histories as in phase
 2, with these changes:
@@ -600,9 +609,10 @@ birth, with unknown parents, and with no imported unions, transitions or
 external relatives. Group duration starts at arrival in every dimension,
 recorded as an entry row (`origin = NA`) per dimension.
 
-**Selection and intensity.** Weights and `custom` assignment see every
-eligible person, with the same `members` columns as household streams. Each
-arrival is one person, so the clock runs at `intensity`.
+**Selection and intensity.** Weights see every eligible person, and
+`custom` assignment the arriving person, without household variables,
+`role` or `household`. Each arrival is one person, so the clock runs at
+`intensity`.
 
 **Warning.** Constructing a cloning stream from a template with any unions
 or transitions warns (kind `no_effect`) that these histories will not come

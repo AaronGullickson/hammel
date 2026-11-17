@@ -4052,14 +4052,43 @@ choices inside the user's rule.
 skilled researchers who should have full control. The cost of calling R at
 each birth is acceptable.
 
-**Limitations:** Household streams assign one category per household from
-its carrier, so arriving children can't get a different generation (such as
-1.5) through assignment; a template column computed beforehand is copied
-per member. Ancestry shares in `birthplace` measure heritage, not recency:
-with continuing immigration, every share drifts.
+**Limitations:** Under D193, custom assignment gives each arriving member
+their own category, so children arriving in households can be 1.5; a
+template column computed beforehand also works and avoids the callback.
+Ancestry shares in `birthplace` measure heritage, not recency: with
+continuing immigration, every share drifts.
+
+Parents' categories summarize their own ancestry, so a rule can recurse to
+any depth: with categories `3` and `4+`, a child of native-born parents is
+`3` when either parent is `2` or `2.5` (a foreign-born grandparent) and
+`4+` otherwise.
 
 **Future use case:** Immigrant shares by generation depth (the share of
 parents, grandparents and so on who were immigrants: a newborn's share at
 depth d is the average of the parents' shares at depth d - 1) measure
-recency without drift. They are a motivating case for the planned general
+recency without drift and keep the mixture that a single category loses,
+such as how many grandparents were foreign-born. They are a motivating case for the planned general
 quantitative person characteristics (D176).
+
+## D193 — Custom migrant assignment at arrival, per person (November 17, 2026)
+
+**Status:** User decision, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** `migrant_assignment("custom", fun = )` is called by the engine
+at each arrival with one row per arriving member and returns one category
+per member, as custom inheritance returns a category per birth. Members
+carry their own age, sex, shared groups and `arrival_time`; on household
+streams also `role`, a `household` number and the household's D189
+variables. Random choices are made inside the function. `"fixed"` and
+`"probability"` still draw once per household in the engine, unchanged.
+
+**Rationale:** Person-level classifications such as generation (D192) need
+different categories within a household, which the carrier-level contract
+could not give. Returning a value matches custom inheritance and gives full
+control, including sampling once to keep a household together. Calling at
+arrival, not once per template person, keeps repeated draws of the same
+template person independent and gives the function the calendar time.
+
+**Supersedes:** the probability-returning, carrier-level custom contract
+of D185 and D189.

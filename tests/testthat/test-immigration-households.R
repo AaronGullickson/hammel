@@ -469,7 +469,7 @@ test_that("custom assignment sees household variables", {
   )
   # Couples go north and everyone else south.
   rule <- migrant_assignment("custom", fun = function(members) {
-    data.frame(n = members$partnered, s = 1 - members$partnered)
+    ifelse(members$partnered == 1, "n", "s")
   })
   model <- make_model(2) |>
     set_population(hammel_population(persons, end_time = 0)) |>
@@ -519,4 +519,101 @@ test_that("population summaries leave out immigrants' births and unions", {
   dissolved <- unions$end_reason %in% "dissolution"
   expect_gt(sum(dissolved), 0)
   expect_identical(s$n_dissolutions, sum(dissolved))
+})
+
+# A destination declaring `generation`, which templates lack.
+generation_model <- function(rule, template = household_template(), ...) {
+  persons <- data.frame(
+    person_id = 1:2, sex = c("f", "m"), birth_time = -30,
+    death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_,
+    generation = "3+"
+  )
+  make_model(2) |>
+    set_population(hammel_population(persons, end_time = 0)) |>
+    set_groups(generation = group(categories = c("1", "1.5", "2", "3+"))) |>
+    set_immigration(
+      a = immigration_stream(
+        template, 60,
+        assignment = list(generation = rule), ...
+      )
+    )
+}
+
+test_that("custom assignment gives each arriving member a category", {
+  rule <- migrant_assignment("custom", fun = function(members) {
+    ifelse(members$age < 13, "1.5", "1")
+  })
+  result <- run_simulation(generation_model(rule), 2, seed = 15)
+  people <- arrived(result)
+  expect_gt(nrow(people), 0)
+  age <- people$arrival_time - people$birth_time
+  expect_identical(people$generation, ifelse(age < 13, "1.5", "1"))
+  # The worked example's household brings both.
+  size <- table(people$arrival_time)[as.character(people$arrival_time)]
+  expect_setequal(people$generation[size == 5], c("1", "1.5"))
+})
+
+test_that("custom assignment sees each member and its household", {
+  seen <- list()
+  rule <- migrant_assignment("custom", fun = function(members) {
+    seen[[length(seen) + 1L]] <<- members
+    rep("1", nrow(members))
+  })
+  result <- run_simulation(generation_model(rule), 1, seed = 16)
+  family <- Filter(function(x) nrow(x) == 5L, seen)[[1]]
+  expect_identical(family$person_id, c(1L, 2L, 4L, 6L, 7L))
+  expect_identical(
+    family$role, c("carrier", "partner", rep("dependent", 3))
+  )
+  expect_identical(family$household_size, rep(5L, 5))
+  expect_identical(family$partner_age, rep(34, 5))
+  expect_length(unique(family$household), 1L)
+  households <- vapply(seen, function(x) x$household[1], numeric(1))
+  expect_false(anyDuplicated(households) > 0)
+  # Called at arrival, with the arrival time.
+  times <- vapply(seen, function(x) x$arrival_time[1], numeric(1))
+  expect_setequal(times, unique(arrived(result)$arrival_time))
+  # Cloning streams describe people alone.
+  clone <- NULL
+  rule <- migrant_assignment("custom", fun = function(members) {
+    clone <<- members
+    "1"
+  })
+  run_simulation(
+    generation_model(rule, generate_uniform_population(10), household = NULL),
+    1, seed = 17
+  )
+  expect_identical(nrow(clone), 1L)
+  expect_false(any(c("role", "household") %in% names(clone)))
+})
+
+test_that("custom assignment can sample once per household", {
+  rule <- migrant_assignment("custom", fun = function(members) {
+    rep(sample(c("1", "1.5"), 1), nrow(members))
+  })
+  model <- generation_model(rule)
+  result <- run_simulation(model, 3, seed = 18)
+  people <- arrived(result)
+  by_party <- tapply(people$generation, people$arrival_time, function(x) {
+    length(unique(x))
+  })
+  expect_true(all(by_party == 1L))
+  expect_setequal(people$generation, c("1", "1.5"))
+  # Sampling inside the function follows the seed.
+  expect_identical(run_simulation(model, 3, seed = 18), result)
+})
+
+test_that("custom assignment results are validated", {
+  short <- migrant_assignment("custom", fun = function(members) "1")
+  expect_hammel_error(
+    run_simulation(generation_model(short), 2, seed = 19),
+    "runtime", "run_simulation"
+  )
+  unknown <- migrant_assignment("custom", fun = function(members) {
+    rep("9", nrow(members))
+  })
+  expect_hammel_error(
+    run_simulation(generation_model(unknown), 2, seed = 19),
+    "runtime", "run_simulation"
+  )
 })

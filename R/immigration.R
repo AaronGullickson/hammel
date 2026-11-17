@@ -207,40 +207,53 @@ immigration_stream <- function(
 #' - `"probability"` draws each migrant's category from `probs`, a numeric
 #'   vector of probabilities named by category. Unlisted categories have
 #'   probability zero, and the probabilities must sum to one.
-#' - `"custom"` draws each migrant's category from probabilities returned by
-#'   `fun(members)`. `members` is a tibble with one row per eligible template
-#'   person, holding `person_id` (the template ID), `age` (at the template's
-#'   `end_time`), `sex` and the template's groups shared with the simulation.
-#'   For household streams, the rows are household carriers, with the
-#'   household's `partnered` (0/1), `household_size`, `n_dependents` and
-#'   `partner_age` (`NA` for unpartnered carriers), and every member of a
-#'   household receives the carrier's category.
-#'   `fun` returns a data frame or matrix with one row per member and one
-#'   column per category, named by category; each row's probabilities must
-#'   sum to one.
+#' - `"custom"` calls `fun(members)` at each arrival. `members` is a tibble
+#'   with one row per arriving person, holding `person_id` (the template
+#'   ID), `age` (at arrival, which equals age at the template's `end_time`),
+#'   `sex`, the template's groups shared with the simulation and
+#'   `arrival_time`. For household streams it also holds `role`
+#'   (`"carrier"`, `"partner"` or `"dependent"`), `household` (a number
+#'   shared by the household's members) and the household's `partnered`
+#'   (0/1), `household_size`, `n_dependents` and `partner_age` (`NA` for
+#'   unpartnered carriers). Rows come in household order, carrier first.
+#'   `fun` returns one category per row, so members
+#'   of a household can receive different categories. Random choices are
+#'   made inside `fun`, for example with [sample()]; to keep a household
+#'   together, draw once and repeat the result.
 #'
-#' The probabilities are computed before the simulation starts; the category
-#' is drawn when each migrant arrives.
+#' `"fixed"` and `"probability"` assign every member of a household the same
+#' category, drawn once per household. A `"custom"` function is called for
+#' every arriving household, so it is slower than the other methods, and is
+#' not needed for groups the template already declares, which members keep.
 #'
 #' @param method One of `"fixed"`, `"probability"` or `"custom"`.
 #' @param fixed_value For `"fixed"`, one category label.
 #' @param probs For `"probability"`, probabilities named by category.
-#' @param fun For `"custom"`, a function of `members` returning
-#'   probabilities, as described in details.
+#' @param fun For `"custom"`, a function of `members` returning one category
+#'   per member, as described in details.
 #' @return A `hammel_migrant_assignment` object.
 #' @seealso [immigration_stream()], [group_inheritance()]
 #' @export
 #' @examples
 #' migrant_assignment("fixed", fixed_value = "north")
 #' migrant_assignment("probability", probs = c(north = 0.6, south = 0.4))
+#' # Generation by age at arrival, person by person.
 #' migrant_assignment(
 #'   "custom",
 #'   fun = function(members) {
-#'     young <- members$age < 30
-#'     data.frame(
-#'       north = ifelse(young, 0.8, 0.5),
-#'       south = ifelse(young, 0.2, 0.5)
+#'     ifelse(members$age < 13, "1.5", "1")
+#'   }
+#' )
+#' # One random region per household, likelier north for young carriers.
+#' migrant_assignment(
+#'   "custom",
+#'   fun = function(members) {
+#'     young <- members$age[1] < 30
+#'     region <- sample(
+#'       c("north", "south"), 1,
+#'       prob = if (young) c(0.8, 0.2) else c(0.5, 0.5)
 #'     )
+#'     rep(region, nrow(members))
 #'   }
 #' )
 migrant_assignment <- function(
@@ -1236,20 +1249,24 @@ prepare_stream <- function(
   n <- nrow(people)
   categories <- matrix(-1L, nrow = n, ncol = length(dimensions))
   assignment <- vector("list", length(dimensions))
+  arriving <- NULL
   for (k in seq_along(dimensions)) {
     d <- dimensions[k]
     if (d %in% shared) {
       categories[, k] <- match(
         as.character(people[[d]]), as.character(registries[[d]])
       ) - 1L
+    } else if (rules[[d]]$method == "custom") {
+      if (is.null(arriving)) {
+        arriving <- arriving_members(people, parties, members, stream)
+      }
+      assignment[[k]] <- custom_assignment(
+        rules[[d]], arriving, as.character(registries[[d]]), d,
+        call = call
+      )
     } else {
       assignment[[k]] <- assignment_probabilities(
-        rules[[d]],
-        members[intersect(
-          c("person_id", "age", "sex", shared, household_variables),
-          names(members)
-        )],
-        as.character(registries[[d]]), d,
+        rules[[d]], nrow(members), as.character(registries[[d]]), d,
         call = call
       )
     }
@@ -1463,89 +1480,125 @@ migrant_probabilities <- function(
   w / sum(w)
 }
 
-# Each eligible template person's probabilities over a dimension's
-# categories, as an n x K matrix.
+# A fixed or probability assignment's probabilities over a dimension's
+# categories, the same for each of a stream's `n` parties (D185).
 assignment_probabilities <- function(
   rule,
-  members,
+  n,
   categories,
   dimension,
   call = rlang::caller_env()
 ) {
-  n <- nrow(members)
-  k <- length(categories)
-  if (rule$method %in% c("fixed", "probability")) {
-    probs <- if (rule$method == "fixed") {
-      stats::setNames(1, as.character(rule$fixed_value))
-    } else {
-      rule$probs
+  probs <- if (rule$method == "fixed") {
+    stats::setNames(1, as.character(rule$fixed_value))
+  } else {
+    rule$probs
+  }
+  unknown <- setdiff(names(probs), categories)
+  if (length(unknown)) {
+    abort_hammel(
+      c(
+        "Assigned categories must belong to {.field {dimension}}.",
+        "x" = "Unknown: {.val {unknown}}.",
+        "i" = "Its categories are {.val {categories}}."
+      ),
+      "groups",
+      group = dimension,
+      call = call
+    )
+  }
+  row <- numeric(length(categories))
+  row[match(names(probs), categories)] <- probs
+  matrix(row, nrow = n, ncol = length(categories), byrow = TRUE)
+}
+
+# Every member a stream can bring, for custom assignment (D193): their own
+# template ID, age, sex and shared groups, and for household streams their
+# role and their household's variables (D189).
+arriving_members <- function(people, parties, members, stream) {
+  table <- as.data.frame(people)
+  if (is.null(stream$household)) {
+    return(table)
+  }
+  starts <- parties$party_start
+  size <- diff(starts)
+  party <- rep(seq_along(size), size)
+  offset <- seq_len(nrow(table)) - 1L - starts[party]
+  partner <- parties$partner[starts[party] + 1L]
+  table$role <- ifelse(
+    offset == 0L, "carrier", ifelse(offset == partner, "partner", "dependent")
+  )
+  for (v in household_variables) {
+    table[[v]] <- members[[v]][party]
+  }
+  table
+}
+
+# A custom assignment, called by the engine at each arrival (D193) with the
+# arriving members' rows, the arrival time and a household number. The
+# user's function returns one category per member; the result is their
+# zero-based category codes.
+custom_assignment <- function(
+  rule,
+  arriving,
+  categories,
+  dimension,
+  call = rlang::caller_env()
+) {
+  # Evaluate now: the caller's loop variables change before arrivals.
+  force(rule)
+  force(categories)
+  force(dimension)
+  force(call)
+  household <- "role" %in% names(arriving)
+  function(rows, time, party) {
+    members <- arriving[rows, , drop = FALSE]
+    rownames(members) <- NULL
+    if (household) {
+      members$household <- rep(party, nrow(members))
     }
-    unknown <- setdiff(names(probs), categories)
-    if (length(unknown)) {
+    members$arrival_time <- rep(time, nrow(members))
+    members <- tibble::as_tibble(members)
+    result <- rule$fun(members)
+    if (is.factor(result)) {
+      result <- as.character(result)
+    }
+    if (!(is.character(result) || is.numeric(result)) ||
+          !is.null(dim(result)) || length(result) != nrow(members) ||
+          anyNA(result)) {
       abort_hammel(
         c(
-          "Assigned categories must belong to {.field {dimension}}.",
-          "x" = "Unknown: {.val {unknown}}.",
-          "i" = "Its categories are {.val {categories}}."
+          paste(
+            "A custom assignment function must return one category per",
+            "member."
+          ),
+          "x" = paste(
+            "It returned {describe_value(result)} for {nrow(members)}",
+            "member{?s}."
+          )
         ),
-        "groups",
+        "runtime",
         group = dimension,
         call = call
       )
     }
-    row <- numeric(k)
-    row[match(names(probs), categories)] <- probs
-    return(matrix(row, nrow = n, ncol = k, byrow = TRUE))
-  }
-  result <- rule$fun(members)
-  labels <- colnames(result)
-  if ((!is.data.frame(result) && !is.matrix(result)) ||
-        NROW(result) != n || is.null(labels)) {
-    abort_hammel(
-      c(
-        paste(
-          "A custom assignment function must return probabilities with one",
-          "row per member and one column per category."
+    codes <- match(as.character(result), categories) - 1L
+    if (anyNA(codes)) {
+      unknown <- unique(as.character(result)[is.na(codes)])
+      abort_hammel(
+        c(
+          "A custom assignment function returned an undeclared category.",
+          "x" = "It returned {.val {unknown}}.",
+          "i" = "The categories of {.field {dimension}} are {.val {categories}}."
         ),
-        "x" = "It returned {describe_value(result)} for {n} member{?s}."
-      ),
-      "runtime",
-      group = dimension,
-      call = call
-    )
+        "runtime",
+        group = dimension,
+        call = call,
+        categories = unknown
+      )
+    }
+    as.integer(codes)
   }
-  unknown <- setdiff(labels, categories)
-  if (length(unknown) || anyDuplicated(labels)) {
-    abort_hammel(
-      c(
-        "Custom assignment columns must be distinct categories.",
-        "x" = if (length(unknown)) "Unknown: {.val {unknown}}.",
-        "i" = "The categories of {.field {dimension}} are {.val {categories}}."
-      ),
-      "runtime",
-      group = dimension,
-      call = call
-    )
-  }
-  values <- as.matrix(as.data.frame(result))
-  if (!is.numeric(values) || any(!is.finite(values)) || any(values < 0) ||
-        any(abs(rowSums(values) - 1) > 1e-8)) {
-    abort_hammel(
-      c(
-        "Custom assignment probabilities must be valid.",
-        "x" = paste(
-          "Each row must hold finite, nonnegative probabilities summing to",
-          "one."
-        )
-      ),
-      "runtime",
-      group = dimension,
-      call = call
-    )
-  }
-  out <- matrix(0, nrow = n, ncol = k)
-  out[, match(labels, categories)] <- values
-  out
 }
 
 # Migrants' ancestry in the engine's columns: template shares where the

@@ -586,3 +586,8 @@ assigns its own name internally, ignoring the template's `birthplace`; it
 replaces the former `stream` column. The dimension is flagged `automatic`
 and excluded from only-dimension defaults. See the
 [birthplace group](immigration.md#birthplace-group).
+
+A `"custom"` migrant assignment (D193) is an R closure the engine calls at
+each arrival with the arriving members' rows, the arrival time and a
+household number, saving and restoring R's RNG state around the call as for
+custom inheritance; it returns one category code per member.

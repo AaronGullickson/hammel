@@ -3304,13 +3304,44 @@ void Simulation::on_arrival(int k, double now) {
         static_cast<size_t>(std::numeric_limits<int>::max())) {
     stop("[limits] Population exceeds supported ID or row limits.");
   }
-  // Assigned dimensions are the same for every member of a stream.
-  std::vector<int> assigned(dimensions, -1);
+  // Assigned dimensions are the same for every member of a stream. Fixed and
+  // probability assignments draw once for the party; a custom assignment
+  // (D193) is an R function of the arriving members that returns each
+  // member's category code.
+  const int party = party_count++;
+  std::vector<std::vector<int>> assigned(dimensions);
   for (int d = 0; d < dimensions; ++d) {
     if (stream.categories(first, d) >= 0) {
       continue;
     }
-    NumericMatrix probs = stream.assignment[d];
+    SEXP rule = stream.assignment[d];
+    if (Rf_isFunction(rule)) {
+      IntegerVector rows(size);
+      for (int j = 0; j < size; ++j) {
+        rows[j] = first + j + 1;
+      }
+      // R's random functions must see all preceding native draws, and
+      // native scheduling must resume from the state the callback leaves.
+      PutRNGstate();
+      IntegerVector codes;
+      try {
+        Function assign(rule);
+        codes = as<IntegerVector>(assign(rows, now, party + 1));
+      } catch (...) {
+        GetRNGstate();
+        throw;
+      }
+      GetRNGstate();
+      const int count = static_cast<int>(dim_labels[d].size());
+      for (int code : codes) {
+        if (code < 0 || code >= count) {
+          stop("Invalid migrant assignment category.");
+        }
+      }
+      assigned[d].assign(codes.begin(), codes.end());
+      continue;
+    }
+    NumericMatrix probs(rule);
     const double draw = R::runif(0, 1);
     double cumulative = 0;
     int c = -1;
@@ -3326,10 +3357,9 @@ void Simulation::on_arrival(int k, double now) {
     if (c < 0) {
       stop("Invalid migrant assignment probabilities.");
     }
-    assigned[d] = c;
+    assigned[d].assign(size, c);
   }
   const int base = static_cast<int>(people.size());
-  const int party = party_count++;
   for (int m = first; m < last; ++m) {
     const int i = static_cast<int>(people.size());
     const int mother = stream.mother[m] < 0 ? -1 : base + stream.mother[m];
@@ -3362,7 +3392,7 @@ void Simulation::on_arrival(int k, double now) {
     for (int d = 0; d < dimensions; ++d) {
       int c = stream.categories(m, d);
       if (c < 0) {
-        c = assigned[d];
+        c = assigned[d][m - first];
         const InheritanceRule& rule = inheritance_rules[d];
         if (rule.size) {
           for (size_t g = 0; g < rule.size; ++g) {

@@ -64,51 +64,75 @@ We are going to track generation through the group mechanism, so I am going to a
 1   1      2
 1   1.5    2
 1   2      2.5
-1   2.5    2.5
-1   3+     2.5
-1.5 1.5    2
-1.5 2
-1.5 2.5
-1.5 3
+1   2.5    2.5?
+1   3+     2.5?
+1.5 1.5    2?
+1.5 2      2.5?
+1.5 2.5    2.5?
+1.5 3      2.5?
 2   2      3
-2   2.5
-2   3 
-2.5 3
+2   2.5    3
+2   3      3
+2.5 3      3
 
 
 ```{r}
 
-inheritance_gen <- group_inheritance(
-  method = "custom",
-  fun = function(mother_group, father_group) {
-    
-  }
-)
-
-increment_gen <- function(gen) {
-  
-  if (gen %in% c("1", "1.5")) {
-    return("2")
-  }
-
-  return("3+")
+# report generation as numeric rounded down
+flatten_gen <- function(gen) {
+  floor(as.numeric(str_remove(gen, "\\+")))
 }
+
+# take numeric value of gen, increment and return character
+increment_gen <- function(gen) {
+  gen <- as.character(min(3, gen + 1))
+  if(gen == "3") {
+    gen = "3+"
+  }
+  gen
+}
+
+gen_inheritance <- function(mother_group, father_group, ...) {
+      if(is.na(father_group) || (mother_group == father_group)) {
+        return(increment_gen(flatten_gen(mother_group)))
+      }
+
+      # get numeric generation of each parent
+      gen_father <- flatten_gen(father_group)
+      gen_mother <- flatten_gen(mother_group)
+
+      # first check for special handling of 2.5 cases. These are
+      # cases where exactly one parent is gen 1
+      if(xor(gen_mother == 1, gen_father == 1)) {
+        return("2.5")
+      }
+
+      # otherwise, take the minimum value and increment
+      increment_gen(min(gen_mother, gen_father))
+}
+
+# test it out
+gens <- c("1", "1.5", "2", "2.5", "3+")
+expand_grid(mother = gens, father = gens) |>
+  mutate(child = map2_chr(mother, father, gen_inheritance)) |>
+  arrange(child) |>
+  print(n = 25)
 
 grp_gen <- group(
   categories =c("1", "1.5", "2", "2.5", "3+"), 
-  inheritance = group_inheritance(
-    method = "custom",
-    fun = function(mother_group, father_group) {
-      if(is.na(father_group) || (mother_group == father_group)) {
-        return(increment_gen(mother_group))
-      }
-
-    
-
-    }
-  )
+  inheritance = group_inheritance(method = "custom", fun = gen_inheritance)
 )
 
+# split 1st gen into 1 and 1.5 by age on arrival
+gen_assignment <- function(members) {
+  ifelse(members$age < 18, "1.5", "1")
+}
+
+# test it out
+test <- tibble(age = 0:25)
+test |> 
+  mutate(generation = gen_assignment(test)) |>
+  print(n = 26)
 ```
 
 ```{r}
@@ -125,9 +149,9 @@ race_exogamy <- c(
 
 # for birthplace, all non-same birthplace cases get the same value
 birthplace_exogamy <- c(
-  "native:asia" = -0.7,
-  "native:latin_america" = -0.7,
-  "asia:latin_america" = -0.7
+  "native:asia" = -1.5,
+  "native:latin_america" = -1.5,
+  "asia:latin_america" = -1.5
 )
 
 ```
@@ -160,7 +184,8 @@ model <- hammel_model() |>
     ),
     region = group(
       categories = c("NE", "MW", "S", "W")
-    )
+    ),
+    generation = grp_gen
   )
 
 # start with no Asian or Latino members
@@ -184,8 +209,13 @@ region_race_dist <- tibble::tribble(
  "Latino",  "W",     0.000
 )
 
+pop_uniform <- generate_uniform_population(50000, groups = region_race_dist)
+
+pop_uniform$persons <- pop_uniform$persons |>
+  mutate(generation = "3+")
+
 model <- model |>
-  set_population(generate_uniform_population(50000, groups = region_race_dist))
+  set_population(pop_uniform)
 
 pop_start <- run_simulation(model, 100, 42, progress = interactive())
 summary(pop_start)
@@ -260,7 +290,8 @@ model <- model |>
       assignment = list(
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.3, "MW" = 0.15, "S" = 0.15, "W" = 0.4)
-        )
+        ),
+        generation = migrant_assignment("custom", fun = gen_assignment)
       ),
       household = household(),
       weights = migrant_selection_fun
@@ -271,7 +302,8 @@ model <- model |>
       assignment = list(
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.25, "MW" = 0.2, "S" = 0.2, "W" = 0.35)
-        )
+        ),
+        generation = migrant_assignment("custom", fun = gen_assignment)
       ),
       household = household(),
       weights = migrant_selection_fun
