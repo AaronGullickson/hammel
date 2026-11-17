@@ -3666,7 +3666,9 @@ signature, selection-weight interpretation or household rule is selected.
 ## D182 — Rate stratification by personal immigration status and stream (November 12, 2026)
 
 **Status:** User-approved design direction, November 12, 2026. Planning only;
-no rate-table schema or implementation is selected.
+no rate-table schema or implementation is selected. Amended by D190: the
+`birthplace` group carries personal status and stream, and starting populations
+default to `"native"`.
 
 **Decision:** Support rate stratification by a person's own immigration
 status and arrival stream, rather than requiring generational classifications
@@ -3983,3 +3985,81 @@ confounds sex with household type: male carriers are always unpartnered.
 These variables let users target household composition directly.
 
 **Supersedes:** D187's deferral of household-level characteristics.
+
+## D190 — Automatic birthplace group (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026, amended November
+17 (ancestry off by default; named `birthplace`, because `origin` and
+`destination` are transition columns), when the user authorized
+implementation. Implemented November 17, 2026.
+
+**Decision:** Models with immigration always have a `birthplace` group
+dimension (see the [specification](immigration.md#birthplace-group)):
+
+- Categories are `"native"` and the stream names. Newborns are `"native"`;
+  arrivals take their stream's name. The template's `birthplace` is
+  ignored.
+- It replaces the `stream` column of `persons`; `arrival_time` remains.
+- Ancestry in `birthplace` is tracked with `birthplace_ancestry = TRUE` on
+  `immigration()`/`set_immigration()`; the default is `FALSE`, matching
+  `group()` and avoiding clutter users did not ask for.
+- Stream names can't be `"native"` or `"birthplace_ancestry"`, and models
+  with immigration can't declare their own `birthplace` group.
+- Starting populations without `birthplace` are `"native"`, meaning not an
+  immigrant during the simulation, as expected of a synthetic population;
+  users who know more supply the column. This relaxes D182's requirement
+  that unknown starting-population histories not be classified as known
+  non-immigration, which the user judged too strong.
+- The automatic dimension never counts as a model's only dimension for
+  defaults (D191 plans to remove those defaults).
+
+**Rationale:** `stream` with `NA` read as `"native"` is already this
+category. As a group it reuses rate stratification, weights, matching,
+observation and restarts, settling D182's choice between a declared group
+and a built-in variable for personal status. Ancestry shares give heritage
+and its dilution over generations without extra machinery. Ancestry is
+opt-in, as for other groups.
+
+## D191 — Deprecate only-dimension defaults (November 17, 2026)
+
+**Status:** User decision, November 17, 2026. Planned for a separate change;
+not implemented.
+
+**Decision:** Deprecate the conveniences that resolve an unnamed dimension
+to a model's only declared dimension: `set_group_transition()` without
+`group`, transition rates without `group`, bare `group_exogamy` and
+`prevent_exogamy` values, default matching pools, and `transitions` input
+without a `group` column. Warn (`deprecated`) when one is used in the next
+release, then remove them.
+
+**Rationale:** Defaults that change meaning when a dimension is added are
+fragile; the automatic `birthplace` dimension (D190) exposed this. Explicit
+names behave the same in every model. Until removal, D190 excludes
+`birthplace` from these defaults.
+
+## D192 — User-defined generation classifications (November 17, 2026)
+
+**Status:** User decision, November 17, 2026. No implementation needed.
+
+**Decision:** Hammel provides no built-in generation rule. Users define
+generation status as a declared group dimension with a
+`group_inheritance("custom")` rule for newborns, `migrant_assignment()` for
+arrivals (age at arrival for 1.25/1.5/1.75 splits) and a supplied column for
+starting populations. Depth, crossed parentage and unknown parents are
+choices inside the user's rule.
+
+**Rationale:** Generation is defined many ways in research, and users are
+skilled researchers who should have full control. The cost of calling R at
+each birth is acceptable.
+
+**Limitations:** Household streams assign one category per household from
+its carrier, so arriving children can't get a different generation (such as
+1.5) through assignment; a template column computed beforehand is copied
+per member. Ancestry shares in `birthplace` measure heritage, not recency:
+with continuing immigration, every share drifts.
+
+**Future use case:** Immigrant shares by generation depth (the share of
+parents, grandparents and so on who were immigrants: a newborn's share at
+depth d is the average of the parents' shares at depth d - 1) measure
+recency without drift. They are a motivating case for the planned general
+quantitative person characteristics (D176).

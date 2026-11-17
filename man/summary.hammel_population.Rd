@@ -35,7 +35,8 @@ including persons in the starting population but not immigrants.}
 \item{n_immigrants}{The number of recorded persons who immigrated, or
 \code{NA} when the population has no arrival records.}
 \item{immigrants_by_stream}{A named integer vector of immigrants by
-stream, or \code{NULL} when the population has no arrival records.}
+stream (their \code{birthplace}), or \code{NULL} when the population has no
+arrival records.}
 \item{n_unions}{The number of recorded union episodes, including
 ended unions but not unions that began before an immigrant partner's
 arrival.}

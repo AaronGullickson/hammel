@@ -578,3 +578,11 @@ arrival, with durations from their original start. See the
 [phase 3 specification](immigration.md#phase-3-specification). Cloning
 streams skip the history import and warn at construction when the template
 has unions or transitions; see [cloning streams](immigration.md#cloning-streams).
+
+Models with immigration add an automatic `birthplace` dimension (D190) to the
+declaration before the run: `"native"` plus the stream names, fixed native
+inheritance, ancestry only with `birthplace_ancestry = TRUE`. Each stream
+assigns its own name internally, ignoring the template's `birthplace`; it
+replaces the former `stream` column. The dimension is flagged `automatic`
+and excluded from only-dimension defaults. See the
+[birthplace group](immigration.md#birthplace-group).

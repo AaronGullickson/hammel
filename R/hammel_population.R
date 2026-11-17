@@ -204,7 +204,8 @@ validate_population <- function(results) {
 #'   \item{n_immigrants}{The number of recorded persons who immigrated, or
 #'     `NA` when the population has no arrival records.}
 #'   \item{immigrants_by_stream}{A named integer vector of immigrants by
-#'     stream, or `NULL` when the population has no arrival records.}
+#'     stream (their `birthplace`), or `NULL` when the population has no
+#'     arrival records.}
 #'   \item{n_unions}{The number of recorded union episodes, including
 #'     ended unions but not unions that began before an immigrant partner's
 #'     arrival.}
@@ -297,10 +298,12 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
   if ("pre_migration" %in% names(unions)) {
     unions <- unions[!unions$pre_migration, , drop = FALSE]
   }
-  if ("stream" %in% names(object$persons)) {
-    born <- born & is.na(object$persons$arrival_time)
-    streams <- object$persons$stream[!is.na(object$persons$stream)]
-    n_immigrants <- length(streams)
+  if ("arrival_time" %in% names(object$persons)) {
+    arrived <- !is.na(object$persons$arrival_time)
+    born <- born & !arrived
+    n_immigrants <- sum(arrived)
+    # An immigrant's birthplace is their stream (D190).
+    streams <- as.character(object$persons$birthplace[arrived])
     immigrants_by_stream <- c(table(streams))
     immigrants_by_stream <- stats::setNames(
       as.integer(immigrants_by_stream), names(immigrants_by_stream)

@@ -370,6 +370,15 @@ model_groups <- function(model) {
   if (!is.null(model$groups)) model$groups else model$population$groups
 }
 
+# Declared dimensions that count as "the only dimension" for defaults: all but
+# the automatic birthplace dimension (D190).
+counted_dimensions <- function(declaration) {
+  automatic <- vapply(
+    declaration, function(x) isTRUE(x$automatic), logical(1)
+  )
+  names(declaration)[!automatic]
+}
+
 # Is a group dimension (any, or the named one) declared for this population?
 declared_group <- function(population, name = NULL) {
   inherits(population, "hammel_population") &&

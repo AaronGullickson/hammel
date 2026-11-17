@@ -5,20 +5,24 @@
 \alias{set_immigration}
 \title{Specify external immigration}
 \usage{
-immigration(...)
+immigration(..., birthplace_ancestry = FALSE)
 
-set_immigration(model, ...)
+set_immigration(model, ..., birthplace_ancestry = FALSE)
 }
 \arguments{
 \item{...}{Named \code{\link[=immigration_stream]{immigration_stream()}} objects, one per stream. The
 argument names are the stream names.}
 
+\item{birthplace_ancestry}{Whether to track ancestry in the automatic
+\code{birthplace} group. Defaults to \code{FALSE}, as for \code{\link[=group]{group()}}.}
+
 \item{model}{A \code{hammel_model} object, used by \code{set_immigration()}.}
 }
 \value{
 \code{immigration()} returns an inspectable process inheriting from
-\code{hammel_immigration} and \code{hammel_process}, with \code{name} and a named list
-of \code{streams}. \code{set_immigration()} returns an updated \code{hammel_model}.
+\code{hammel_immigration} and \code{hammel_process}, with \code{name}, a named list
+of \code{streams} and \code{birthplace_ancestry}. \code{set_immigration()} returns an
+updated \code{hammel_model}.
 }
 \description{
 DRAFT: agent-written documentation that needs user review and editing.
@@ -32,8 +36,9 @@ model.
 }
 \details{
 Each named argument is one stream, and its name identifies the stream in
-the \code{stream} column of simulated persons. Every stream must be named, and
-names must be unique.
+the \code{birthplace} group of simulated persons. Every stream must be named,
+names must be unique, and no stream can be named \code{"native"} or
+\code{"birthplace_ancestry"}.
 
 A model has at most one immigration process. Each call to
 \code{set_immigration()} defines the complete set of streams, replacing any
@@ -58,9 +63,20 @@ imported duration; it is a pre-migration union, so rate calculations count
 its dissolution and conversion only from arrival and never count its
 formation.
 
-Simulated populations of models with immigration gain \code{arrival_time} and
-\code{stream} columns in \code{persons}, which are \code{NA} for people who did not
-immigrate, and a \code{pre_migration} column in \code{unions} and \code{transitions}.
+Models with immigration have an automatic group dimension, \code{birthplace}.
+Its categories are \code{"native"}, for everyone born in the population
+(including the starting population, unless it supplies a \code{birthplace}
+column), and the stream names, for immigrants. Like any group, it can
+stratify rates and appear in weight models, matching models and \code{by}
+arguments, but it never counts as a model's only dimension, and models
+with immigration can't declare their own \code{birthplace} group. With
+\code{birthplace_ancestry = TRUE}, ancestry is tracked in \code{birthplace}, so
+descendants of immigrants carry their heritage shares, such as
+\code{ancestry_birthplace_asia} in weight models.
+
+Simulated populations of models with immigration gain an \code{arrival_time}
+column in \code{persons}, which is \code{NA} for people who did not immigrate, and a
+\code{pre_migration} column in \code{unions} and \code{transitions}.
 External relatives have a \code{censor_time}, after which nothing is known about
 them. Observation functions such as \code{\link[=calculate_life_table]{calculate_life_table()}} count a
 migrant's exposure and events only from their arrival.
@@ -74,7 +90,7 @@ model <- hammel_model() |>
   set_union_formation("on_demand") |>
   set_immigration(origin = immigration_stream(template, intensity = 20))
 result <- run_simulation(model, years = 10, seed = 1)
-table(result$persons$stream, useNA = "ifany")
+table(result$persons$birthplace)
 }
 \seealso{
 \code{\link[=immigration_stream]{immigration_stream()}}, \code{\link[=migrant_assignment]{migrant_assignment()}}, \code{\link[=set_process]{set_process()}}

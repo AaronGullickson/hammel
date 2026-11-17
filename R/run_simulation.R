@@ -86,7 +86,15 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     )
   }
   population <- model$population
-  population <- apply_group_declaration(population, model_groups(model))
+  # Models with immigration, and populations that have had it, carry the
+  # automatic birthplace dimension (D190).
+  declared <- with_birthplace(
+    population, model_groups(model), model$processes$immigration,
+    user_groups = model$groups
+  )
+  population <- apply_group_declaration(
+    declared$population, declared$declaration
+  )
   check_population(population)
   population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
@@ -382,10 +390,11 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   )
   resolved <- resolve_matching_models(union_process, declaration, registries)
   union_process <- resolved$process
+  counted <- counted_dimensions(declaration)
   match_dims <- if (length(resolved$dims)) {
     resolved$dims
-  } else if (length(dimensions) == 1L) {
-    dimensions
+  } else if (length(counted) == 1L) {
+    counted
   }
   group_values <- if (length(resolved$dims)) {
     resolved$values
@@ -984,9 +993,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   if (!is.null(immigration_process)) {
     arrivals <- if (years > 0) native$arrivals else NULL
-    result$persons <- record_arrivals(
-      result$persons, arrivals, names(immigration_process$streams)
-    )
+    result$persons <- record_arrivals(result$persons, arrivals)
     result <- import_histories(
       result, arrivals, immigration_process, immigration_input, declaration,
       registries

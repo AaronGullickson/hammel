@@ -1597,3 +1597,26 @@ assignment that sends couples' households to one region, and the error for
 household variables on a cloning stream. `devtools::test()` passed 8,899
 expectations with no failures or warnings and one skip (the opt-in live
 database test).
+
+## Birthplace group (November 17, 2026)
+
+`tests/testthat/test-immigration-birthplace.R` covers D190: categories
+(`"native"` and the streams) and the `automatic` flag; native newborns of
+immigrant mothers; no `stream` column; opt-in ancestry, with immigrants at
+100% of their stream, the starting population native, and newborns at the
+average of their parents' shares (an unknown father's half unknown); a
+template's own birthplace ignored; persistence through restarts with and
+without immigration, new streams adding categories, and supplied starting
+birthplaces; mortality stratified by birthplace; `birthplace` excluded from
+only-dimension defaults (transitions without `group`, bare `group_exogamy`,
+transition rates and observation by the one declared dimension); and
+validation of reserved stream names, `birthplace_ancestry`, assignments and
+user-declared `birthplace` groups. The immigration tests were updated for
+the `birthplace` column and its entry rows, and a combined observation view
+now keeps `pre_migration` on its empty transitions table.
+
+The offline test files other than the four immigration files made 1,830
+native calls on `master` (5640556) and on this branch with
+`-ffp-contract=off`, all with identical hashes. `devtools::test()` passed
+8,958 expectations with no failures or warnings and one skip (the opt-in
+live database test).

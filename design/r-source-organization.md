@@ -156,7 +156,7 @@ Retrieve HMD mortality and HFD fertility rates, convert them to Hammel tables, a
 
 Declare group dimensions and apply/check declarations.
 
-- Functions: **`group()`**, `validate_group()`, `check_group_names()`, `normalize_group_declaration()`, **`set_groups()`**, `apply_group_declaration()`, `model_groups()`, `declared_group()`, `single_dimension()`, `validate_group_declaration()`.
+- Functions: **`group()`**, `validate_group()`, `check_group_names()`, `normalize_group_declaration()`, **`set_groups()`**, `apply_group_declaration()`, `model_groups()`, `counted_dimensions()`, `declared_group()`, `single_dimension()`, `validate_group_declaration()`.
 
 ### `R/group_history.R`
 
@@ -198,7 +198,7 @@ Specify persistent fertility heterogeneity and initialize/check individual weigh
 
 Construct, validate, and attach immigration streams (D184–D187); prepare migrants and households and their imported state for the engine; import histories after a run; validate and record arrival columns, external relatives and `pre_migration`; provide history lookups that include external relatives.
 
-- Functions: **`immigration()`**, **`set_immigration()`**, **`immigration_stream()`**, **`migrant_assignment()`**, **`summary.hammel_immigration()`**, **`print.summary.hammel_immigration()`**, `new_immigration()`, `validate_immigration()`, `new_immigration_stream()`, `validate_immigration_stream()`, `check_intensity()`, `validate_migrant_assignment()`, `migrant_parties()`, `clone_state()`, `intensity_table()`, `complete_ancestry_columns()`, `prepare_immigration()`, `prepare_stream()`, `migrant_probabilities()`, `assignment_probabilities()`, `migrant_ancestry()`, `template_people()`, `migrant_history_state()`, `check_arrivals()`, `check_external_relatives()`, `check_pre_migration()`, `bind_columns()`, `import_histories()`, `with_external_rows()`, `history_people()`, `kin_people()`, `observed_unions()`, `mark_pre_migration()`, `record_arrivals()`.
+- Functions: **`immigration()`**, **`set_immigration()`**, **`immigration_stream()`**, **`migrant_assignment()`**, **`summary.hammel_immigration()`**, **`print.summary.hammel_immigration()`**, `new_immigration()`, `validate_immigration()`, `new_immigration_stream()`, `validate_immigration_stream()`, `check_intensity()`, `validate_migrant_assignment()`, `migrant_parties()`, `clone_state()`, `with_birthplace()`, `intensity_table()`, `complete_ancestry_columns()`, `prepare_immigration()`, `prepare_stream()`, `migrant_probabilities()`, `assignment_probabilities()`, `migrant_ancestry()`, `template_people()`, `migrant_history_state()`, `check_arrivals()`, `check_external_relatives()`, `check_pre_migration()`, `bind_columns()`, `import_histories()`, `with_external_rows()`, `history_people()`, `kin_people()`, `observed_unions()`, `mark_pre_migration()`, `record_arrivals()`.
 
 ### `R/matching_groups.R`
 

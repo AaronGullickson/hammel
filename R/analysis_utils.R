@@ -425,8 +425,13 @@ observation_alias <- function(
   dims <- names(population$groups)
   none$dims <- dims
   external <- as.vector(outer(dims, suffixes, paste0))
-  if (length(dims) == 1L && !length(extra)) {
-    dim <- dims
+  # The automatic birthplace dimension (D190) never becomes "the only
+  # dimension"; splitting by it uses the general path.
+  counted <- counted_dimensions(population$groups)
+  uncounted <- setdiff(dims, counted)
+  if (length(counted) == 1L && !length(extra) &&
+        !any(as.vector(outer(uncounted, suffixes, paste0)) %in% by)) {
+    dim <- counted
     if (dim != "group" && any(paste0("group", suffixes) %in% by)) {
       abort_hammel(
         c(
@@ -480,6 +485,10 @@ observation_alias <- function(
   view$persons$group <- combined$current
   view$groups <- list(group = group())
   view$transitions <- empty_transitions()
+  # Arrival records require the pre-migration flag (D186).
+  if ("pre_migration" %in% names(population$transitions)) {
+    view$transitions$pre_migration <- logical()
+  }
   view["ancestry"] <- list(NULL)
   view[[".hammel_combined"]] <- list(
     values = seq_len(combined$count) - 1L,

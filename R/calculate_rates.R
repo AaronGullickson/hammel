@@ -531,7 +531,7 @@ calculate_transition_rates <- function(
       "groups"
     )
   }
-  dims <- names(population$groups)
+  dims <- counted_dimensions(population$groups)
   if (is.null(group)) {
     if (length(dims) != 1L) {
       abort_hammel(

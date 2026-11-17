@@ -19,8 +19,9 @@
 #' @details
 #'
 #' Each named argument is one stream, and its name identifies the stream in
-#' the `stream` column of simulated persons. Every stream must be named, and
-#' names must be unique.
+#' the `birthplace` group of simulated persons. Every stream must be named,
+#' names must be unique, and no stream can be named `"native"` or
+#' `"birthplace_ancestry"`.
 #'
 #' A model has at most one immigration process. Each call to
 #' `set_immigration()` defines the complete set of streams, replacing any
@@ -45,19 +46,33 @@
 #' its dissolution and conversion only from arrival and never count its
 #' formation.
 #'
-#' Simulated populations of models with immigration gain `arrival_time` and
-#' `stream` columns in `persons`, which are `NA` for people who did not
-#' immigrate, and a `pre_migration` column in `unions` and `transitions`.
+#' Models with immigration have an automatic group dimension, `birthplace`.
+#' Its categories are `"native"`, for everyone born in the population
+#' (including the starting population, unless it supplies a `birthplace`
+#' column), and the stream names, for immigrants. Like any group, it can
+#' stratify rates and appear in weight models, matching models and `by`
+#' arguments, but it never counts as a model's only dimension, and models
+#' with immigration can't declare their own `birthplace` group. With
+#' `birthplace_ancestry = TRUE`, ancestry is tracked in `birthplace`, so
+#' descendants of immigrants carry their heritage shares, such as
+#' `ancestry_birthplace_asia` in weight models.
+#'
+#' Simulated populations of models with immigration gain an `arrival_time`
+#' column in `persons`, which is `NA` for people who did not immigrate, and a
+#' `pre_migration` column in `unions` and `transitions`.
 #' External relatives have a `censor_time`, after which nothing is known about
 #' them. Observation functions such as [calculate_life_table()] count a
 #' migrant's exposure and events only from their arrival.
 #'
 #' @param ... Named [immigration_stream()] objects, one per stream. The
 #'   argument names are the stream names.
+#' @param birthplace_ancestry Whether to track ancestry in the automatic
+#'   `birthplace` group. Defaults to `FALSE`, as for [group()].
 #' @param model A `hammel_model` object, used by `set_immigration()`.
 #' @return `immigration()` returns an inspectable process inheriting from
-#'   `hammel_immigration` and `hammel_process`, with `name` and a named list
-#'   of `streams`. `set_immigration()` returns an updated `hammel_model`.
+#'   `hammel_immigration` and `hammel_process`, with `name`, a named list
+#'   of `streams` and `birthplace_ancestry`. `set_immigration()` returns an
+#'   updated `hammel_model`.
 #' @seealso [immigration_stream()], [migrant_assignment()], [set_process()]
 #' @export
 #' @examples
@@ -69,17 +84,17 @@
 #'   set_union_formation("on_demand") |>
 #'   set_immigration(origin = immigration_stream(template, intensity = 20))
 #' result <- run_simulation(model, years = 10, seed = 1)
-#' table(result$persons$stream, useNA = "ifany")
+#' table(result$persons$birthplace)
 #' @order 1
-immigration <- function(...) {
-  new_immigration(list(...))
+immigration <- function(..., birthplace_ancestry = FALSE) {
+  new_immigration(list(...), birthplace_ancestry)
 }
 
 #' @rdname immigration
 #' @export
 #' @order 2
-set_immigration <- function(model, ...) {
-  attach_process(model, new_immigration(list(...)))
+set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
+  attach_process(model, new_immigration(list(...), birthplace_ancestry))
 }
 
 #' Describe one stream of immigrants
@@ -262,7 +277,9 @@ migrant_assignment <- function(
 #'
 #' @return
 #' `summary()` returns an object of class `summary.hammel_immigration`
-#' containing `streams`, a named list with one element per stream holding
+#' containing `birthplace_ancestry` (whether ancestry is tracked in the
+#' `birthplace` group) and `streams`, a named list with one element per
+#' stream holding
 #' `template_size` (persons in the template), `eligible` (households, or for
 #' cloning streams template people, that can be drawn), `household` (the
 #' household rule's `age_independence`, or `NULL` for cloning streams),
@@ -299,7 +316,13 @@ summary.hammel_immigration <- function(object, ...) {
       )
     }
   )
-  structure(list(streams = streams), class = "summary.hammel_immigration")
+  structure(
+    list(
+      streams = streams,
+      birthplace_ancestry = isTRUE(object$birthplace_ancestry)
+    ),
+    class = "summary.hammel_immigration"
+  )
 }
 
 #' @rdname summary.hammel_immigration
@@ -310,6 +333,10 @@ print.summary.hammel_immigration <- function(x, ...) {
   cli::cli_h2("Immigration process")
   list <- open_summary_list()
   print_stat("Streams", length(x$streams))
+  print_stat(
+    "Birthplace ancestry tracked",
+    if (isTRUE(x$birthplace_ancestry)) "yes" else "no"
+  )
   for (name in names(x$streams)) {
     stream <- x$streams[[name]]
     item <- open_nested_stat("Stream", name)
@@ -359,8 +386,15 @@ print.summary.hammel_immigration <- function(x, ...) {
 
 # INTERNAL CONSTANTS -------------------------------------------------------
 
-# Columns that record arrivals in `persons` (D185).
-arrival_columns <- c("arrival_time", "stream")
+# Columns that record arrivals in `persons` (D185); the stream is the
+# arrival's `birthplace` (D190).
+arrival_columns <- "arrival_time"
+
+# The automatic group dimension of models with immigration (D190), its
+# category for people born in the population, and names streams can't take.
+birthplace_dimension <- "birthplace"
+native_birthplace <- "native"
+reserved_stream_names <- c(native_birthplace, "birthplace_ancestry")
 
 assignment_methods <- c("fixed", "probability", "custom")
 
@@ -373,9 +407,17 @@ household_variables <- c(
 
 # Build a validated immigration process from a list of streams; errors name
 # `call`.
-new_immigration <- function(streams, call = rlang::caller_env()) {
+new_immigration <- function(
+  streams,
+  birthplace_ancestry = FALSE,
+  call = rlang::caller_env()
+) {
   process <- structure(
-    list(name = "immigration", streams = streams),
+    list(
+      name = "immigration",
+      streams = streams,
+      birthplace_ancestry = birthplace_ancestry
+    ),
     class = c("hammel_immigration", "hammel_process")
   )
   validate_immigration(process, call = call)
@@ -383,6 +425,10 @@ new_immigration <- function(streams, call = rlang::caller_env()) {
 }
 
 validate_immigration <- function(process, call = rlang::caller_env()) {
+  check_flag(
+    process$birthplace_ancestry, "birthplace_ancestry",
+    call = call
+  )
   streams <- process$streams
   if (!is.list(streams) || inherits(streams, "hammel_immigration_stream")) {
     abort_hammel(
@@ -409,6 +455,21 @@ validate_immigration <- function(process, call = rlang::caller_env()) {
         "Every immigration stream must be named.",
         "x" = "Unnamed {cli::qty(length(unnamed))}stream{?s}: {unnamed}.",
         "i" = "Name each stream, as in {.code origin = immigration_stream()}."
+      ),
+      "specification",
+      argument = "...",
+      call = call
+    )
+  }
+  reserved <- intersect(stream_names, reserved_stream_names)
+  if (length(reserved)) {
+    abort_hammel(
+      c(
+        "Immigration streams can't be named {.val {reserved}}.",
+        "i" = paste(
+          "Stream names are categories of the {.field birthplace} group,",
+          "where {.val native} means born in the population."
+        )
       ),
       "specification",
       argument = "...",
@@ -853,6 +914,69 @@ migrant_parties <- function(template, household) {
   )
 }
 
+# The declaration and population of a run with the automatic birthplace
+# dimension (D190), present when the model has immigration or the population
+# already has it. Categories are "native", the streams, and any earlier
+# categories; newborns are always native. People without a recorded
+# birthplace are native. `user_groups` is the model's set_groups()
+# declaration, which can't declare birthplace alongside immigration.
+with_birthplace <- function(
+  population,
+  declaration,
+  process,
+  user_groups = NULL,
+  call = rlang::caller_env()
+) {
+  name <- birthplace_dimension
+  existing <- population$groups[[name]]
+  if (!isTRUE(existing$automatic)) {
+    existing <- NULL
+  }
+  if (is.null(process) && is.null(existing)) {
+    return(list(population = population, declaration = declaration))
+  }
+  if (!is.null(process) && name %in% names(user_groups)) {
+    abort_hammel(
+      c(
+        "Models with immigration can't declare a {.field birthplace} group.",
+        "i" = paste(
+          "{.field birthplace} is created automatically: {.val native} for",
+          "people born in the population, and the stream name for immigrants."
+        )
+      ),
+      "groups",
+      group = name,
+      call = call
+    )
+  }
+  persons <- population$persons
+  if (!name %in% names(persons)) {
+    persons[[name]] <- rep(native_birthplace, nrow(persons))
+  }
+  values <- as.character(persons[[name]])
+  categories <- unique(
+    c(
+      native_birthplace, as.character(existing$categories),
+      names(process$streams), values[!is.na(values)]
+    )
+  )
+  persons[[name]] <- values
+  population$persons <- persons
+  ancestry <- if (is.null(process)) {
+    isTRUE(existing$ancestry)
+  } else {
+    isTRUE(process$birthplace_ancestry)
+  }
+  entry <- group(
+    categories = categories,
+    ancestry = ancestry,
+    inheritance = group_inheritance("fixed", fixed_value = native_birthplace)
+  )
+  entry$automatic <- TRUE
+  declaration[[name]] <- entry
+  list(population = population, declaration = declaration)
+}
+
 # A stream's intensity as calendar intervals; a constant applies throughout.
 intensity_table <- function(intensity) {
   if (!is.data.frame(intensity)) {
@@ -954,6 +1078,26 @@ prepare_stream <- function(
 ) {
   template <- stream$template
   intensity <- intensity_table(stream$intensity)
+  rules <- stream$assignment
+  if (birthplace_dimension %in% names(rules)) {
+    abort_hammel(
+      c(
+        "Assignments can't set {.field birthplace}.",
+        "i" = "Each migrant's birthplace is their stream's name."
+      ),
+      "specification",
+      argument = "assignment",
+      group = birthplace_dimension,
+      call = call
+    )
+  }
+  # A migrant's birthplace is their stream (D190); the template's is ignored.
+  if (birthplace_dimension %in% names(declaration)) {
+    rules[[birthplace_dimension]] <- migrant_assignment(
+      "fixed",
+      fixed_value = name
+    )
+  }
   if (is.data.frame(stream$intensity)) {
     check_time_coverage(
       intensity$time_start, intensity$time_end, start, end,
@@ -977,7 +1121,7 @@ prepare_stream <- function(
   }
   persons <- template$persons[rows, , drop = FALSE]
   dimensions <- names(declaration)
-  template_dims <- names(template$groups)
+  template_dims <- setdiff(names(template$groups), birthplace_dimension)
   shared <- intersect(dimensions, template_dims)
   assigned <- setdiff(dimensions, template_dims)
   template_registries <- if (length(template_dims)) {
@@ -1010,7 +1154,6 @@ prepare_stream <- function(
       )
     }
   }
-  rules <- stream$assignment
   overriding <- intersect(names(rules), template_dims)
   if (length(overriding)) {
     abort_hammel(
@@ -1454,24 +1597,8 @@ migrant_ancestry <- function(
 # Arrival columns of a population's persons: both or neither, consistent,
 # and within each migrant's life and the population's endpoint.
 check_arrivals <- function(persons, end_time, call = rlang::caller_env()) {
-  present <- intersect(arrival_columns, names(persons))
-  if (!length(present)) {
+  if (!"arrival_time" %in% names(persons)) {
     return(invisible(persons))
-  }
-  if (length(present) == 1L) {
-    absent <- setdiff(arrival_columns, present)
-    abort_hammel(
-      c(
-        "Arrival records need both {.field arrival_time} and {.field stream}.",
-        "x" = paste(
-          "{.field persons} has {.field {present}} but not",
-          "{.field {absent}}."
-        )
-      ),
-      "population",
-      argument = "persons",
-      call = call
-    )
   }
   arrival <- persons$arrival_time
   check_numeric_column(
@@ -1479,27 +1606,16 @@ check_arrivals <- function(persons, end_time, call = rlang::caller_env()) {
     missing = TRUE,
     call = call
   )
-  stream <- persons$stream
-  if (!is.character(stream)) {
-    abort_hammel(
-      c(
-        "{.field persons$stream} must contain stream names.",
-        "x" = "It is {describe_value(stream)}."
-      ),
-      "table",
-      argument = "persons$stream",
+  # An arrival's birthplace is their stream, never "native" (D190).
+  if (birthplace_dimension %in% names(persons)) {
+    place <- as.character(persons[[birthplace_dimension]])
+    abort_population_rows(
+      which(!is.na(arrival) & (is.na(place) | place == native_birthplace)),
+      "Immigrants' {.field birthplace} must be their stream.",
+      "Immigrants with birthplace {.val native} or {.code NA}",
       call = call
     )
   }
-  abort_population_rows(
-    which(is.na(arrival) != is.na(stream)),
-    paste(
-      "{.field arrival_time} and {.field stream} must both be missing or",
-      "both be present."
-    ),
-    "Mismatched arrival records",
-    call = call
-  )
   abort_population_rows(
     which(!is.na(arrival) & arrival < persons$birth_time),
     "Arrivals must not precede births.",
@@ -1758,7 +1874,9 @@ import_histories <- function(
     if (is.null(t_moves)) {
       t_moves <- empty_transitions()
     }
-    template_dims <- intersect(dimensions, names(template$groups))
+    template_dims <- intersect(
+      dimensions, setdiff(names(template$groups), birthplace_dimension)
+    )
     # Clones import no records, and enter every group at arrival (D188).
     if (is.null(process$streams[[s]]$household)) {
       t_unions <- t_unions[0, , drop = FALSE]
@@ -2100,22 +2218,15 @@ mark_pre_migration <- function(population) {
   population
 }
 
-# Fill the arrival columns of simulated persons from the engine's records.
+# Fill the arrival times of simulated persons from the engine's records.
 # Earlier arrivals and other people keep their values; new rows are NA.
-record_arrivals <- function(persons, arrivals, stream_names) {
-  for (column in arrival_columns) {
-    if (!column %in% names(persons)) {
-      persons[[column]] <- if (column == "stream") {
-        rep(NA_character_, nrow(persons))
-      } else {
-        rep(NA_real_, nrow(persons))
-      }
-    }
+record_arrivals <- function(persons, arrivals) {
+  if (!"arrival_time" %in% names(persons)) {
+    persons$arrival_time <- rep(NA_real_, nrow(persons))
   }
   if (!is.null(arrivals) && length(arrivals$person_id)) {
     rows <- match(arrivals$person_id, persons$person_id)
     persons$arrival_time[rows] <- arrivals$time
-    persons$stream[rows] <- stream_names[arrivals$stream + 1L]
   }
   persons
 }

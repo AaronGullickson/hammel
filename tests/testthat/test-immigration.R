@@ -210,11 +210,12 @@ test_that("migrants keep age and sex and arrive without relatives", {
   age <- arrived$arrival_time - arrived$birth_time
   expect_true(all(abs(age - ifelse(arrived$sex == "f", 25, 61)) < 1e-9))
   expect_true(all(is.na(arrived$mother_id) & is.na(arrived$father_id)))
-  expect_identical(unique(arrived$stream), "origin")
+  expect_identical(unique(arrived$birthplace), "origin")
   expect_false(any(duplicated(result$persons$person_id)))
   expect_true(all(arrived$person_id > 10))
-  # The original people have no arrival record.
-  expect_true(all(is.na(result$persons$stream[1:10])))
+  # The original people have no arrival record and are native.
+  expect_true(all(is.na(result$persons$arrival_time[1:10])))
+  expect_true(all(result$persons$birthplace[1:10] == "native"))
   # The template is untouched.
   expect_identical(
     model$processes$immigration$streams$origin$template, template
@@ -259,7 +260,9 @@ test_that("cloning streams draw anyone alive without their histories", {
   entry <- result$transitions[
     result$transitions$person_id %in% arrived$person_id,
   ]
-  expect_identical(nrow(entry), nrow(arrived))
+  # One entry per arrival in region and in the automatic birthplace.
+  expect_identical(nrow(entry), 2L * nrow(arrived))
+  expect_setequal(entry$group, c("region", "birthplace"))
   expect_true(all(is.na(entry$origin)))
   expect_equal(
     entry$time, arrived$arrival_time[match(entry$person_id, arrived$person_id)]
@@ -543,17 +546,21 @@ test_that("a constant death rate is recovered from migrants' exposure", {
 test_that("arrival columns appear only with immigration and survive restarts", {
   model <- quiet_model()
   plain <- run_simulation(model, 1, seed = 1)
-  expect_false(any(c("arrival_time", "stream") %in% names(plain$persons)))
+  expect_false(
+    any(c("arrival_time", "birthplace") %in% names(plain$persons))
+  )
   migrating <- set_immigration(
     model, a = immigration_stream(immigration_template(30), 20)
   )
   none <- run_simulation(migrating, 0)
-  expect_true(all(c("arrival_time", "stream") %in% names(none$persons)))
+  expect_true(all(c("arrival_time", "birthplace") %in% names(none$persons)))
+  expect_false("stream" %in% names(none$persons))
   result <- run_simulation(migrating, 1, seed = 1)
   restarted <- run_simulation(set_population(model, result), 1, seed = 2)
   kept <- restarted$persons[seq_len(nrow(result$persons)), ]
   expect_identical(kept$arrival_time, result$persons$arrival_time)
-  expect_identical(kept$stream, result$persons$stream)
+  expect_identical(kept$birthplace, result$persons$birthplace)
+  expect_true(restarted$groups$birthplace$automatic)
 })
 
 test_that("models without streams are unchanged", {
@@ -576,13 +583,8 @@ test_that("arrival records are validated in populations", {
   )
   persons <- result$persons
   bad <- persons
-  bad$stream <- NULL
-  expect_hammel_error(
-    hammel_population(bad, end_time = 1), "population", "hammel_population"
-  )
-  bad <- persons
   row <- which(!is.na(bad$arrival_time))[1]
-  bad$stream[row] <- NA
+  bad$birthplace[row] <- "native"
   expect_hammel_error(
     hammel_population(bad, end_time = 1), "population", "hammel_population"
   )
@@ -631,8 +633,9 @@ test_that("population summaries count immigrants by stream", {
   )
   result <- run_simulation(model, 2, seed = 3)
   s <- summary(result)
-  streams <- result$persons$stream
-  expect_identical(s$n_immigrants, sum(!is.na(streams)))
+  arrived <- !is.na(result$persons$arrival_time)
+  streams <- result$persons$birthplace[arrived]
+  expect_identical(s$n_immigrants, sum(arrived))
   expect_identical(
     s$immigrants_by_stream,
     c(a = sum(streams %in% "a"), b = sum(streams %in% "b"))

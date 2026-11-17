@@ -27,8 +27,9 @@ normalize_population_transitions <- function(population) {
     return(population)
   }
   tx <- tibble::as_tibble(tx)
-  if (!"group" %in% names(tx) && length(dims) == 1L) {
-    tx$group <- rep(dims, nrow(tx))
+  counted <- counted_dimensions(population$groups)
+  if (!"group" %in% names(tx) && length(counted) == 1L) {
+    tx$group <- rep(counted, nrow(tx))
     tx <- tx[c(
       "person_id", "time", "group", setdiff(
         names(tx), c("person_id", "time", "group")

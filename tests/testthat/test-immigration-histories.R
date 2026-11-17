@@ -205,7 +205,7 @@ test_that("group duration continues from the template or starts at arrival", {
   tx <- result$transitions
   tx <- tx[tx$person_id %in% arrived$person_id, ]
   # Entry rows record the assigned region at arrival.
-  entries <- tx[is.na(tx$origin), ]
+  entries <- tx[is.na(tx$origin) & tx$group != "birthplace", ]
   expect_identical(nrow(entries), nrow(arrived))
   expect_true(all(entries$group == "region" & entries$destination == "s"))
   expect_false(any(entries$pre_migration))

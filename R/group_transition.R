@@ -380,12 +380,11 @@ store_transition_process <- function(
   process,
   call = rlang::caller_env()
 ) {
-  declaration <- model_groups(model)
-  if (is.null(process$group) && length(declaration) == 1L) {
-    process$group <- names(declaration)
+  dimensions <- counted_dimensions(model_groups(model))
+  if (is.null(process$group) && length(dimensions) == 1L) {
+    process$group <- dimensions
   }
-  if (is.null(process$group) && length(declaration) > 1L) {
-    dimensions <- names(declaration)
+  if (is.null(process$group) && length(dimensions) > 1L) {
     abort_hammel(
       c(
         "{.arg group} must name the dimension whose categories change.",

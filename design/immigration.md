@@ -53,6 +53,7 @@ remain separate responsibilities. The public interface is described in
 | Selective migration | A weight model selects among a stream's eligible template people; intensity is unchanged | D180, D184 |
 | Migration histories | Separate personal/family facts from reusable, named classifications | D181 |
 | Rate schedules | Stratify by personal immigration status and stream; generation rules stay outside the required rate-table schema | D182 |
+| Birthplace | Automatic `birthplace` group (`"native"` or stream), replacing `stream`; optional heritage ancestry; never the only dimension | D190 |
 | Phase 3 contract | Household parties under D140's rule; carriers sampled; intensity in persons converted by expected party size; ongoing unions arrive live and are left-truncated | D187 |
 | Households | Arrivals are parties; household parties are phase 3 | D179–D180, D184, D187 |
 | Cloning | Household streams are the default; `household = NULL` clones age, sex and groups without history | D188 |
@@ -607,6 +608,75 @@ arrival is one person, so the clock runs at `intensity`.
 or transitions warns (kind `no_effect`) that these histories will not come
 with migrants, and that a `household()` rule imports them.
 
+## Birthplace group
+
+User decisions, November 16 and 17, 2026 (D190). Implemented November 17,
+2026; see [testing](testing.md#birthplace-group-november-17-2026). The
+dimension is named `birthplace` because `origin` and `destination` are
+transition columns.
+
+**Always on.** Every model with an immigration process has a group
+dimension `birthplace`, created automatically and marked `automatic`. Its
+categories are `"native"`, any categories the population already has, and
+the stream names in declaration order. It replaces the former `stream`
+column of `persons`: an immigrant's `birthplace` is their stream's name,
+and everyone else's is `"native"`. `arrival_time` remains the arrival
+record. Stream names can't be `"native"` or `"birthplace_ancestry"`, and a
+model with immigration can't declare its own `birthplace` group. Populations
+that already have the automatic dimension keep it in later runs, with or
+without immigration.
+
+**Category: personal status.** Newborns are always `"native"` (fixed
+inheritance, not configurable). An arrival's category is their stream's
+name; the template's own `birthplace`, if any, is ignored, and
+`assignment` can't set it. The category therefore records personal
+immigration status and stream, which D182 rate strata, weight models,
+matching and `by = "birthplace"` observation use like any group. Each
+arrival gets an entry row in `birthplace`, so group duration starts at
+arrival and duration-based transitions in the dimension measure time since
+arrival.
+
+**Only-dimension defaults.** The automatic dimension never counts as a
+model's only dimension: transitions without `group`, bare matching settings,
+default matching pools, transition rates without `group`, `transitions`
+input without a `group` column and observation by a single dimension all
+ignore it. It is used only when named.
+
+**Ancestry: heritage.** `immigration(..., birthplace_ancestry = TRUE)` (and
+`set_immigration()`) tracks ancestry in `birthplace`; the default is
+`FALSE`, as for `group()`. Shares follow the existing ancestry rule: an
+immigrant has all their ancestry in their stream, and a newborn has the
+average of the parents' shares, with an unknown father's half in the
+unknown share. Weight models can use `ancestry_birthplace_<category>`. The
+template's own birthplace ancestry is ignored.
+
+**Starting populations and restarts.** A population without `birthplace`
+starts with every person `"native"` and, with ancestry tracking, all their
+ancestry native. `"native"` means not an immigrant during the simulation,
+as expected of a synthetic population; users who know more supply the
+`birthplace` column (and ancestry). A population with the dimension keeps
+its categories and shares; streams added on restart add categories, and
+categories of streams no longer present are kept for the people who
+arrived through them. With immigration and `birthplace_ancestry = FALSE`,
+existing birthplace ancestry is dropped; turning it on for a population
+without shares starts everyone at 100% of their category, as for other
+groups. A restart without immigration keeps the dimension's ancestry
+setting.
+
+**External relatives** have `NA` birthplace, as in groups templates lack.
+
+**Worked example.** Streams `asia` and `latin_america`; the starting
+population is native. An Asian immigrant woman has `birthplace = "asia"`
+and ancestry 100% asia. Her daughter with a native man is `"native"`, 50%
+asia and 50% native. The daughter's son by a native man is `"native"`, 25%
+asia and 75% native. His child with a Latin American immigrant woman is
+`"native"`, 12.5% asia, 37.5% native and 50% latin_america. A child of the
+immigrant woman with an unknown father is `"native"`, 50% asia and 50%
+unknown. A rate table with `birthplace` rows `native`, `asia` and
+`latin_america` gives the immigrants their own schedules from arrival and
+their descendants the native schedule; a weight model on
+`ancestry_birthplace_asia` lets heritage act within those cells.
+
 ## Migration facts, family history and classifications
 
 Keep migration history separate from derived generation/origin classifications
@@ -666,8 +736,9 @@ A destination-born child of stream-A immigrants belongs to the category of
 people who have not themselves immigrated. Their family migration history
 still connects them to stream A for D181 classifications and custom models.
 Arrival-stream status records personal immigration, not inherited origin.
-Unknown starting-population histories must not silently be classified as a
-known absence of immigration; their handling remains to be specified.
+Under D190, starting populations default to `"native"`, meaning not an
+immigrant during the simulation; users supply `origin` when they know
+more.
 
 Status/stream-specific schedules set aggregate rate targets for those strata.
 Derived generational variables in normalized weight models instead influence
@@ -708,8 +779,8 @@ The following choices are open; listing an option does not select it.
 | Calendar inputs | Template and weight-model schedules: interval columns, coverage, gaps and exact boundaries |
 | Households | Settled for phase 3 (D187) and selection variables (D189); multigenerational rules |
 | Migration history | Stored facts, source provenance, history depth, starting-population unknowns and restart persistence |
-| Classifications | Rule interface, output types, update timing, custom-model inputs and imported-history inputs |
-| Rate strata | Declared group versus built-in migration variable, process support and coverage rules |
+| Classifications | Generation is user-defined (D192): a declared group with custom inheritance and migrant assignment; per-member assignment for arriving households; recency shares by generation depth await quantitative characteristics |
+| Rate strata | Personal status and stream via the `birthplace` group (D190); generation strata |
 | Observation | Settled for phase 2 (D186) |
 | Timing and interface | Remaining `immigration_stream()` and `migrant_assignment()` arguments; the non-immigrant label |
 

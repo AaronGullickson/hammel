@@ -126,7 +126,7 @@ test_that("a household arrives together with its links and relatives", {
   party <- first_party(result)
   expect_identical(nrow(party), 5L)
   offset <- party$arrival_time[1]
-  expect_true(all(party$stream == "a"))
+  expect_true(all(party$birthplace == "a"))
   expect_equal(sort(party$birth_time), offset + c(-34, -30, -15, -5, -1))
   wife <- party[party$birth_time == offset - 30, ]
   husband <- party[party$birth_time == offset - 34, ]
@@ -233,7 +233,8 @@ test_that("members share their household's assigned categories", {
   expect_equal(shares$s, as.numeric(people$region == "s"))
   # Each member enters the assigned group at arrival.
   entry <- result$transitions[
-    result$transitions$person_id %in% people$person_id,
+    result$transitions$person_id %in% people$person_id &
+      result$transitions$group == "region",
   ]
   expect_identical(nrow(entry), nrow(people))
   expect_true(all(is.na(entry$origin)))
