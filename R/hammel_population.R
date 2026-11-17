@@ -197,14 +197,20 @@ validate_population <- function(results) {
 #'   \item{end_time}{The population's reference time, in years.}
 #'   \item{persons_alive}{The number of persons alive at the reference time.}
 #'   \item{n_births}{The number of recorded persons with a birth time,
-#'     including persons in the starting population.}
+#'     including persons in the starting population but not immigrants.}
 #'   \item{n_births_u}{The number of retained unrealized birth records, or
 #'     `NA` when no unrealized birth table is present.}
 #'   \item{n_deaths}{The number of recorded persons with a death time.}
+#'   \item{n_immigrants}{The number of recorded persons who immigrated, or
+#'     `NA` when the population has no arrival records.}
+#'   \item{immigrants_by_stream}{A named integer vector of immigrants by
+#'     stream, or `NULL` when the population has no arrival records.}
 #'   \item{n_unions}{The number of recorded union episodes, including
-#'     ended unions.}
+#'     ended unions but not unions that began before an immigrant partner's
+#'     arrival.}
 #'   \item{n_dissolutions}{The number of union episodes with end reason
-#'     `"dissolution"`.}
+#'     `"dissolution"`, excluding dissolutions before an immigrant partner's
+#'     arrival.}
 #'   \item{age_counts}{A tibble of living male and female counts by five-year
 #'     age group, with columns `age`, `male`, and `female`.}
 #'   \item{simulation}{A list describing the latest simulation run, with
@@ -281,6 +287,26 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
     simulation <- NULL
   }
 
+  # Everyone who immigrated, alive or not, by stream (D185). Immigrants'
+  # births and pre-migration unions are not the population's events (D186).
+  n_immigrants <- NA_integer_
+  immigrants_by_stream <- NULL
+  born <- !is.na(object$persons$birth_time)
+  unions <- object$unions
+  ended <- observed_unions(object)
+  if ("pre_migration" %in% names(unions)) {
+    unions <- unions[!unions$pre_migration, , drop = FALSE]
+  }
+  if ("stream" %in% names(object$persons)) {
+    born <- born & is.na(object$persons$arrival_time)
+    streams <- object$persons$stream[!is.na(object$persons$stream)]
+    n_immigrants <- length(streams)
+    immigrants_by_stream <- c(table(streams))
+    immigrants_by_stream <- stats::setNames(
+      as.integer(immigrants_by_stream), names(immigrants_by_stream)
+    )
+  }
+
   if (!is.null(object$groups)) {
     group_counts <- lapply(
       names(object$groups),
@@ -310,14 +336,15 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
       first_time = min(object$persons$birth_time),
       end_time = object$end_time,
       persons_alive = sum(alive),
-      n_births = sum(!is.na(object$persons$birth_time)),
+      n_births = sum(born),
       n_births_u = ifelse(
         is.null(object$unrealized_births), NA, nrow(object$unrealized_births)
       ),
       n_deaths = sum(!is.na(object$persons$death_time)),
-      n_unions = nrow(object$unions),
-      n_dissolutions = (sum(!is.na(object$unions$end_reason) &
-                              object$unions$end_reason == "dissolution")),
+      n_immigrants = n_immigrants,
+      immigrants_by_stream = immigrants_by_stream,
+      n_unions = nrow(unions),
+      n_dissolutions = sum(ended$end_reason %in% "dissolution"),
       age_counts = age_counts,
       simulation = simulation,
       group_counts = group_counts
@@ -343,6 +370,20 @@ print.summary.hammel_population <- function(x, ...) {
     print_stat("Total unrealized births", x$n_births_u)
   }
   print_stat("Total deaths", x$n_deaths)
+  if (!is.null(x$n_immigrants) && !is.na(x$n_immigrants)) {
+    streams <- x$immigrants_by_stream
+    print_stat(
+      "Total immigrants",
+      if (length(streams)) {
+        paste0(
+          x$n_immigrants, " (",
+          paste(names(streams), streams, collapse = ", "), ")"
+        )
+      } else {
+        x$n_immigrants
+      }
+    )
+  }
   print_stat("Total unions", x$n_unions)
   print_stat("Total dissolutions", x$n_dissolutions)
 

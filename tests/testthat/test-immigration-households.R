@@ -498,3 +498,24 @@ test_that("cloning streams can't weight by household variables", {
     "specification", "immigration_stream"
   )
 })
+
+test_that("population summaries leave out immigrants' births and unions", {
+  # Imported marriages dissolve only after 2 years in the destination.
+  model <- make_model(10) |>
+    set_union_dissolution(
+      data.frame(dur_start = c(0, 12), dur_end = c(12, Inf), rate = c(0, 5))
+    ) |>
+    set_immigration(a = household_stream(intensity = 15))
+  result <- run_simulation(model, 6, seed = 14)
+  s <- summary(result)
+  people <- result$persons
+  expect_identical(s$n_immigrants, sum(!is.na(people$arrival_time)))
+  expect_identical(s$n_births, sum(is.na(people$arrival_time)))
+  unions <- result$unions
+  expect_gt(sum(unions$pre_migration), 0)
+  expect_identical(s$n_unions, sum(!unions$pre_migration))
+  # Dissolutions after arrival count; none happened before it.
+  dissolved <- unions$end_reason %in% "dissolution"
+  expect_gt(sum(dissolved), 0)
+  expect_identical(s$n_dissolutions, sum(dissolved))
+})

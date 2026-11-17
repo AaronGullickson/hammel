@@ -621,3 +621,34 @@ test_that("immigration summaries describe each stream", {
   text <- cli::cli_fmt(print(summary(model)))
   expect_true(any(grepl("Immigration process", text, fixed = TRUE)))
 })
+
+test_that("population summaries count immigrants by stream", {
+  template <- immigration_template(c(30, 40))
+  model <- set_immigration(
+    quiet_model(),
+    b = immigration_stream(template, 10),
+    a = immigration_stream(template, 20)
+  )
+  result <- run_simulation(model, 2, seed = 3)
+  s <- summary(result)
+  streams <- result$persons$stream
+  expect_identical(s$n_immigrants, sum(!is.na(streams)))
+  expect_identical(
+    s$immigrants_by_stream,
+    c(a = sum(streams %in% "a"), b = sum(streams %in% "b"))
+  )
+  expect_match(
+    paste(cli::cli_fmt(print(s)), collapse = "\n"),
+    sprintf(
+      "Total immigrants: %d \\(a %d, b %d\\)", s$n_immigrants,
+      s$immigrants_by_stream[["a"]], s$immigrants_by_stream[["b"]]
+    )
+  )
+  # Populations without arrival records report no immigrants.
+  plain <- summary(quiet_model()$population)
+  expect_true(is.na(plain$n_immigrants))
+  expect_null(plain$immigrants_by_stream)
+  expect_no_match(
+    paste(cli::cli_fmt(print(plain)), collapse = "\n"), "immigrants"
+  )
+})
