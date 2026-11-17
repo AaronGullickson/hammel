@@ -132,6 +132,14 @@ set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
 #' more variation than individual arrivals. Drawing does not change the
 #' template.
 #'
+#' With `step`, the template is cut over time instead: an arrival in
+#' `[start + k * step, start + (k + 1) * step)` is drawn from the template as
+#' it stood at `start + k * step`, with the people then alive, their unions,
+#' groups and children up to that time, and nothing after it. One long
+#' simulation of an origin population then supplies migrants whose ages,
+#' families and histories change with the origin over time. Migrants arrive
+#' as they were at the cut, with dates shifted to their arrival.
+#'
 #' With `household = NULL`, the stream clones individuals instead: anyone
 #' alive at the template's `end_time` can be drawn, and keeps their age, sex
 #' and groups but none of their history. Clones arrive never partnered, with
@@ -172,6 +180,12 @@ set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
 #'   lacks.
 #' @param household A [household()] rule (default) to draw whole households
 #'   with their histories, or `NULL` to clone individuals without histories.
+#' @param step `NULL` (default) to draw migrants from the template's living
+#'   population at its `end_time`, or a positive number of years to cut the
+#'   template over time: arrivals in each `step`-year interval from the run's
+#'   start are drawn from the template as it stood at the interval's start.
+#'   The template must have been simulated on the same calendar over every
+#'   cut.
 #' @return An `hammel_immigration_stream` object.
 #' @seealso [immigration()], [migrant_assignment()], [weight_model()]
 #' @export
@@ -197,9 +211,12 @@ immigration_stream <- function(
   template,
   weights = NULL,
   assignment = NULL,
-  household = hammel::household()
+  household = hammel::household(),
+  step = NULL
 ) {
-  new_immigration_stream(intensity, template, weights, assignment, household)
+  new_immigration_stream(
+    intensity, template, weights, assignment, household, step
+  )
 }
 
 #' Assign migrants to a group category
@@ -308,6 +325,7 @@ migrant_assignment <- function(
 #' `template_size` (persons in the template), `eligible` (households, or for
 #' cloning streams template people, that can be drawn), `household` (the
 #' household rule's `age_independence`, or `NULL` for cloning streams),
+#' `step` (the years between template cuts, or `NULL`),
 #' `intensity` (a tibble with a `count` or `rate` column),
 #' `weights` (a weight model summary, or `NULL` for uniform draws) and
 #' `assignment` (the method assigning each group dimension, named by
@@ -332,6 +350,7 @@ summary.hammel_immigration <- function(object, ...) {
         template_size = nrow(stream$template$persons),
         eligible = length(parties$party_start) - 1L,
         household = stream$household$age_independence,
+        step = stream$step,
         intensity = intensity,
         weights = summarize_model_argument(stream$weights),
         assignment = vapply(stream$assignment, `[[`, "", "method")
@@ -374,6 +393,9 @@ print.summary.hammel_immigration <- function(x, ...) {
         "Households",
         paste("dependents under", stream$household, "years")
       )
+    }
+    if (!is.null(stream$step)) {
+      print_stat("Template cuts", paste("every", stream$step, "years"))
     }
     intensity <- intensity_table(stream$intensity)
     unit <- if (intensity$kind[1] == "rate") {
@@ -546,6 +568,7 @@ new_immigration_stream <- function(
   weights,
   assignment,
   household,
+  step = NULL,
   call = rlang::caller_env()
 ) {
   if (missing(intensity)) {
@@ -576,7 +599,8 @@ new_immigration_stream <- function(
       intensity = intensity,
       weights = weights,
       assignment = assignment,
-      household = household
+      household = household,
+      step = step
     ),
     class = "hammel_immigration_stream"
   )
@@ -630,6 +654,23 @@ validate_immigration_stream <- function(stream, call = rlang::caller_env()) {
     )
   }
   validate_process_weights(weights, "migrant", call = call)
+  step <- stream$step
+  if (!is.null(step) &&
+        (!is.numeric(step) || length(step) != 1L || !is.null(dim(step)) ||
+           !is.finite(step) || step <= 0)) {
+    abort_hammel(
+      c(
+        paste(
+          "{.arg step} must be {.code NULL} or a single positive number of",
+          "years."
+        ),
+        "x" = "It is {describe_value(step)}."
+      ),
+      "argument",
+      argument = "step",
+      call = call
+    )
+  }
   household <- stream$household
   used <- if (!is.null(weights$formula)) all.vars(weights$formula)
   clone_only <- intersect(used, household_variables)
@@ -1134,7 +1175,9 @@ prepare_immigration <- function(
     }
   )
   oldest <- max(
-    0, vapply(streams, function(x) max(c(0, x$age)), numeric(1))
+    0, unlist(lapply(streams, function(x) {
+      vapply(x$slices, function(y) max(c(0, y$age)), numeric(1))
+    }))
   )
   list(
     streams = streams,
@@ -1155,8 +1198,105 @@ prepare_stream <- function(
   cohab_enabled,
   call = rlang::caller_env()
 ) {
-  template <- stream$template
   intensity <- intensity_table(stream$intensity)
+  if ("time_start" %in% names(stream$intensity)) {
+    check_time_coverage(
+      intensity$time_start, intensity$time_end, start, end,
+      "The stream's intensity",
+      call = call
+    )
+  }
+  # Template cuts (D196): one truncated template per cut, used from its cut
+  # time; without cuts, the template at its end_time.
+  cuts <- template_cuts(stream, start, end, call = call)
+  templates <- if (is.null(stream$step)) {
+    list(stream$template)
+  } else {
+    lapply(cuts, function(cut) population_at(stream$template, cut))
+  }
+  slices <- lapply(
+    seq_along(templates),
+    function(k) {
+      prepare_slice(
+        stream, templates[[k]], name, declaration, registries, components,
+        counts_cohab, cohab_enabled,
+        cut = if (is.null(stream$step)) NULL else cuts[k],
+        call = call
+      )
+    }
+  )
+  list(
+    time_start = intensity$time_start,
+    time_end = intensity$time_end,
+    intensity = intensity$intensity,
+    per_person = identical(intensity$kind[1], "rate"),
+    cuts = as.numeric(cuts),
+    slices = slices,
+    templates = templates
+  )
+}
+
+# The cut times of a stream (D196): the run's start and every `step` years
+# after it, each within the template's simulated history; without `step`,
+# the run's start alone.
+template_cuts <- function(stream, start, end, call = rlang::caller_env()) {
+  step <- stream$step
+  if (is.null(step)) {
+    return(start)
+  }
+  cuts <- start + step * (seq_len(max(1, ceiling((end - start) / step))) - 1)
+  template <- stream$template
+  first <- template$unrealized_since
+  if (is.null(first)) {
+    abort_hammel(
+      c(
+        "Template cuts need a template with a simulated history.",
+        "i" = paste(
+          "Use a template from {.fn run_simulation}, or {.code step = NULL}",
+          "to draw from the template's end."
+        )
+      ),
+      "population",
+      argument = "step",
+      call = call
+    )
+  }
+  outside <- cuts[cuts < first | cuts > template$end_time]
+  if (length(outside)) {
+    abort_hammel(
+      c(
+        "The template's history must cover every cut.",
+        "x" = paste(
+          "Cuts at {outside} fall outside its simulated period, {first} to",
+          "{template$end_time}."
+        ),
+        "i" = paste(
+          "Cuts run from the run's start every {.arg step} years, on the",
+          "template's calendar."
+        )
+      ),
+      "coverage",
+      argument = "step",
+      call = call
+    )
+  }
+  cuts
+}
+
+# One template's engine input for a stream: its parties, selection and
+# assignment probabilities, expected party size and imported state.
+prepare_slice <- function(
+  stream,
+  template,
+  name,
+  declaration,
+  registries,
+  components,
+  counts_cohab,
+  cohab_enabled,
+  cut = NULL,
+  call = rlang::caller_env()
+) {
   rules <- stream$assignment
   if (birthplace_dimension %in% names(rules)) {
     abort_hammel(
@@ -1175,13 +1315,6 @@ prepare_stream <- function(
     rules[[birthplace_dimension]] <- migrant_assignment(
       "fixed",
       fixed_value = name
-    )
-  }
-  if ("time_start" %in% names(stream$intensity)) {
-    check_time_coverage(
-      intensity$time_start, intensity$time_end, start, end,
-      "The stream's intensity",
-      call = call
     )
   }
   parties <- migrant_parties(template, stream$household)
@@ -1304,6 +1437,7 @@ prepare_stream <- function(
   }
   probabilities <- migrant_probabilities(
     stream$weights, members, registries[shared], name,
+    cut = cut,
     call = call
   )
   # Intensity is in persons per year; the clock counts parties (D187).
@@ -1339,10 +1473,7 @@ prepare_stream <- function(
   }
   live <- template$unions[parties$union_row, , drop = FALSE]
   list(
-    time_start = intensity$time_start,
-    time_end = intensity$time_end,
-    intensity = intensity$intensity / expected_size,
-    per_person = identical(intensity$kind[1], "rate"),
+    expected_size = expected_size,
     age = as.numeric(people$age),
     female = people$sex == "f",
     categories = categories,
@@ -1387,6 +1518,95 @@ clone_state <- function(n, dimensions) {
     since_union_end = rep(NA_real_, n),
     since_entry = matrix(NA_real_, nrow = n, ncol = dimensions)
   )
+}
+
+# A population as it stood at `time` (D196), for template cuts: people born
+# by then who had arrived, unions started by then (live if they ended
+# later), transitions by then with groups at that time, external relatives
+# censored at it, and deaths after it undone. Internal for now.
+population_at <- function(population, time) {
+  if (time >= population$end_time) {
+    return(population)
+  }
+  persons <- population$persons
+  keep <- persons$birth_time <= time
+  if ("arrival_time" %in% names(persons)) {
+    keep <- keep &
+      (is.na(persons$arrival_time) | persons$arrival_time <= time)
+  }
+  external <- population[["external_relatives"]]
+  has_external <- !is.null(external) && nrow(external) > 0
+  if (has_external) {
+    external <- external[external$birth_time <= time, , drop = FALSE]
+  }
+  # Groups at the time: the origin of a person's first later move.
+  tx <- population$transitions
+  for (d in names(population$groups)) {
+    if (is.null(tx) || !nrow(tx)) {
+      break
+    }
+    later <- tx[tx$group == d & tx$time > time, , drop = FALSE]
+    later <- later[order(later$person_id, later$time), , drop = FALSE]
+    first <- later[!duplicated(later$person_id), , drop = FALSE]
+    at <- match(first$person_id, persons$person_id)
+    persons[[d]][at[!is.na(at)]] <- first$origin[!is.na(at)]
+  }
+  persons <- persons[keep, , drop = FALSE]
+  persons$death_time[!is.na(persons$death_time) &
+                       persons$death_time > time] <- NA
+  ids <- c(persons$person_id, if (has_external) external$person_id)
+  unions <- population$unions
+  unions <- unions[unions$start_time <= time & unions$wife_id %in% ids &
+                     unions$husband_id %in% ids, , drop = FALSE]
+  ongoing <- !is.na(unions$end_time) & unions$end_time > time
+  unions$end_time[ongoing] <- NA
+  unions$end_reason[ongoing] <- NA
+  if (has_external) {
+    # Keep external relatives still linked to a remaining person.
+    member <- unions$wife_id %in% persons$person_id |
+      unions$husband_id %in% persons$person_id
+    linked <- external$person_id %in% c(
+      unions$wife_id[member], unions$husband_id[member],
+      persons$mother_id, persons$father_id
+    ) |
+      external$mother_id %in% persons$person_id |
+      external$father_id %in% persons$person_id
+    external <- external[linked, , drop = FALSE]
+    external$death_time[!is.na(external$death_time) &
+                          external$death_time > time] <- NA
+    external$censor_time <- ifelse(
+      is.na(external$death_time),
+      pmin(external$censor_time, time),
+      external$death_time
+    )
+    ids <- c(persons$person_id, external$person_id)
+    unions <- unions[unions$wife_id %in% ids & unions$husband_id %in% ids, ,
+                     drop = FALSE]
+    for (field in c("mother_id", "father_id")) {
+      external[[field]][!external[[field]] %in% ids] <- NA
+    }
+    population$external_relatives <- external
+  }
+  for (field in c("mother_id", "father_id")) {
+    persons[[field]][!persons[[field]] %in% ids] <- NA
+  }
+  if (!is.null(tx)) {
+    population$transitions <- tx[tx$time <= time &
+                                   tx$person_id %in% persons$person_id, ,
+                                 drop = FALSE]
+  }
+  if (!is.null(population$ancestry)) {
+    population$ancestry <- lapply(
+      population$ancestry,
+      function(shares) {
+        shares[shares$person_id %in% persons$person_id, , drop = FALSE]
+      }
+    )
+  }
+  population$persons <- persons
+  population$unions <- unions
+  population$end_time <- time
+  population
 }
 
 # Template people: persons and any external relatives, in one table with the
@@ -1496,6 +1716,7 @@ migrant_probabilities <- function(
   members,
   categories,
   name,
+  cut = NULL,
   call = rlang::caller_env()
 ) {
   n <- nrow(members)
@@ -1503,7 +1724,11 @@ migrant_probabilities <- function(
     return(rep(1 / n, n))
   }
   if (!is.null(weights$fun)) {
-    eta <- weights$fun(members, list(process = "immigration", stream = name))
+    bin <- list(process = "immigration", stream = name)
+    if (!is.null(cut)) {
+      bin$cut <- cut
+    }
+    eta <- weights$fun(members, bin)
     if (!is.numeric(eta) || !is.null(dim(eta)) || length(eta) != n ||
           any(!is.finite(eta))) {
       abort_hammel(
@@ -1985,12 +2210,14 @@ import_histories <- function(
   unions <- list()
   moves <- list()
   live_unions <- list()
-  for (s in seq_along(process$streams)) {
-    a <- which(arrivals$stream == s - 1L)
-    if (!length(a)) {
-      next
-    }
-    template <- process$streams[[s]]$template
+  # Arrivals by stream and template cut (D196); each cut's template supplies
+  # its arrivals' histories.
+  batches <- unique(data.frame(s = arrivals$stream, k = arrivals$slice))
+  for (batch in seq_len(nrow(batches))) {
+    s <- batches$s[batch] + 1L
+    k <- batches$k[batch] + 1L
+    a <- which(arrivals$stream == s - 1L & arrivals$slice == k - 1L)
+    template <- input$streams[[s]]$templates[[k]]
     people <- template_people(template)
     t_unions <- as.data.frame(template$unions)
     t_moves <- template$transitions
@@ -2012,7 +2239,7 @@ import_histories <- function(
     time <- arrivals$time[a]
     offset <- time - template$end_time
     party <- arrivals$party[a]
-    rows <- input$streams[[s]]$rows[arrivals$row[a] + 1L]
+    rows <- input$streams[[s]]$slices[[k]]$rows[arrivals$row[a] + 1L]
     tp <- template$persons$person_id[rows]
     key <- as.character(tp)
     member_key <- paste(party, tp)
@@ -2075,8 +2302,12 @@ import_histories <- function(
         sex = people$sex[r],
         birth_time = people$birth_time[r] + party_offset,
         death_time = people$death_time[r] + party_offset,
-        mother_id = ifelse(child, map(rel_party, people$mother_id[r]), NA),
-        father_id = ifelse(child, map(rel_party, people$father_id[r]), NA),
+        mother_id = as.numeric(
+          ifelse(child, map(rel_party, people$mother_id[r]), NA)
+        ),
+        father_id = as.numeric(
+          ifelse(child, map(rel_party, people$father_id[r]), NA)
+        ),
         stringsAsFactors = FALSE
       )
       for (d in dimensions) {

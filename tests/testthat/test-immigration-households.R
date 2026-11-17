@@ -253,11 +253,14 @@ test_that("intensity counts people and households arrive in proportion", {
   prepared <- prepare_immigration(
     immigration(a = stream), list(), list(), list(), integer(), 0, 20
   )$streams[[1]]
-  sizes <- diff(prepared$party_start)
-  probs <- diff(c(0, prepared$cumulative))
+  slice <- prepared$slices[[1]]
+  sizes <- diff(slice$party_start)
+  probs <- diff(c(0, slice$cumulative))
   expected_size <- sum(probs * sizes)
   expect_equal(expected_size, (3 * 5 + 1 + 2 + 1) / 6)
-  expect_equal(prepared$intensity, 90 / expected_size)
+  # The engine runs the clock at intensity / expected size.
+  expect_identical(prepared$intensity, 90)
+  expect_equal(slice$expected_size, expected_size)
   model <- set_immigration(make_model(10), a = stream)
   result <- run_simulation(model, 20, seed = 5)
   people <- arrived(result)
@@ -417,7 +420,7 @@ party_probabilities <- function(stream) {
   prepared <- prepare_immigration(
     immigration(a = stream), list(), list(), list(), integer(), 0, 1
   )$streams[[1]]
-  diff(c(0, prepared$cumulative))
+  diff(c(0, prepared$slices[[1]]$cumulative))
 }
 
 test_that("household variables describe each carrier's household", {
@@ -524,6 +527,17 @@ test_that("population summaries leave out immigrants' births and unions", {
   expect_identical(s$n_dissolutions, sum(dissolved))
 })
 
+# Ten unpartnered adults, built without random numbers.
+clone_template <- function() {
+  hammel_population(
+    data.frame(
+      person_id = 1:10, sex = rep(c("f", "m"), 5), birth_time = -(21:30),
+      death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_
+    ),
+    end_time = 0
+  )
+}
+
 # A destination declaring `generation`, which templates lack.
 generation_model <- function(rule, template = household_template(), ...) {
   persons <- data.frame(
@@ -583,7 +597,7 @@ test_that("custom assignment sees each member and its household", {
     "1"
   })
   run_simulation(
-    generation_model(rule, generate_uniform_population(10), household = NULL),
+    generation_model(rule, clone_template(), household = NULL),
     1, seed = 17
   )
   expect_identical(nrow(clone), 1L)

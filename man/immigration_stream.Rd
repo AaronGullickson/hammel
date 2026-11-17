@@ -9,7 +9,8 @@ immigration_stream(
   template,
   weights = NULL,
   assignment = NULL,
-  household = hammel::household()
+  household = hammel::household(),
+  step = NULL
 )
 }
 \arguments{
@@ -40,6 +41,13 @@ lacks.}
 
 \item{household}{A \code{\link[=household]{household()}} rule (default) to draw whole households
 with their histories, or \code{NULL} to clone individuals without histories.}
+
+\item{step}{\code{NULL} (default) to draw migrants from the template's living
+population at its \code{end_time}, or a positive number of years to cut the
+template over time: arrivals in each \code{step}-year interval from the run's
+start are drawn from the template as it stood at the interval's start.
+The template must have been simulated on the same calendar over every
+cut.}
 }
 \value{
 An \code{hammel_immigration_stream} object.
@@ -72,6 +80,14 @@ their history, and shares the categories assigned by \code{assignment}.
 divided by the expected household size, and arrivals come in groups, with
 more variation than individual arrivals. Drawing does not change the
 template.
+
+With \code{step}, the template is cut over time instead: an arrival in
+\verb{[start + k * step, start + (k + 1) * step)} is drawn from the template as
+it stood at \code{start + k * step}, with the people then alive, their unions,
+groups and children up to that time, and nothing after it. One long
+simulation of an origin population then supplies migrants whose ages,
+families and histories change with the origin over time. Migrants arrive
+as they were at the cut, with dates shifted to their arrival.
 
 With \code{household = NULL}, the stream clones individuals instead: anyone
 alive at the template's \code{end_time} can be drawn, and keeps their age, sex

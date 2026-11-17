@@ -4139,3 +4139,26 @@ let users derive age, time since arrival and age at arrival themselves.
 
 **Consequence:** Weights depending on time since arrival in matching remain
 unsupported; search weights can stand in by changing who searches.
+
+## D196 — Template cuts every step (November 17, 2026)
+
+**Status:** User decisions, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** `immigration_stream(..., step = NULL)`. With a positive
+`step`, the run is divided into intervals starting at the run's start, and
+arrivals in each are drawn from the template as it stood at the interval's
+start (the cut), on the template's and destination's shared calendar.
+`step = NULL` keeps drawing from the template's `end_time`. Migrants arrive
+as they were at the cut, with dates shifted by the arrival time minus the
+cut, as now. Every cut must lie within the template's simulated history,
+otherwise it is an error. The truncation to a cut time is an internal
+helper for now.
+
+**Rationale:** One long simulation of an origin population, cut over time,
+gives a changing origin (age structure, fertility, household composition)
+without assembling a list of templates, and on a shared calendar
+approximates a co-simulated origin.
+
+**Supersedes:** D180's list of templates as the way to vary a stream's
+template over time.

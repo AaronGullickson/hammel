@@ -1705,3 +1705,32 @@ run the same tests, the offline files other than the five immigration files
 made 1,830 native calls on `master` and this branch with
 `-ffp-contract=off`, all with identical hashes. `devtools::test()` passed
 9,062 expectations with one skip (the opt-in live database test).
+
+## Template cuts (November 17, 2026)
+
+`tests/testthat/test-immigration-cuts.R` covers D196: the internal
+`population_at()` on a hand-built template (a child not yet born, a husband
+still alive and married before his death, the widow and child after) and on
+a simulated population with deaths and regional moves (valid populations,
+no later records, and each person's region at the cut matching their
+history); arrivals from successive cuts with ages at each cut, couples
+arriving married from the early cut and the widow arriving widowed from the
+later one with her marriage's end shifted to her arrival; coverage errors
+for cuts beyond the template's history and for templates without one;
+`step` validation; and the summary. Preparing an all-partner batch of
+external relatives exposed logical `NA` parent IDs, now kept numeric. A
+household test built its template from unseeded random numbers; it is now
+deterministic.
+
+With `-ffp-contract=off`, the offline test files other than the six
+immigration files (and without D195's two new weight tests) made 1,830
+native calls on `master` and this branch, all identical. The five earlier
+immigration files made 396 calls on commit 072c7d1 and this branch, all
+identical except the unseeded test, which differed between two runs of the
+same commit too. `devtools::test()` passed 9,136 expectations with one skip
+(the opt-in live database test).
+
+At report scale (a template of 29,744 people simulated from 0 to 150, a
+destination run from 100 to 150, `count = 800`), a run took 3.2 seconds
+without cuts, 4.7 with `step = 5` (10 cuts) and 10.6 with `step = 1` (50
+cuts).

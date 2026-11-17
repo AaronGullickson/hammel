@@ -603,3 +603,11 @@ Each engine person stores an arrival time (`NA` for the born), read from a
 restarted population's `arrival_time`. Custom weight functions receive
 birth and arrival times in `members` and the evaluation time as `bin$time`,
 set from the event time (D195).
+
+Each stream is prepared as one slice per template cut (D196), from the
+template truncated to the cut by the internal `population_at()`; without
+`step` there is one slice from the template's end. Slices hold parties,
+probabilities, imported state and their expected party size; cut times are
+calendar boundaries where the engine switches slice and redraws the clock,
+dividing intensity by the slice's expected size. Arrival records carry
+their slice, so histories are imported from that cut's template.

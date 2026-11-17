@@ -273,8 +273,7 @@ double draw_threshold() {
 // groups entry at arrival). Links within a party are member offsets (-1
 // none): parents, and for a woman her current partner, with the union's
 // elapsed duration, type and template row. `next` is the next arrival time.
-struct ImmigrationStream {
-  std::vector<double> time_start, time_end, intensity;
+struct ImmigrationSlice {
   NumericVector age, cumulative, since_birth, since_end, union_since;
   LogicalVector female, union_cohab;
   IntegerVector parity, previous, legal, party_start, mother, father, partner,
@@ -282,6 +281,17 @@ struct ImmigrationStream {
   IntegerMatrix categories;
   NumericMatrix ancestry, since_entry;
   List assignment;
+  double expected_size = 1;  // persons per party under selection (D187)
+};
+
+// A stream's intensity is in persons; its clock runs at intensity divided by
+// the active slice's expected party size. Template cuts (D196) give one
+// slice per cut, active from its cut time; without cuts there is one.
+struct ImmigrationStream {
+  std::vector<double> time_start, time_end, intensity;
+  std::vector<ImmigrationSlice> slices;
+  std::vector<double> cuts;
+  int active = 0;
   double next = R_PosInf;
   // A crude-rate stream (D194): its hazard is `rate` per living person, and
   // it arrives when the hazard `used` since its last draw reaches
@@ -641,7 +651,8 @@ class Simulation {
   std::vector<std::vector<int>> category_component;
   double immigration_min_birth = R_PosInf;
   std::vector<double> arrival_person, arrival_time;
-  std::vector<int> arrival_stream, arrival_row, arrival_cats, arrival_party;
+  std::vector<int> arrival_stream, arrival_row, arrival_cats, arrival_party,
+    arrival_slice;
   // Unions that arrive live (D187): engine ID, template row and party.
   std::vector<double> arrival_union;
   std::vector<int> arrival_union_row, arrival_union_party;
@@ -1302,25 +1313,36 @@ void Simulation::read_immigration(Nullable<List> immigration_input) {
     stream.time_start = as<std::vector<double>>(x["time_start"]);
     stream.time_end = as<std::vector<double>>(x["time_end"]);
     stream.intensity = as<std::vector<double>>(x["intensity"]);
-    stream.age = x["age"];
-    stream.cumulative = x["cumulative"];
-    stream.female = x["female"];
-    stream.categories = as<IntegerMatrix>(x["categories"]);
-    stream.ancestry = as<NumericMatrix>(x["ancestry"]);
-    stream.assignment = x["assignment"];
-    stream.parity = x["parity"];
-    stream.since_birth = x["since_birth"];
-    stream.previous = x["previous_union"];
-    stream.legal = x["legal_previous"];
-    stream.since_end = x["since_union_end"];
-    stream.since_entry = as<NumericMatrix>(x["since_entry"]);
-    stream.party_start = x["party_start"];
-    stream.mother = x["mother"];
-    stream.father = x["father"];
-    stream.partner = x["partner"];
-    stream.union_since = x["union_since"];
-    stream.union_cohab = x["union_cohab"];
-    stream.union_row = x["union_row"];
+    stream.cuts = as<std::vector<double>>(x["cuts"]);
+    List slices = x["slices"];
+    for (int c = 0; c < slices.size(); ++c) {
+      List y = slices[c];
+      ImmigrationSlice slice;
+      slice.age = y["age"];
+      slice.cumulative = y["cumulative"];
+      slice.female = y["female"];
+      slice.categories = as<IntegerMatrix>(y["categories"]);
+      slice.ancestry = as<NumericMatrix>(y["ancestry"]);
+      slice.assignment = y["assignment"];
+      slice.parity = y["parity"];
+      slice.since_birth = y["since_birth"];
+      slice.previous = y["previous_union"];
+      slice.legal = y["legal_previous"];
+      slice.since_end = y["since_union_end"];
+      slice.since_entry = as<NumericMatrix>(y["since_entry"]);
+      slice.party_start = y["party_start"];
+      slice.mother = y["mother"];
+      slice.father = y["father"];
+      slice.partner = y["partner"];
+      slice.union_since = y["union_since"];
+      slice.union_cohab = y["union_cohab"];
+      slice.union_row = y["union_row"];
+      slice.expected_size = as<double>(y["expected_size"]);
+      stream.slices.push_back(slice);
+    }
+    for (double cut : stream.cuts) {
+      add_calendar_time(cut);
+    }
     stream.per_person = as<bool>(x["per_person"]);
     any_rate_stream = any_rate_stream || stream.per_person;
     for (size_t j = 0; j < stream.time_start.size(); ++j) {
@@ -3005,13 +3027,22 @@ bool Simulation::apply_calendar_boundary() {
   calendar_boundaries.erase(calendar_boundaries.begin());
   weight_now = now;
   checkUserInterrupt();
-  // A stream whose intensity interval starts or ends here redraws its clock,
-  // valid after survival to the boundary (memoryless).
+  // A stream whose intensity interval starts or ends here, or whose template
+  // cut (D196) begins here, redraws its clock, valid after survival to the
+  // boundary (memoryless).
   for (auto& stream : streams) {
-    if (std::find(stream.time_start.begin(), stream.time_start.end(), now) !=
-          stream.time_start.end() ||
-        std::find(stream.time_end.begin(), stream.time_end.end(), now) !=
-          stream.time_end.end()) {
+    bool redraw =
+      std::find(stream.time_start.begin(), stream.time_start.end(), now) !=
+        stream.time_start.end() ||
+      std::find(stream.time_end.begin(), stream.time_end.end(), now) !=
+        stream.time_end.end();
+    for (size_t c = 0; c < stream.cuts.size(); ++c) {
+      if (stream.cuts[c] == now) {
+        stream.active = static_cast<int>(c);
+        redraw = true;
+      }
+    }
+    if (redraw) {
       draw_arrival(stream, now);
     }
   }
@@ -3330,16 +3361,17 @@ void Simulation::on_birth(int i, double now) {
 // union of the same duration and type.
 void Simulation::on_arrival(int k, double now) {
   ImmigrationStream& stream = streams[k];
+  const ImmigrationSlice& slice = stream.slices[stream.active];
   const double u = R::runif(0, 1);
-  const int n = stream.cumulative.size();
+  const int n = slice.cumulative.size();
   const int r = std::min(
     n - 1,
     static_cast<int>(
-      std::upper_bound(stream.cumulative.begin(), stream.cumulative.end(), u) -
-      stream.cumulative.begin()
+      std::upper_bound(slice.cumulative.begin(), slice.cumulative.end(), u) -
+      slice.cumulative.begin()
     )
   );
-  const int first = stream.party_start[r], last = stream.party_start[r + 1];
+  const int first = slice.party_start[r], last = slice.party_start[r + 1];
   const int size = last - first;
   if (next_id + size >= kMaxExactId ||
       people.size() + size >=
@@ -3353,10 +3385,10 @@ void Simulation::on_arrival(int k, double now) {
   const int party = party_count++;
   std::vector<std::vector<int>> assigned(dimensions);
   for (int d = 0; d < dimensions; ++d) {
-    if (stream.categories(first, d) >= 0) {
+    if (slice.categories(first, d) >= 0) {
       continue;
     }
-    SEXP rule = stream.assignment[d];
+    SEXP rule = slice.assignment[d];
     if (Rf_isFunction(rule)) {
       IntegerVector rows(size);
       for (int j = 0; j < size; ++j) {
@@ -3404,18 +3436,18 @@ void Simulation::on_arrival(int k, double now) {
   const int base = static_cast<int>(people.size());
   for (int m = first; m < last; ++m) {
     const int i = static_cast<int>(people.size());
-    const int mother = stream.mother[m] < 0 ? -1 : base + stream.mother[m];
-    const int father = stream.father[m] < 0 ? -1 : base + stream.father[m];
+    const int mother = slice.mother[m] < 0 ? -1 : base + slice.mother[m];
+    const int father = slice.father[m] < 0 ? -1 : base + slice.father[m];
     people.push_back(
-      {++next_id, now - stream.age[m], NA_REAL,
+      {++next_id, now - slice.age[m], NA_REAL,
        mother < 0 ? NA_REAL : people[mother].id,
        father < 0 ? NA_REAL : people[father].id,
-       -std::numeric_limits<double>::infinity(), stream.female[m] != 0, 0}
+       -std::numeric_limits<double>::infinity(), slice.female[m] != 0, 0}
     );
     people[i].arrived = now;
     // Imported reproductive history (D186): parity and spacing.
-    if (!NumericVector::is_na(stream.since_birth[m])) {
-      people[i].last_birth = now - stream.since_birth[m];
+    if (!NumericVector::is_na(slice.since_birth[m])) {
+      people[i].last_birth = now - slice.since_birth[m];
     }
     mother_of.push_back(mother);
     father_of.push_back(father);
@@ -3425,15 +3457,15 @@ void Simulation::on_arrival(int k, double now) {
         kids[parent].push_back(i);
       }
     }
-    parity.push_back(stream.parity[m]);
+    parity.push_back(slice.parity[m]);
     cats.resize(static_cast<size_t>(i + 1) * dimensions);
     const size_t row = static_cast<size_t>(i) * ancestry_components;
     ancestry.resize(row + ancestry_components);
     for (size_t g = 0; g < ancestry_components; ++g) {
-      ancestry[row + g] = stream.ancestry(m, g);
+      ancestry[row + g] = slice.ancestry(m, g);
     }
     for (int d = 0; d < dimensions; ++d) {
-      int c = stream.categories(m, d);
+      int c = slice.categories(m, d);
       if (c < 0) {
         c = assigned[d][m - first];
         const InheritanceRule& rule = inheritance_rules[d];
@@ -3451,11 +3483,11 @@ void Simulation::on_arrival(int k, double now) {
     // Imported union history: previous-union state and when it began.
     person_unions.emplace_back();
     current_partner.push_back(-1);
-    previous_union.push_back(stream.previous[m]);
-    legal_previous.push_back(stream.legal[m]);
+    previous_union.push_back(slice.previous[m]);
+    legal_previous.push_back(slice.legal[m]);
     previous_union_end.push_back(
-      NumericVector::is_na(stream.since_end[m]) ? NA_REAL
-                                                : now - stream.since_end[m]
+      NumericVector::is_na(slice.since_end[m]) ? NA_REAL
+                                               : now - slice.since_end[m]
     );
     if (calibrator) {
       counted_woman.push_back(0);
@@ -3463,28 +3495,28 @@ void Simulation::on_arrival(int k, double now) {
     // Group duration continues from the template, or for an assigned group
     // runs from arrival.
     for (auto& tp : tprocs) {
-      const double since = stream.since_entry(m, tp.dim);
+      const double since = slice.since_entry(m, tp.dim);
       tp.entry.push_back(NumericVector::is_na(since) ? now : now - since);
     }
   }
   // A current union arrives live, with its imported duration (D187).
   for (int m = first; m < last; ++m) {
-    if (!stream.female[m] || stream.partner[m] < 0) {
+    if (!slice.female[m] || slice.partner[m] < 0) {
       continue;
     }
     check_union_capacity();
-    const int wife = base + (m - first), husband = base + stream.partner[m];
+    const int wife = base + (m - first), husband = base + slice.partner[m];
     const int u = static_cast<int>(union_history.size());
     union_history.push_back(
-      {++next_union_id, now - stream.union_since[m], NA_REAL, wife, husband}
+      {++next_union_id, now - slice.union_since[m], NA_REAL, wife, husband}
     );
-    union_history.back().cohab = stream.union_cohab[m];
+    union_history.back().cohab = slice.union_cohab[m];
     person_unions[wife].push_back(u);
     person_unions[husband].push_back(u);
     current_partner[wife] = husband;
     current_partner[husband] = wife;
     arrival_union.push_back(union_history.back().id);
-    arrival_union_row.push_back(stream.union_row[m]);
+    arrival_union_row.push_back(slice.union_row[m]);
     arrival_union_party.push_back(party);
   }
   for (int i = base; i < base + size; ++i) {
@@ -3497,6 +3529,7 @@ void Simulation::on_arrival(int k, double now) {
     arrival_stream.push_back(k);
     arrival_row.push_back(first + (i - base));
     arrival_party.push_back(party);
+    arrival_slice.push_back(stream.active);
     for (int d = 0; d < dimensions; ++d) {
       arrival_cats.push_back(category(i, d));
     }
@@ -3515,7 +3548,7 @@ void Simulation::draw_arrival(ImmigrationStream& stream, double now) {
   double rate = 0;
   for (size_t j = 0; j < stream.intensity.size(); ++j) {
     if (stream.time_start[j] <= now && now < stream.time_end[j]) {
-      rate = stream.intensity[j];
+      rate = stream.intensity[j] / stream.slices[stream.active].expected_size;
       break;
     }
   }
@@ -3816,7 +3849,7 @@ List Simulation::results() {
       _["person_id"] = wrap(arrival_person), _["time"] = wrap(arrival_time),
       _["stream"] = wrap(arrival_stream), _["row"] = wrap(arrival_row),
       _["categories"] = wrap(arrival_cats), _["party"] = wrap(arrival_party),
-      _["union_id"] = wrap(arrival_union),
+      _["slice"] = wrap(arrival_slice), _["union_id"] = wrap(arrival_union),
       _["union_row"] = wrap(arrival_union_row),
       _["union_party"] = wrap(arrival_union_party)
     )

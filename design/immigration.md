@@ -44,7 +44,7 @@ remain separate responsibilities. The public interface is described in
 | Arrival flow | Stochastic intensity as a count per year or a crude rate per destination person-year; no controlled/exact-count option | D177, D194 |
 | Origins | Multiple streams with separate intensities | D178 |
 | Source | Sample an existing population with replacement; preserve age, sex and groups; assign fresh IDs | D179 |
-| Template schedules | Support calendar-scheduled templates; truncation deferred | D180, D184 |
+| Template schedules | Cuts of one template every `step` years on a shared calendar (D196), not a list of templates | D180, D184, D196 |
 | Imported histories | Arrivals bring their birth, union and transition histories, with dates shifted by the age offset; referenced non-members go in `external_relatives` | D184 |
 | Eligibility | No one arrives without their current partner; cloning streams import no relationships, so anyone alive can be cloned | D184, D188 |
 | Phasing | Individual arrivals without histories, then imported histories, then household parties | D184 |
@@ -798,9 +798,75 @@ General generation-specific rate stratification is not selected. This design
 does not change the current implementation's requirement that categorical
 rate strata use declared group dimensions.
 
+## Template cuts
+
+User decisions, November 17, 2026 (D196). Implemented November 17, 2026;
+see [testing](testing.md#template-cuts-november-17-2026).
+
+**Interface.** `immigration_stream(..., step = NULL)`. With `step = NULL`
+(default), migrants are drawn from the template's living population at its
+`end_time`, as before. With a positive number of years, the run is divided
+into intervals `[start + k * step, start + (k + 1) * step)`, the last ending
+at the run's end, and an arrival in interval k is drawn from the template as
+it stood at the cut `c_k = start + k * step`, the start of its interval. The
+template and the destination share one calendar.
+
+**Coverage.** Every cut must lie within the template's simulated history:
+from the start of its first recorded run (`unrealized_since`) to its
+`end_time`. Before its first run a template has only its starting
+population. A cut outside that range, or a template without a recorded run,
+is an error naming the cuts and the template's simulated period.
+
+**The template at a cut.** An internal helper truncates the template to its
+state at time c:
+
+- People born after c are removed, as are the template's own immigrants who
+  had not arrived by c, with unions and external relatives only they
+  reference. Deaths after c are undone.
+- Unions starting after c are removed; unions ending after c are live at c
+  (no end time or reason). A cohabitation converted after c is a live
+  cohabitation, and the marriage it became is removed.
+- Transitions after c are removed, and each person's groups are their
+  categories at c from their transition history.
+- Template external relatives born after c are removed; those alive at c
+  are censored at c (`censor_time` no later than c, deaths after c undone).
+- Ancestry is kept for remaining people, and the truncated `end_time` is c.
+
+Parity, previous-union state, households, eligibility, weights, custom
+assignment, imported histories and external relatives then follow from the
+truncated template exactly as for `step = NULL`, with c in place of the
+template's `end_time`: a migrant arrives as they were at c, with every date
+shifted by the arrival time minus c (less than `step`). Template IDs are
+the same at every cut, and custom weight functions' `bin` gains `cut`.
+
+**Engine.** Each cut's parties, selection probabilities, assignment
+probabilities and imported state are prepared before the run. Cut times
+inside the run are calendar boundaries: at each, the stream switches to the
+cut's parties and redraws its arrival clock (memoryless). Household streams
+divide intensity by each cut's E[size], so the person intensity holds as
+household composition changes. Intensity tables are unaffected.
+
+**Cost.** Setup work and memory grow with the number of cuts; at report
+scale (50 yearly cuts of a template of about 25,000) setup is estimated at
+tens of seconds, to be measured.
+
+**Worked example.** A template simulated from 0 to 200 serves a destination
+run from 100 to 150 with `step = 10`. Arrivals in [100, 110) are drawn from
+the template as of 100, those in [110, 120) as of 110, and so on to [140,
+150) from 140. A woman aged 30 in the template at 120, married at 115 and
+mother of a child born at 118, arriving at 124.5 is 30 at arrival, born at
+94.5; her marriage starts at 119.5 and arrives live, and her child, aged 2
+at the cut, arrives aged 2 if a dependent. Her template births after 120
+are not part of her history. A template simulated only from 50 to 140
+still serves this run, whose last cut is 140, but not a run from 100 to
+160, which needs a cut at 150; nor does a template whose first run starts
+after 100.
+
 ## Template truncation (deferred)
 
-D180 recorded a requested helper to truncate templates to living people and
+Truncating a template to its state at a cut time (D196) is internal and
+distinct from the following. D180 recorded a requested helper to truncate
+templates to living people and
 their descendants. D184 defers it: the user is not certain it is worth its
 complexity, and migrants no longer depend on it because external relatives
 carry the records parity and previous-union status need. Templates are used
