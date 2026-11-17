@@ -826,6 +826,7 @@ The following choices are open; listing an option does not select it.
 | Calendar inputs | Template and weight-model schedules: interval columns, coverage, gaps and exact boundaries |
 | Households | Settled for phase 3 (D187) and selection variables (D189); multigenerational rules |
 | Migration history | Stored facts, source provenance, history depth, starting-population unknowns and restart persistence |
+| Duration of residence | Custom weight functions see `birth_time`, `arrival_time` and `bin$time` (D195); not formulas or matching |
 | Classifications | Generation is user-defined (D192): a declared group with custom inheritance and migrant assignment; per-member assignment for arriving households; recency shares by generation depth await quantitative characteristics |
 | Rate strata | Personal status and stream via the `birthplace` group (D190); generation strata |
 | Observation | Settled for phase 2 (D186) |

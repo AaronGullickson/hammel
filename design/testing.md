@@ -1692,3 +1692,16 @@ dispersion 2 (1 when split by sex) with wider intervals, and adjusted 90%
 coverage across 40 replications. Over 200 replications at 95%, coverage was
 0.92 adjusted versus 0.81 plain for two-person households, and 0.95 versus
 0.76 for a simulated template (mean dispersion 2.62).
+
+## Times in custom weight functions (November 17, 2026)
+
+Under D195, `test-weight-models.R` checks that custom mortality weights see
+`birth_time` and `arrival_time` matching the population (`NA` for natives),
+that they are evaluated at each death through `bin$time`, that time since
+arrival is never negative, and that custom dissolution weights see both
+partners' birth and arrival times; one test asserting the old "no exact
+times" contract was updated. With the two new tests removed so both sides
+run the same tests, the offline files other than the five immigration files
+made 1,830 native calls on `master` and this branch with
+`-ffp-contract=off`, all with identical hashes. `devtools::test()` passed
+9,062 expectations with one skip (the opt-in live database test).

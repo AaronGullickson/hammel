@@ -66,15 +66,22 @@
 #' @section Custom functions: Instead of using a formula, users can create a
 #'   custom function with `fun`. `fun(members, bin)` receives a tibble with one
 #'   row per eligible member of the chosen cell, holding the variables above for
-#'   every declared dimension (with labels for categorical variables) and
-#'   identifiers (`person_id`, or `union_id`, `wife_id` and `husband_id`), and a
+#'   every declared dimension (with labels for categorical variables),
+#'   identifiers (`person_id`, or `union_id`, `wife_id` and `husband_id`) and
+#'   `birth_time` and `arrival_time` (`NA` for people who did not immigrate;
+#'   `birth_time_w`, `birth_time_h`, `arrival_time_w` and `arrival_time_h` for
+#'   union processes), and a
 #'   list `bin` describing the cell: its `process`, strata (each dimension's
 #'   category, or `<dim>_w`/`<dim>_h` for union processes, NA when the rates do
 #'   not stratify by it; `origin` and `destination` for transitions), band
-#'   (`age_start`/`age_end` or `dur_start`/`dur_end`) and the active rate period
-#'   `time_start`/`time_end` (NA for static rates). Exact ages and times are not
-#'   passed. In fertility with weighted matching calibration, the function is
-#'   evaluated at every refresh of every woman, which can be slow.
+#'   (`age_start`/`age_end` or `dur_start`/`dur_end`), the active rate period
+#'   `time_start`/`time_end` (NA for static rates) and `time`, when the weights
+#'   are evaluated. Exact ages and durations follow from these: age is
+#'   `bin$time - birth_time` and time since arrival
+#'   `bin$time - arrival_time`. Weights are usually evaluated at the event; in
+#'   fertility and search with weighted matching calibration, they are
+#'   evaluated, and `time` set, at every refresh of every woman, which can be
+#'   slow.
 #'
 #' @section Time-varying weights: A process's `weights` may instead be a tibble
 #'   with numeric `time_start`, `time_end` and a list column `model` of weight

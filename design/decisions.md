@@ -4117,3 +4117,25 @@ column naming the kind matches other processes' rate tables.
 
 **Supersedes:** D177's restriction to absolute intensity, and the numeric
 and `intensity`-column forms of D184.
+
+## D195 — Birth and arrival times in custom weight functions (November 17, 2026)
+
+**Status:** User decision, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** Custom weight functions for person processes receive
+`birth_time` and `arrival_time` (`NA` for people who did not immigrate) in
+`members`; union processes receive `birth_time_w`, `birth_time_h`,
+`arrival_time_w` and `arrival_time_h`. `bin$time` is when the weights are
+evaluated: the event, or for weights stored at refresh (fertility and search
+under weighted matching calibration) the refresh. Formula weights gain no
+time variables, and matching models are unchanged.
+
+**Rationale:** Time since arrival and age change continuously. Formula
+weights are stored at refresh and would go stale between events, while
+custom functions are evaluated at the event, so exact ages and durations
+are available there without engine bookkeeping. Raw times plus the clock
+let users derive age, time since arrival and age at arrival themselves.
+
+**Consequence:** Weights depending on time since arrival in matching remain
+unsupported; search weights can stand in by changing who searches.

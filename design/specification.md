@@ -598,3 +598,8 @@ and every change in the living population (births, deaths, arrivals) adds
 rate × N × elapsed time to each rate stream's used hazard and reschedules
 it. `calculate_immigration_rates()` divides arrivals by the person-years of
 the whole population.
+
+Each engine person stores an arrival time (`NA` for the born), read from a
+restarted population's `arrival_time`. Custom weight functions receive
+birth and arrival times in `members` and the evaluation time as `bin$time`,
+set from the event time (D195).

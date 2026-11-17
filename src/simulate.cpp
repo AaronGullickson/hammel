@@ -49,6 +49,7 @@ struct Person {
   double id, born, died, mother, father, last_birth;
   bool female;
   int group;
+  double arrived = NA_REAL;  // arrival time of an immigrant (D185)
 };
 
 // Event processes, in their same-time priority order.
@@ -973,6 +974,9 @@ Simulation::read_people(DataFrame persons, NumericMatrix initial_ancestry) {
     }
   }
   std::map<double, int> index;
+  const bool arrivals = persons.containsElementNamed("arrival_time");
+  NumericVector arrival_times =
+    arrivals ? NumericVector(persons["arrival_time"]) : NumericVector();
   // Pools and calibration bin by birth time, so they must reach the earliest
   // migrant birth.
   min_birth = std::min(start, immigration_min_birth);
@@ -983,6 +987,9 @@ Simulation::read_people(DataFrame persons, NumericMatrix initial_ancestry) {
        -std::numeric_limits<double>::infinity(), female,
        person_stratum(matching_spec, i)}
     );
+    if (arrivals) {
+      people.back().arrived = arrival_times[i];
+    }
     index[ids[i]] = i;
     next_id = std::max(next_id, ids[i]);
     min_birth = std::min(min_birth, births[i]);
@@ -2229,7 +2236,7 @@ List Simulation::weight_members(
     names.push_back(name);
   };
   if (!is_union) {
-    NumericVector id(n);
+    NumericVector id(n), born(n), arrived(n);
     CharacterVector sex(n), type(n), previous(n);
     IntegerVector partnered(n), births(n);
     std::vector<CharacterVector> own(dimensions), partners(dimensions);
@@ -2241,6 +2248,8 @@ List Simulation::weight_members(
       const int i = units[r];
       const int partner = current_partner[i];
       id[r] = people[i].id;
+      born[r] = people[i].born;
+      arrived[r] = people[i].arrived;
       sex[r] = people[i].female ? "f" : "m";
       type[r] = kUnionTypeLabels[static_cast<int>(person_value(2, 0, i, -1))];
       partnered[r] = partner >= 0;
@@ -2254,6 +2263,8 @@ List Simulation::weight_members(
     }
     add("person_id", id);
     add("sex", sex);
+    add("birth_time", born);
+    add("arrival_time", arrived);
     for (int d = 0; d < dimensions; ++d) {
       add(dim_names[d], own[d]);
     }
@@ -2276,7 +2287,8 @@ List Simulation::weight_members(
       add("destination", destination);
     }
   } else {
-    NumericVector id(n), wife(n), husband(n), gap(n);
+    NumericVector id(n), wife(n), husband(n), gap(n), born_w(n), born_h(n),
+      arrived_w(n), arrived_h(n);
     CharacterVector previous_w(n), previous_h(n), type(n);
     IntegerVector parity_w(n);
     std::vector<CharacterVector> wives(dimensions), husbands(dimensions);
@@ -2291,6 +2303,10 @@ List Simulation::weight_members(
       id[r] = x.id;
       wife[r] = people[x.wife].id;
       husband[r] = people[x.husband].id;
+      born_w[r] = people[x.wife].born;
+      born_h[r] = people[x.husband].born;
+      arrived_w[r] = people[x.wife].arrived;
+      arrived_h[r] = people[x.husband].arrived;
       for (int d = 0; d < dimensions; ++d) {
         wives[d][r] = dim_label(d, category(x.wife, d));
         husbands[d][r] = dim_label(d, category(x.husband, d));
@@ -2309,6 +2325,10 @@ List Simulation::weight_members(
       add(dim_names[d] + "_w", wives[d]);
       add(dim_names[d] + "_h", husbands[d]);
     }
+    add("birth_time_w", born_w);
+    add("birth_time_h", born_h);
+    add("arrival_time_w", arrived_w);
+    add("arrival_time_h", arrived_h);
     add("parity_w", parity_w);
     add("previous_union_w", previous_w);
     add("previous_union_h", previous_h);
@@ -2346,6 +2366,9 @@ void Simulation::custom_eta(
   std::vector<double>& eta
 ) {
   Function f(spec.fun);
+  // The time at which the weights are evaluated: the event, or for stored
+  // weights the refresh.
+  bin["time"] = weight_now;
   PutRNGstate();
   NumericVector result;
   try {
@@ -3389,6 +3412,7 @@ void Simulation::on_arrival(int k, double now) {
        father < 0 ? NA_REAL : people[father].id,
        -std::numeric_limits<double>::infinity(), stream.female[m] != 0, 0}
     );
+    people[i].arrived = now;
     // Imported reproductive history (D186): parity and spacing.
     if (!NumericVector::is_na(stream.since_birth[m])) {
       people[i].last_birth = now - stream.since_birth[m];
