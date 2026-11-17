@@ -3965,3 +3965,21 @@ relationship makes the partner restriction unnecessary.
 
 **Supersedes:** the individual-arrival eligibility of D185 and the
 individual-arrival imports of D186, which now apply to household members.
+
+## D189 — Household variables in immigration selection (November 16, 2026)
+
+**Status:** User decision, November 16, 2026, authorizing implementation.
+
+**Decision:** Household streams describe each household to weight models
+and `custom` assignment functions by its carrier plus `partnered` (0/1),
+`household_size`, `n_dependents` and `partner_age` (`NA` when unpartnered).
+The partner's sex is omitted because all partnerships are currently
+heterosexual. In formulas, a term with a missing value contributes nothing,
+following the engine's convention for weight models; cloning streams can't
+use these variables.
+
+**Rationale:** With carriers as the selection unit (D187), `sex` alone
+confounds sex with household type: male carriers are always unpartnered.
+These variables let users target household composition directly.
+
+**Supersedes:** D187's deferral of household-level characteristics.

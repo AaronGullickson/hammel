@@ -36,8 +36,10 @@ probability zero, and the probabilities must sum to one.
 \code{fun(members)}. \code{members} is a tibble with one row per eligible template
 person, holding \code{person_id} (the template ID), \code{age} (at the template's
 \code{end_time}), \code{sex} and the template's groups shared with the simulation.
-For household streams, the rows are household carriers, and every
-member of a household receives the carrier's category.
+For household streams, the rows are household carriers, with the
+household's \code{partnered} (0/1), \code{household_size}, \code{n_dependents} and
+\code{partner_age} (\code{NA} for unpartnered carriers), and every member of a
+household receives the carrier's category.
 \code{fun} returns a data frame or matrix with one row per member and one
 column per category, named by category; each row's probabilities must
 sum to one.

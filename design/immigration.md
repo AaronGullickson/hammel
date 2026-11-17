@@ -503,9 +503,12 @@ template; otherwise they are independent.
 replacement. The stream's weight model applies to carriers'
 characteristics, so a household's selection probability is its carrier's
 normalized weight. A `custom` assignment function receives carriers, one
-row per party. Household-level characteristics, such as size or
-children's ages, are not available to weights or assignment functions in
-phase 3.
+row per party. Under D189, carriers also carry their household's
+`partnered` (0/1), `household_size`, `n_dependents` and `partner_age` (`NA`
+when unpartnered) for weights and assignment. A formula term with a
+missing value contributes nothing to the log weight, as in the engine's
+weight models, so `partner_age` acts only on couples. Cloning streams can't
+use these variables.
 
 **Intensity.** `intensity` stays in persons per year. Let E[size] be the
 expected party size under the stream's selection probabilities: the sum of
@@ -703,7 +706,7 @@ The following choices are open; listing an option does not select it.
 | Imported state | Settled for phase 2 (D186) |
 | Compatibility | Categories of future scheduled templates; calendar-scheduled assignments |
 | Calendar inputs | Template and weight-model schedules: interval columns, coverage, gaps and exact boundaries |
-| Households | Settled for phase 3 (D187); household-level characteristics in weights and assignment; multigenerational rules |
+| Households | Settled for phase 3 (D187) and selection variables (D189); multigenerational rules |
 | Migration history | Stored facts, source provenance, history depth, starting-population unknowns and restart persistence |
 | Classifications | Rule interface, output types, update timing, custom-model inputs and imported-history inputs |
 | Rate strata | Declared group versus built-in migration variable, process support and coverage rules |

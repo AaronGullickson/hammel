@@ -26,7 +26,10 @@ or a \code{\link[=weight_model]{weight_model()}} whose formula or function may u
 template's \code{end_time}), \code{sex} and the template's groups shared with the
 simulation. Each eligible person is drawn with probability proportional
 to their weight; weights do not change the stream's intensity. For
-household streams, weights use the carrier's characteristics.}
+household streams, weights describe each household by its carrier, and
+may also use \code{partnered} (0/1), \code{household_size}, \code{n_dependents} and
+\code{partner_age} (\code{NA} for unpartnered carriers; in a formula the term then
+contributes nothing).}
 
 \item{assignment}{\code{NULL} (default) or a list of \code{\link[=migrant_assignment]{migrant_assignment()}}
 objects named by the simulation's group dimensions that the template

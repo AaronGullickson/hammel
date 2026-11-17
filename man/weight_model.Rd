@@ -54,7 +54,10 @@ dimension.
 
 Immigration streams select template people rather than cell members, and
 may use \code{age} (at the template's end), \code{sex} and the template's groups
-shared with the simulation.
+shared with the simulation. Household streams select households by their
+carriers and may also use \code{partnered} (0/1), \code{household_size},
+\code{n_dependents} and \code{partner_age} (NA when unpartnered, so the term
+contributes nothing for unpartnered carriers).
 
 Dissolution and conversion are union processes and may use \code{race_w},
 \code{race_h}, \code{parity_w}, \code{previous_union_w}, \code{previous_union_h},

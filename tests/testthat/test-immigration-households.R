@@ -410,3 +410,91 @@ test_that("household rules are validated", {
   expect_identical(stream$eligible, 4L)
   expect_identical(stream$household, 18)
 })
+
+# Selection probabilities of a household stream's parties, in carrier order.
+party_probabilities <- function(stream) {
+  prepared <- prepare_immigration(
+    immigration(a = stream), list(), list(), list(), integer(), 0, 1
+  )$streams[[1]]
+  diff(c(0, prepared$cumulative))
+}
+
+test_that("household variables describe each carrier's household", {
+  seen <- NULL
+  weights <- weight_model(fun = function(members, bin) {
+    seen <<- members
+    rep(0, nrow(members))
+  })
+  stream <- immigration_stream(household_template(), 10, weights = weights)
+  party_probabilities(stream)
+  # Carriers 1 (married to 2, three dependents), 8, 9 (one child) and 11.
+  expect_identical(seen$person_id, c(1L, 8L, 9L, 11L))
+  expect_identical(seen$partnered, c(1L, 0L, 0L, 0L))
+  expect_identical(seen$household_size, c(5L, 1L, 2L, 1L))
+  expect_identical(seen$n_dependents, c(3L, 0L, 1L, 0L))
+  expect_equal(seen$partner_age, c(34, NA, NA, NA))
+})
+
+test_that("formula weights use household variables", {
+  template <- household_template()
+  stream <- function(formula, coefficients) {
+    immigration_stream(
+      template, 10,
+      weights = weight_model(formula, coefficients)
+    )
+  }
+  p <- party_probabilities(
+    stream(
+      ~ partnered + n_dependents,
+      c(partnered = log(2), n_dependents = log(3))
+    )
+  )
+  w <- c(2 * 3^3, 1, 3, 1)
+  expect_equal(p, w / sum(w))
+  p <- party_probabilities(stream(~household_size, c(household_size = log(2))))
+  w <- 2^c(5, 1, 2, 1)
+  expect_equal(p, w / sum(w))
+  # The partner's age counts only for couples.
+  p <- party_probabilities(stream(~partner_age, c(partner_age = log(1.1))))
+  w <- c(1.1^34, 1, 1, 1)
+  expect_equal(p, w / sum(w))
+})
+
+test_that("custom assignment sees household variables", {
+  persons <- data.frame(
+    person_id = 1:2, sex = c("f", "m"), birth_time = -30,
+    death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_,
+    region = c("n", "s")
+  )
+  # Couples go north and everyone else south.
+  rule <- migrant_assignment("custom", fun = function(members) {
+    data.frame(n = members$partnered, s = 1 - members$partnered)
+  })
+  model <- make_model(2) |>
+    set_population(hammel_population(persons, end_time = 0)) |>
+    set_groups(region = group(categories = c("n", "s"))) |>
+    set_immigration(
+      a = immigration_stream(
+        household_template(), 60,
+        assignment = list(region = rule)
+      )
+    )
+  result <- run_simulation(model, 2, seed = 13)
+  people <- arrived(result)
+  size <- table(people$arrival_time)[as.character(people$arrival_time)]
+  expect_true(all(people$region[size == 5] == "n"))
+  expect_true(all(people$region[size < 5] == "s"))
+  expect_true(any(size == 5) && any(size < 5))
+})
+
+test_that("cloning streams can't weight by household variables", {
+  template <- generate_uniform_population(20)
+  expect_hammel_error(
+    immigration_stream(
+      template, 1,
+      weights = weight_model(~partnered, c(partnered = 1)),
+      household = NULL
+    ),
+    "specification", "immigration_stream"
+  )
+})

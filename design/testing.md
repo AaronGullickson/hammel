@@ -1586,3 +1586,14 @@ without does not. The phase 2 history tests now use household streams with
 with her history. The engine was unchanged. `devtools::test()` passed 8,885
 expectations with no failures or warnings and one skip (the opt-in live
 database test).
+
+## Household selection variables (November 16, 2026)
+
+Under D189, `test-immigration-households.R` checks the household variables
+each carrier receives in the worked-example template, exact selection
+probabilities from formulas on `partnered`, `n_dependents`,
+`household_size` and `partner_age` (which acts only on couples), a custom
+assignment that sends couples' households to one region, and the error for
+household variables on a cloning stream. `devtools::test()` passed 8,899
+expectations with no failures or warnings and one skip (the opt-in live
+database test).

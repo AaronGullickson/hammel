@@ -42,7 +42,10 @@
 #'
 #'   Immigration streams select template people rather than cell members, and
 #'   may use `age` (at the template's end), `sex` and the template's groups
-#'   shared with the simulation.
+#'   shared with the simulation. Household streams select households by their
+#'   carriers and may also use `partnered` (0/1), `household_size`,
+#'   `n_dependents` and `partner_age` (NA when unpartnered, so the term
+#'   contributes nothing for unpartnered carriers).
 #'
 #'   Dissolution and conversion are union processes and may use `race_w`,
 #'   `race_h`, `parity_w`, `previous_union_w`, `previous_union_h`,
@@ -226,7 +229,11 @@ weight_builtins <- function(type) {
           levels = c("f", "m"),
           level_codes = c(f = 1L, m = 0L)
         ),
-        age = list(code = -1L)
+        age = list(code = -1L),
+        partnered = list(code = -1L),
+        household_size = list(code = -1L),
+        n_dependents = list(code = -1L),
+        partner_age = list(code = -1L)
       )
     )
   }

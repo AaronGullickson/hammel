@@ -139,7 +139,10 @@ set_immigration <- function(model, ...) {
 #'   template's `end_time`), `sex` and the template's groups shared with the
 #'   simulation. Each eligible person is drawn with probability proportional
 #'   to their weight; weights do not change the stream's intensity. For
-#'   household streams, weights use the carrier's characteristics.
+#'   household streams, weights describe each household by its carrier, and
+#'   may also use `partnered` (0/1), `household_size`, `n_dependents` and
+#'   `partner_age` (`NA` for unpartnered carriers; in a formula the term then
+#'   contributes nothing).
 #' @param assignment `NULL` (default) or a list of [migrant_assignment()]
 #'   objects named by the simulation's group dimensions that the template
 #'   lacks.
@@ -193,8 +196,10 @@ immigration_stream <- function(
 #'   `fun(members)`. `members` is a tibble with one row per eligible template
 #'   person, holding `person_id` (the template ID), `age` (at the template's
 #'   `end_time`), `sex` and the template's groups shared with the simulation.
-#'   For household streams, the rows are household carriers, and every
-#'   member of a household receives the carrier's category.
+#'   For household streams, the rows are household carriers, with the
+#'   household's `partnered` (0/1), `household_size`, `n_dependents` and
+#'   `partner_age` (`NA` for unpartnered carriers), and every member of a
+#'   household receives the carrier's category.
 #'   `fun` returns a data frame or matrix with one row per member and one
 #'   column per category, named by category; each row's probabilities must
 #'   sum to one.
@@ -359,6 +364,11 @@ arrival_columns <- c("arrival_time", "stream")
 
 assignment_methods <- c("fixed", "probability", "custom")
 
+# Carrier variables of household streams, for weights and assignment (D189).
+household_variables <- c(
+  "partnered", "household_size", "n_dependents", "partner_age"
+)
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 # Build a validated immigration process from a list of streams; errors name
@@ -519,6 +529,23 @@ validate_immigration_stream <- function(stream, call = rlang::caller_env()) {
   }
   validate_process_weights(weights, "migrant", call = call)
   household <- stream$household
+  used <- if (!is.null(weights$formula)) all.vars(weights$formula)
+  clone_only <- intersect(used, household_variables)
+  if (is.null(household) && length(clone_only)) {
+    abort_hammel(
+      c(
+        "Weights for a cloning stream can't use {.field {clone_only}}.",
+        "i" = paste(
+          "Household variables describe a household's carrier; use",
+          "{.code household = household()} to draw households."
+        )
+      ),
+      "specification",
+      argument = "weights",
+      variables = clone_only,
+      call = call
+    )
+  }
   if (!is.null(household) && !inherits(household, "hammel_household")) {
     abort_hammel(
       c(
@@ -745,11 +772,11 @@ validate_migrant_assignment <- function(model, call = rlang::caller_env()) {
 # is a one-person party to clone (D188). With one, the template's living
 # persons form households under D140's rule at its end_time: a carrier (the
 # woman in a current union, or an unpartnered person who is not a
-# dependent), their partner and the dependents of either, recursively. Returns the members'
-# template rows, party by party (carrier, partner, then dependents by birth),
-# the zero-based start of each party and its end, and links within parties
-# as member offsets (-1 none): parents, and each woman's current partner with
-# the union's template row.
+# dependent), their partner and the dependents of either, recursively.
+# Returns the members' template rows, party by party (carrier, partner, then
+# dependents by birth), the zero-based start of each party and its end, and
+# links within parties as member offsets (-1 none): parents, and each
+# woman's current partner with the union's template row.
 migrant_parties <- function(template, household) {
   persons <- template$persons
   n <- nrow(persons)
@@ -1040,7 +1067,19 @@ prepare_stream <- function(
     people[[d]] <- persons[[d]]
   }
   starts <- parties$party_start
-  members <- people[utils::head(starts, -1) + 1L, , drop = FALSE]
+  carriers <- utils::head(starts, -1) + 1L
+  members <- people[carriers, , drop = FALSE]
+  # Household streams describe each household by its carrier (D189).
+  if (!is.null(stream$household)) {
+    partner <- parties$partner[carriers]
+    size <- diff(starts)
+    members$partnered <- as.integer(partner >= 0)
+    members$household_size <- as.integer(size)
+    members$n_dependents <- as.integer(size - 1L - members$partnered)
+    members$partner_age <- ifelse(
+      partner >= 0, people$age[carriers + pmax(partner, 0L)], NA_real_
+    )
+  }
   probabilities <- migrant_probabilities(
     stream$weights, members, registries[shared], name,
     call = call
@@ -1062,7 +1101,11 @@ prepare_stream <- function(
       ) - 1L
     } else {
       assignment[[k]] <- assignment_probabilities(
-        rules[[d]], members[c("person_id", "age", "sex", shared)],
+        rules[[d]],
+        members[intersect(
+          c("person_id", "age", "sex", shared, household_variables),
+          names(members)
+        )],
         as.character(registries[[d]]), d,
         call = call
       )
@@ -1266,7 +1309,11 @@ migrant_probabilities <- function(
           as.numeric(as.character(x) == f$level)
         }
       }
-      eta <- eta + column$coefficient * value
+      # A term with a missing value, such as the partner's age of an
+      # unpartnered carrier, contributes nothing.
+      term <- column$coefficient * value
+      term[is.na(term)] <- 0
+      eta <- eta + term
     }
   }
   w <- exp(eta - max(eta))

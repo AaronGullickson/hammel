@@ -171,6 +171,17 @@ Ok, now lets add the migration streams.
 
 ```{r}
 
+# custom weight model to highly select working age pop
+migrant_selection_fun <- weight_model(fun = function(members, bin) {
+  w <- ifelse(
+    members$age >= 20 & members$age < 45, 1,
+    ifelse(members$age >= 45 & members$age < 65, 0.3,
+      ifelse(members$age >= 65, 0.05, 0.02))
+  )
+  w <- ifelse(members$sex == "m", 2 * w, w)
+  log(w)
+})
+
 model <- model |>
   set_immigration(
     asia = immigration_stream(
@@ -181,7 +192,8 @@ model <- model |>
           "probability", probs = c("NE" = 0.3, "MW" = 0.15, "S" = 0.15, "W" = 0.4)
         )
       ),
-      weights = weight_model(~ age + sex, c(age = log(1), sexm = log(1)))
+      household = household(),
+      weights = migrant_selection_fun
     ),
     latin_america = immigration_stream(
       pop_latino_template,
@@ -191,7 +203,8 @@ model <- model |>
           "probability", probs = c("NE" = 0.25, "MW" = 0.2, "S" = 0.2, "W" = 0.35)
         )
       ),
-      weights =  weight_model(~ age + sex, c(age = log(1), sexm = log(1)))
+      household = household(),
+      weights = migrant_selection_fun 
     )
   )
 
