@@ -634,7 +634,8 @@ and everyone else's is `"native"`. `arrival_time` remains the arrival
 record. Stream names can't be `"native"` or `"birthplace_ancestry"`, and a
 model with immigration can't declare its own `birthplace` group. Populations
 that already have the automatic dimension keep it in later runs, with or
-without immigration.
+without immigration, including when `set_groups()` redeclares the user's
+dimensions without it.
 
 **Category: personal status.** Newborns are always `"native"` (fixed
 inheritance, not configurable). An arrival's category is their stream's

@@ -1641,3 +1641,10 @@ A seeded run with a household stream of intensity 800 over 50 years from a
 template of about 25,000 people (40,139 arrivals in 20,903 households) took
 8.6 seconds with a fixed `generation` assignment and 13.0 seconds with a
 custom one, about 0.21 milliseconds per arriving household.
+
+A restart that called `set_groups()` without `birthplace` dropped the
+automatic dimension from the population, so its arrival entry rows failed
+validation. Declarations now keep a population's automatic dimensions;
+`test-immigration-birthplace.R` checks that the dimension and its ancestry
+survive such a restart. `devtools::test()` passed 8,983 expectations with
+one skip (the opt-in live database test).

@@ -343,6 +343,13 @@ apply_group_declaration <- function(
   call = rlang::caller_env()
 ) {
   declaration <- normalize_group_declaration(declaration, call = call)
+  # Automatic dimensions, such as birthplace (D190), stay with a population
+  # whose new declaration does not mention them.
+  for (d in setdiff(names(population$groups), names(declaration))) {
+    if (isTRUE(population$groups[[d]]$automatic)) {
+      declaration[[d]] <- population$groups[[d]]
+    }
+  }
   # A dimension declared without categories keeps the categories the
   # population already declares (so turning on ancestry, say, keeps their
   # order).

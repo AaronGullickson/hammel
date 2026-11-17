@@ -219,3 +219,29 @@ test_that("birthplace names and settings are validated", {
     set_immigration(a = immigration_stream(template, 1))
   expect_hammel_error(run_simulation(model, 1), "groups", "run_simulation")
 })
+
+test_that("redeclaring groups keeps birthplace", {
+  model <- birthplace_model(birth_rate = 1)
+  model$population$persons$race <- "A"
+  model <- model |>
+    set_groups(race = group(categories = "A", ancestry = TRUE)) |>
+    set_immigration(
+      asia = immigration_stream(
+        birthplace_template(), 10,
+        assignment = list(race = migrant_assignment("fixed", fixed_value = "A"))
+      ),
+      birthplace_ancestry = TRUE
+    )
+  first <- run_simulation(model, 3, seed = 11)
+  # A restart that redeclares the user's groups, without immigration.
+  again <- set_population(birthplace_model(birth_rate = 1), first) |>
+    set_groups(race = group(categories = "A", ancestry = TRUE))
+  expect_true(again$population$groups$birthplace$automatic)
+  second <- run_simulation(again, 2, seed = 12)
+  expect_setequal(names(second$groups), c("race", "birthplace"))
+  expect_setequal(names(second$ancestry), c("race", "birthplace"))
+  old <- match(first$persons$person_id, second$ancestry$birthplace$person_id)
+  expect_equal(
+    second$ancestry$birthplace$asia[old], first$ancestry$birthplace$asia
+  )
+})
