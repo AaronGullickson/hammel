@@ -4,7 +4,13 @@
 \alias{extract_kin}
 \title{Extract known kin within generation-distance bounds}
 \usage{
-extract_kin(population, ego_ids, generations = 2, relative_ids = NULL)
+extract_kin(
+  population,
+  ego_ids,
+  generations = 2,
+  relative_ids = NULL,
+  include_external = FALSE
+)
 }
 \arguments{
 \item{population}{A \code{hammel_population} with a finite \code{end_time}.}
@@ -16,6 +22,10 @@ side, default \code{2}. Zero returns no kin between distinct people.}
 
 \item{relative_ids}{Optional unique relative IDs to consider. \code{NULL} means
 all recorded persons. Unknown IDs are errors; empty vectors return no rows.}
+
+\item{include_external}{If \code{TRUE}, immigrants' external relatives (see
+\code{\link[=immigration]{immigration()}}) can be relatives, and \code{relative_ids} may name them. They
+are never egos. Defaults to \code{FALSE}.}
 }
 \value{
 A tibble with one row per ego and relative: \code{ego_id}, \code{relative_id},

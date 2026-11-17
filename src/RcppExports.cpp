@@ -109,8 +109,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // count_kin_cpp
-List count_kin_cpp(DataFrame persons, int generations, IntegerMatrix relationship_types, IntegerMatrix strata, int n_strata, int n_types);
-RcppExport SEXP _hammel_count_kin_cpp(SEXP personsSEXP, SEXP generationsSEXP, SEXP relationship_typesSEXP, SEXP strataSEXP, SEXP n_strataSEXP, SEXP n_typesSEXP) {
+List count_kin_cpp(DataFrame persons, int generations, IntegerMatrix relationship_types, IntegerMatrix strata, int n_strata, int n_types, Nullable<LogicalVector> egos);
+RcppExport SEXP _hammel_count_kin_cpp(SEXP personsSEXP, SEXP generationsSEXP, SEXP relationship_typesSEXP, SEXP strataSEXP, SEXP n_strataSEXP, SEXP n_typesSEXP, SEXP egosSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -120,7 +120,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerMatrix >::type strata(strataSEXP);
     Rcpp::traits::input_parameter< int >::type n_strata(n_strataSEXP);
     Rcpp::traits::input_parameter< int >::type n_types(n_typesSEXP);
-    rcpp_result_gen = Rcpp::wrap(count_kin_cpp(persons, generations, relationship_types, strata, n_strata, n_types));
+    Rcpp::traits::input_parameter< Nullable<LogicalVector> >::type egos(egosSEXP);
+    rcpp_result_gen = Rcpp::wrap(count_kin_cpp(persons, generations, relationship_types, strata, n_strata, n_types, egos));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -300,7 +301,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_union_start_groups_cpp", (DL_FUNC) &_hammel_union_start_groups_cpp, 3},
     {"_hammel_union_group_history_cpp", (DL_FUNC) &_hammel_union_group_history_cpp, 7},
     {"_hammel_extract_kin_cpp", (DL_FUNC) &_hammel_extract_kin_cpp, 4},
-    {"_hammel_count_kin_cpp", (DL_FUNC) &_hammel_count_kin_cpp, 6},
+    {"_hammel_count_kin_cpp", (DL_FUNC) &_hammel_count_kin_cpp, 7},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 2},
     {"_hammel_inspect_group_matching_cpp", (DL_FUNC) &_hammel_inspect_group_matching_cpp, 4},
     {"_hammel_inspect_exact_draw_cpp", (DL_FUNC) &_hammel_inspect_exact_draw_cpp, 11},

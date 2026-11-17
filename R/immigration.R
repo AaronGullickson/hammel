@@ -28,14 +28,23 @@
 #' declaration. Calling `set_immigration(model)` without streams removes
 #' immigration from the model.
 #'
-#' Migrants arrive individually and without histories. A migrant keeps the age
-#' and sex of the template person they were drawn from, has unknown parents,
-#' no union history and parity zero, and enters every applicable rate process
-#' and matching pool at arrival. Simulated populations of models with
-#' immigration gain `arrival_time` and `stream` columns in `persons`, which
-#' are `NA` for people who did not immigrate. Observation functions such as
-#' [calculate_life_table()] count a migrant's exposure and events only from
-#' their arrival.
+#' Migrants arrive individually. A migrant keeps the age, sex and history of
+#' the template person they were drawn from, with every date shifted so that
+#' ages and durations at the template's `end_time` are unchanged at arrival.
+#' Their template unions arrive as pre-migration unions, and their previous
+#' partners and children become `external_relatives` of the simulated
+#' population: records that inform histories, such as parity and
+#' previous-union status, but are never simulated or counted. Their own
+#' parents are unknown. Group duration continues from the template, or for
+#' groups assigned by [migrant_assignment()] starts at arrival, recorded as a
+#' `transitions` row with no `origin`.
+#'
+#' Simulated populations of models with immigration gain `arrival_time` and
+#' `stream` columns in `persons`, which are `NA` for people who did not
+#' immigrate, and a `pre_migration` column in `unions` and `transitions`.
+#' External relatives have a `censor_time`, after which nothing is known about
+#' them. Observation functions such as [calculate_life_table()] count a
+#' migrant's exposure and events only from their arrival.
 #'
 #' @param ... Named [immigration_stream()] objects, one per stream. The
 #'   argument names are the stream names.
@@ -716,6 +725,8 @@ prepare_immigration <- function(
   offsets,
   start,
   end,
+  counts_cohab = FALSE,
+  cohab_enabled = FALSE,
   call = rlang::caller_env()
 ) {
   dimensions <- names(declaration)
@@ -725,7 +736,7 @@ prepare_immigration <- function(
       with_error_context(
         prepare_stream(
           process$streams[[name]], name, declaration, registries, components,
-          start, end,
+          start, end, counts_cohab, cohab_enabled,
           call = call
         ),
         paste0("In immigration stream \"", name, "\".")
@@ -763,6 +774,8 @@ prepare_stream <- function(
   components,
   start,
   end,
+  counts_cohab,
+  cohab_enabled,
   call = rlang::caller_env()
 ) {
   template <- stream$template
@@ -910,7 +923,114 @@ prepare_stream <- function(
       template, rows, members, dimensions, shared, registries, components
     ),
     cumulative = c(utils::head(cumsum(probabilities), -1), 1),
-    assignment = assignment
+    assignment = assignment,
+    rows = rows
+  ) |>
+    c(
+      migrant_history_state(
+        template, rows, dimensions, shared, counts_cohab, cohab_enabled,
+        call = call
+      )
+    )
+}
+
+# Template people: persons and any external relatives, in one table with the
+# columns histories need (D186). Template arrival records are ignored.
+template_people <- function(template) {
+  columns <- c(
+    "person_id", "sex", "birth_time", "death_time", "mother_id",
+    "father_id"
+  )
+  people <- as.data.frame(template$persons)[columns]
+  external <- template$external_relatives
+  if (!is.null(external) && nrow(external)) {
+    people <- rbind(people, as.data.frame(external)[columns])
+  }
+  people
+}
+
+# Each eligible template person's state at the template endpoint, as elapsed
+# times for the engine (D186): parity and time since the last birth (women),
+# previous-union category, legal category and time since the last union
+# ended, and time since entering each destination group (NA for groups the
+# template lacks, whose entry is the arrival).
+migrant_history_state <- function(
+  template,
+  rows,
+  dimensions,
+  shared,
+  counts_cohab,
+  cohab_enabled,
+  call = rlang::caller_env()
+) {
+  persons <- template$persons[rows, , drop = FALSE]
+  ids <- persons$person_id
+  end <- template$end_time
+  people <- template_people(template)
+  unions <- template$unions
+  mine <- unions$wife_id %in% ids | unions$husband_id %in% ids
+  if (!cohab_enabled && "union_type" %in% names(unions) &&
+        any(unions$union_type[mine] == "cohab")) {
+    abort_hammel(
+      c(
+        paste(
+          "The stream's template has cohabitations, but cohabitation isn't",
+          "enabled."
+        ),
+        "i" = paste(
+          "Migrants bring their union histories. Enable cohabitation with",
+          "{.arg cohab_prob} in {.fn set_union_formation}."
+        )
+      ),
+      "specification",
+      argument = "template",
+      call = call
+    )
+  }
+  female <- persons$sex == "f"
+  children <- !is.na(people$mother_id)
+  key <- as.character(ids)
+  mothers <- as.character(people$mother_id[children])
+  counts <- c(table(mothers))
+  parity <- as.integer(counts[key])
+  parity[is.na(parity)] <- 0L
+  last <- rep(NA_real_, length(ids))
+  if (any(children)) {
+    latest <- c(tapply(people$birth_time[children], mothers, max))
+    last <- as.numeric(latest[key])
+  }
+  parity[!female] <- 0L
+  last[!female] <- NA_real_
+  previous <- call_native(
+    previous_union_info_cpp(people, unions, counts_cohab),
+    call = call
+  )
+  at <- match(ids, people$person_id)
+  since_entry <- matrix(NA_real_, nrow = length(ids), ncol = length(dimensions))
+  tx <- template$transitions
+  for (k in seq_along(dimensions)) {
+    d <- dimensions[k]
+    if (!d %in% shared) {
+      next
+    }
+    entered <- persons$birth_time
+    if (!is.null(tx) && nrow(tx)) {
+      moves <- tx[tx$group == d & tx$person_id %in% ids, , drop = FALSE]
+      if (nrow(moves)) {
+        latest <- tapply(moves$time, moves$person_id, max)
+        i <- match(names(latest), as.character(ids))
+        entered[i] <- as.numeric(latest)
+      }
+    }
+    since_entry[, k] <- end - entered
+  }
+  list(
+    parity = as.integer(parity),
+    since_birth = end - last,
+    previous_union = as.integer(previous$previous_union[at]),
+    legal_previous = as.integer(previous$legal_previous[at]),
+    since_union_end = end - previous$end_time[at],
+    since_entry = since_entry
   )
 }
 
@@ -1168,6 +1288,507 @@ check_arrivals <- function(persons, end_time, call = rlang::caller_env()) {
     call = call
   )
   invisible(persons)
+}
+
+# External relatives (D186): people referenced by immigrants' histories who
+# are not population members. Checks the specification's rules 1-7.
+check_external_relatives <- function(x, call = rlang::caller_env()) {
+  external <- x$external_relatives
+  persons <- x$persons
+  required <- c(
+    "person_id", "sex", "birth_time", "death_time", "mother_id",
+    "father_id", "censor_time"
+  )
+  check_columns(external, required, "external_relatives", call = call)
+  check_numeric_column(
+    external$person_id, "external_relatives$person_id",
+    id = TRUE,
+    call = call
+  )
+  check_unique_ids(
+    external$person_id, "external_relatives$person_id",
+    call = call
+  )
+  shared <- which(external$person_id %in% persons$person_id)
+  abort_population_rows(
+    shared,
+    "External relatives must not also be in {.field persons}.",
+    "IDs also in {.field persons}",
+    table = "external_relatives",
+    call = call
+  )
+  check_labels(
+    external$sex, "external_relatives$sex", c("m", "f"),
+    call = call
+  )
+  for (field in c("birth_time", "death_time", "censor_time")) {
+    check_numeric_column(
+      external[[field]], paste0("external_relatives$", field),
+      missing = field == "death_time",
+      call = call
+    )
+  }
+  ids <- c(persons$person_id, external$person_id)
+  for (field in c("mother_id", "father_id")) {
+    parents <- external[[field]]
+    check_numeric_column(
+      parents, paste0("external_relatives$", field),
+      missing = TRUE,
+      id = TRUE,
+      call = call
+    )
+    abort_population_rows(
+      which(
+        !is.na(parents) &
+          (!parents %in% ids | parents == external$person_id)
+      ),
+      "{.field {field}} must refer to another person or be {.code NA}.",
+      "Unknown or self references in {.field {field}}",
+      table = "external_relatives",
+      call = call
+    )
+  }
+  died <- !is.na(external$death_time)
+  abort_population_rows(
+    which(died & external$death_time < external$birth_time),
+    "Deaths must not precede births.",
+    "{.field death_time} is before {.field birth_time}",
+    table = "external_relatives",
+    call = call
+  )
+  abort_population_rows(
+    which(
+      (died & external$censor_time != external$death_time) |
+        (!died & (external$censor_time < external$birth_time |
+                    external$censor_time > x$end_time))
+    ),
+    paste(
+      "{.field censor_time} must equal {.field death_time}, or for the",
+      "living lie between {.field birth_time} and {.field end_time}."
+    ),
+    "Invalid {.field censor_time}",
+    table = "external_relatives",
+    call = call
+  )
+  unions <- x$unions
+  member_unions <- unions$wife_id %in% persons$person_id |
+    unions$husband_id %in% persons$person_id
+  referenced <- external$person_id %in% c(
+    unions$wife_id[member_unions], unions$husband_id[member_unions],
+    persons$mother_id, persons$father_id
+  ) |
+    external$mother_id %in% persons$person_id |
+    external$father_id %in% persons$person_id
+  abort_population_rows(
+    which(!referenced),
+    paste(
+      "Each external relative must be a partner, parent or child of someone",
+      "in {.field persons}."
+    ),
+    "Unreferenced external relatives",
+    table = "external_relatives",
+    call = call
+  )
+  current <- unions[is.na(unions$end_time), , drop = FALSE]
+  abort_population_rows(
+    which(external$person_id %in% c(current$wife_id, current$husband_id)),
+    "External relatives must not be in a union without an end time.",
+    "Current partners",
+    table = "external_relatives",
+    call = call
+  )
+  for (d in names(x$groups)) {
+    categories <- x$groups[[d]]$categories
+    if (!d %in% names(external) || is.null(categories)) {
+      next
+    }
+    values <- external[[d]]
+    abort_population_rows(
+      which(
+        !is.na(values) & !as.character(values) %in% as.character(categories)
+      ),
+      "External relatives' {.field {d}} must be a declared category or NA.",
+      "Undeclared categories",
+      table = "external_relatives",
+      call = call
+    )
+  }
+  invisible(x)
+}
+
+# `pre_migration` on unions and transitions: present exactly when persons
+# has arrival records, logical and complete (D186).
+check_pre_migration <- function(x, call = rlang::caller_env()) {
+  arrivals <- all(arrival_columns %in% names(x$persons))
+  for (table in c("unions", "transitions")) {
+    rows <- x[[table]]
+    if (is.null(rows)) {
+      next
+    }
+    present <- "pre_migration" %in% names(rows)
+    if (present != arrivals) {
+      abort_hammel(
+        c(
+          paste(
+            "{.field {table}} must have {.field pre_migration} exactly when",
+            "{.field persons} has arrival records."
+          ),
+          "x" = if (arrivals) {
+            paste(
+              "{.field persons} has arrival records, but {.field {table}}",
+              "has no {.field pre_migration}."
+            )
+          } else {
+            paste(
+              "{.field {table}} has {.field pre_migration} without arrival",
+              "records."
+            )
+          }
+        ),
+        "population",
+        argument = table,
+        call = call
+      )
+    }
+    if (present &&
+          (!is.logical(rows$pre_migration) || anyNA(rows$pre_migration))) {
+      abort_hammel(
+        c(
+          "{.field {table}$pre_migration} must be TRUE or FALSE.",
+          "x" = "It is {describe_value(rows$pre_migration)}."
+        ),
+        "table",
+        argument = paste0(table, "$pre_migration"),
+        call = call
+      )
+    }
+  }
+  invisible(x)
+}
+
+# Bind two tables whose columns may differ; a column one lacks is NA there.
+bind_columns <- function(old, new) {
+  if (is.null(old)) {
+    return(tibble::as_tibble(new))
+  }
+  columns <- union(names(old), names(new))
+  for (column in setdiff(columns, names(old))) {
+    old[[column]] <- new[[column]][rep(NA_integer_, nrow(old))]
+  }
+  for (column in setdiff(columns, names(new))) {
+    new[[column]] <- old[[column]][rep(NA_integer_, nrow(new))]
+  }
+  tibble::as_tibble(
+    rbind(as.data.frame(old)[columns], as.data.frame(new)[columns])
+  )
+}
+
+# Add the imported histories of a run's arrivals (D186) to its result: each
+# migrant's template unions, their partners and children as external
+# relatives, their template transitions in shared groups, and an entry row
+# at arrival for each assigned group. Dates shift by the arrival time minus
+# the template endpoint; every ID is fresh.
+import_histories <- function(
+  result,
+  arrivals,
+  process,
+  input,
+  declaration,
+  registries
+) {
+  if (is.null(arrivals) || !length(arrivals$person_id)) {
+    return(result)
+  }
+  dimensions <- names(declaration)
+  # Each arrival's categories at arrival, by dimension (engine codes).
+  arrived_in <- matrix(
+    arrivals$categories,
+    ncol = length(dimensions), byrow = TRUE
+  )
+  next_person <- max(
+    c(result$persons$person_id, result$external_relatives$person_id)
+  )
+  next_union <- max(c(0, result$unions$union_id))
+  next_move <- max(c(0, result$transitions$move_id), na.rm = TRUE)
+  external <- list()
+  unions <- list()
+  moves <- list()
+  for (s in seq_along(process$streams)) {
+    a <- which(arrivals$stream == s - 1L)
+    if (!length(a)) {
+      next
+    }
+    template <- process$streams[[s]]$template
+    people <- template_people(template)
+    t_unions <- as.data.frame(template$unions)
+    t_moves <- template$transitions
+    if (is.null(t_moves)) {
+      t_moves <- empty_transitions()
+    }
+    template_dims <- intersect(dimensions, names(template$groups))
+    assigned <- setdiff(dimensions, template_dims)
+    pid <- arrivals$person_id[a]
+    time <- arrivals$time[a]
+    offset <- time - template$end_time
+    rows <- input$streams[[s]]$rows[arrivals$row[a] + 1L]
+    tp <- template$persons$person_id[rows]
+    key <- as.character(tp)
+    # Records of each arrival's template person, as (arrival, record) pairs.
+    pairs <- function(index) {
+      found <- index[key]
+      list(
+        arrival = rep(seq_along(a), lengths(found)),
+        record = as.integer(unlist(found, use.names = FALSE))
+      )
+    }
+    unions_of <- split(
+      rep(seq_len(nrow(t_unions)), 2L),
+      as.character(c(t_unions$wife_id, t_unions$husband_id))
+    )
+    parents <- c(people$mother_id, people$father_id)
+    known <- !is.na(parents)
+    children_of <- split(
+      rep(seq_len(nrow(people)), 2L)[known], as.character(parents[known])
+    )
+    u <- pairs(unions_of)
+    k <- pairs(children_of)
+    # Relatives: partners in those unions and children; fresh IDs.
+    partner <- ifelse(
+      t_unions$wife_id[u$record] == tp[u$arrival],
+      t_unions$husband_id[u$record], t_unions$wife_id[u$record]
+    )
+    rel_arrival <- c(u$arrival, k$arrival)
+    rel_id <- c(partner, people$person_id[k$record])
+    child <- rep(c(FALSE, TRUE), c(length(partner), length(k$record)))
+    keep <- !duplicated(paste(rel_arrival, rel_id))
+    rel_arrival <- rel_arrival[keep]
+    rel_id <- rel_id[keep]
+    child <- child[keep]
+    new_id <- next_person + seq_along(rel_id)
+    next_person <- next_person + length(rel_id)
+    lookup_key <- c(paste(rel_arrival, rel_id), paste(seq_along(a), tp))
+    lookup_id <- c(new_id, pid)
+    map <- function(arrival, id) {
+      lookup_id[match(paste(arrival, id), lookup_key)]
+    }
+    if (length(rel_id)) {
+      r <- match(rel_id, people$person_id)
+      shift <- offset[rel_arrival]
+      table <- data.frame(
+        person_id = new_id,
+        sex = people$sex[r],
+        birth_time = people$birth_time[r] + shift,
+        death_time = people$death_time[r] + shift,
+        mother_id = ifelse(child, map(rel_arrival, people$mother_id[r]), NA),
+        father_id = ifelse(child, map(rel_arrival, people$father_id[r]), NA),
+        stringsAsFactors = FALSE
+      )
+      for (d in dimensions) {
+        table[[d]] <- if (d %in% template_dims) {
+          c(
+            template$persons[[d]],
+            if (!is.null(template$external_relatives)) {
+              template$external_relatives[[d]]
+            }
+          )[r]
+        } else {
+          result$persons[[d]][rep(NA_integer_, length(r))]
+        }
+      }
+      censor <- rep(NA_real_, nrow(people))
+      if (!is.null(template$external_relatives)) {
+        censor[nrow(template$persons) +
+                 seq_len(nrow(template$external_relatives))] <-
+          template$external_relatives$censor_time
+      }
+      table$censor_time <- ifelse(
+        is.na(table$death_time),
+        ifelse(is.na(censor[r]), time[rel_arrival], censor[r] + shift),
+        table$death_time
+      )
+      external[[length(external) + 1L]] <- table
+    }
+    if (length(u$record)) {
+      ids <- next_union + seq_along(u$record)
+      next_union <- next_union + length(u$record)
+      shift <- offset[u$arrival]
+      x <- t_unions[u$record, , drop = FALSE]
+      table <- data.frame(
+        union_id = ids,
+        wife_id = map(u$arrival, x$wife_id),
+        husband_id = map(u$arrival, x$husband_id),
+        start_time = x$start_time + shift,
+        end_time = x$end_time + shift,
+        end_reason = as.character(x$end_reason),
+        stringsAsFactors = FALSE
+      )
+      if ("union_type" %in% names(result$unions)) {
+        table$union_type <- if ("union_type" %in% names(x)) {
+          as.character(x$union_type)
+        } else {
+          rep("marriage", nrow(x))
+        }
+      }
+      if ("previous_cohab_id" %in% names(result$unions)) {
+        table$previous_cohab_id <- if ("previous_cohab_id" %in% names(x)) {
+          ids[match(
+            paste(u$arrival, x$previous_cohab_id),
+            paste(u$arrival, x$union_id)
+          )]
+        } else {
+          rep(NA_real_, nrow(x))
+        }
+      }
+      table$pre_migration <- rep(TRUE, nrow(table))
+      unions[[length(unions) + 1L]] <- table
+    }
+    if (length(dimensions)) {
+      imported <- list(arrival = integer(), record = integer())
+      if (nrow(t_moves)) {
+        shared <- which(t_moves$group %in% template_dims)
+        imported <- pairs(
+          split(shared, as.character(t_moves$person_id[shared]))
+        )
+      }
+      m <- t_moves[imported$record, , drop = FALSE]
+      entry_arrival <- rep(seq_along(a), each = length(assigned))
+      entry_group <- rep(assigned, times = length(a))
+      entry_code <- arrived_in[cbind(
+        a[entry_arrival], match(entry_group, dimensions)
+      )]
+      entry_destination <- vapply(
+        seq_along(entry_group),
+        function(j) {
+          as.character(registries[[entry_group[j]]])[entry_code[j] + 1L]
+        },
+        ""
+      )
+      n_moves <- length(imported$record) + length(entry_arrival)
+      if (n_moves) {
+        moves[[length(moves) + 1L]] <- data.frame(
+          person_id = pid[c(imported$arrival, entry_arrival)],
+          time = c(m$time + offset[imported$arrival], time[entry_arrival]),
+          group = c(as.character(m$group), entry_group),
+          origin = c(
+            as.character(m$origin), rep(NA_character_, length(entry_group))
+          ),
+          destination = c(as.character(m$destination), entry_destination),
+          move_id = next_move + seq_len(n_moves),
+          initiator_id = pid[c(imported$arrival, entry_arrival)],
+          pre_migration = rep(
+            c(TRUE, FALSE), c(length(imported$record), length(entry_arrival))
+          ),
+          stringsAsFactors = FALSE
+        )
+        next_move <- next_move + n_moves
+      }
+    }
+  }
+  if (length(external)) {
+    result$external_relatives <- bind_columns(
+      result$external_relatives, do.call(rbind, external)
+    )
+  }
+  if (length(unions)) {
+    result$unions <- bind_columns(result$unions, do.call(rbind, unions))
+  }
+  if (length(moves)) {
+    result$transitions <- bind_columns(
+      result$transitions, do.call(rbind, moves)
+    )
+  }
+  result
+}
+
+# Observation copies of persons with any external relatives appended and
+# flagged (D186), so native histories resolve their links. Their group is a
+# placeholder: they are never counted.
+with_external_rows <- function(persons, external) {
+  if (is.null(external) || !nrow(external)) {
+    return(persons)
+  }
+  extra <- persons[rep(NA_integer_, nrow(external)), , drop = FALSE]
+  columns <- c(
+    "person_id", "sex", "birth_time", "death_time", "mother_id", "father_id"
+  )
+  for (column in columns) {
+    extra[[column]] <- external[[column]]
+  }
+  if ("group" %in% names(persons) && nrow(persons)) {
+    extra$group <- persons$group[1]
+  }
+  persons$.hammel_external <- rep(FALSE, nrow(persons))
+  extra$.hammel_external <- rep(TRUE, nrow(extra))
+  out <- rbind(as.data.frame(persons), as.data.frame(extra))
+  # rbind drops the observation attributes; they are added afterwards.
+  out
+}
+
+# Persons followed by any external relatives (D186), for resolving partner
+# and parent references. Columns external relatives lack are NA.
+history_people <- function(population) {
+  persons <- population$persons
+  external <- population[["external_relatives"]]
+  if (is.null(external) || !nrow(external)) {
+    return(persons)
+  }
+  external <- external[setdiff(names(external), "censor_time")]
+  bind_columns(persons, external)
+}
+
+# People for kinship: persons, then external relatives when included
+# (D186). Without them, references to external relatives are unknown.
+kin_people <- function(population, include_external) {
+  persons <- population$persons
+  external <- population[["external_relatives"]]
+  columns <- c(
+    "person_id", "sex", "birth_time", "death_time", "mother_id", "father_id"
+  )
+  people <- as.data.frame(persons)[columns]
+  if (is.null(external) || !nrow(external)) {
+    return(people)
+  }
+  if (!include_external) {
+    for (field in c("mother_id", "father_id")) {
+      people[[field]][people[[field]] %in% external$person_id] <- NA
+    }
+    return(people)
+  }
+  extra <- as.data.frame(external)[c(columns, "censor_time")]
+  people$censor_time <- NA_real_
+  rbind(people, extra)
+}
+
+# Unions observed in the population: those that did not start before an
+# immigrant partner's arrival (D186).
+observed_unions <- function(unions) {
+  if (!"pre_migration" %in% names(unions)) {
+    return(unions)
+  }
+  unions[!unions$pre_migration, , drop = FALSE]
+}
+
+# With arrival records, unions and transitions record `pre_migration`;
+# events of the run, and earlier histories without the column, are not
+# pre-migration (D186).
+mark_pre_migration <- function(population) {
+  if (!all(arrival_columns %in% names(population$persons))) {
+    return(population)
+  }
+  for (table in c("unions", "transitions")) {
+    rows <- population[[table]]
+    if (is.null(rows)) {
+      next
+    }
+    flag <- rows[["pre_migration"]]
+    if (is.null(flag)) {
+      flag <- rep(FALSE, nrow(rows))
+    }
+    flag[is.na(flag)] <- FALSE
+    rows$pre_migration <- as.logical(flag)
+    population[[table]] <- rows
+  }
+  population
 }
 
 # Fill the arrival columns of simulated persons from the engine's records.

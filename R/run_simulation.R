@@ -544,6 +544,38 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     )
   }
   engine_persons <- population$persons
+  # External relatives of immigrants (D186) stay outside the engine: unions
+  # with them are removed from its input and restored afterwards, references
+  # to them are hidden, and births to children among them are supplied as
+  # counts and latest times.
+  external <- population[["external_relatives"]]
+  engine_unions <- population$unions
+  external_unions <- engine_unions[0, , drop = FALSE]
+  if (!is.null(external) && nrow(external)) {
+    outside <- engine_unions$wife_id %in% external$person_id |
+      engine_unions$husband_id %in% external$person_id
+    external_unions <- engine_unions[outside, , drop = FALSE]
+    engine_unions <- engine_unions[!outside, , drop = FALSE]
+    for (field in c("mother_id", "father_id")) {
+      hidden <- engine_persons[[field]] %in% external$person_id
+      engine_persons[[field]][hidden] <- NA
+    }
+    born <- external[!is.na(external$mother_id), , drop = FALSE]
+    mothers <- as.character(born$mother_id)
+    key <- as.character(engine_persons$person_id)
+    births <- as.integer(c(table(mothers))[key])
+    births[is.na(births)] <- 0L
+    engine_persons$.hammel_external_births <- births
+    engine_persons$.hammel_id_floor <- max(
+      c(population$persons$person_id, external$person_id)
+    )
+    engine_persons$.hammel_union_floor <- max(c(0, population$unions$union_id))
+    engine_persons$.hammel_external_last_birth <- if (nrow(born)) {
+      as.numeric(c(tapply(born$birth_time, mothers, max))[key])
+    } else {
+      rep(NA_real_, nrow(engine_persons))
+    }
+  }
   group_input <- if (!grouped) {
     NULL
   } else {
@@ -667,15 +699,18 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   }
   if ("previous_union" %in% names(union_rates) || cohab_enabled ||
         length(weight_models)) {
+    people <- population$persons[c("person_id", "death_time")]
+    if (!is.null(external)) {
+      people <- rbind(people, external[c("person_id", "death_time")])
+    }
     previous <- call_native(
-      previous_union_info_cpp(
-        population$persons, population$unions,
-        counts_cohab
-      )
+      previous_union_info_cpp(people, population$unions, counts_cohab)
     )
-    engine_persons$.hammel_previous_union <- previous$previous_union
-    engine_persons$.hammel_previous_union_end <- previous$end_time
-    engine_persons$.hammel_legal_previous <- previous$legal_previous
+    members <- seq_len(nrow(population$persons))
+    engine_persons$.hammel_previous_union <- previous$previous_union[members]
+    engine_persons$.hammel_previous_union_end <- previous$end_time[members]
+    engine_persons$.hammel_legal_previous <-
+      previous$legal_previous[members]
   }
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
@@ -717,7 +752,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
   } else {
     prepare_immigration(
       immigration_process, declaration, registries, components, offsets,
-      start, start + years,
+      start, start + years, counts_cohab, cohab_enabled,
       call = run_call
     )
   }
@@ -758,7 +793,7 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     native <- call_native(
       simulate_cpp(
         engine_persons, death_rates, birth_rates,
-        start, years, birth_interval, population$unions,
+        start, years, birth_interval, engine_unions,
         matching,
         union_process$min_male_age,
         as.integer(union_process$kinship_generations),
@@ -792,6 +827,12 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     for (column in names(native$persons)) {
       persons[[column]] <- native$persons[[column]]
     }
+    # Restore parent references hidden from the engine.
+    if (!is.null(external)) {
+      members <- seq_len(nrow(population$persons))
+      persons$mother_id[members] <- population$persons$mother_id
+      persons$father_id[members] <- population$persons$father_id
+    }
     if (!is.null(hetfert)) {
       persons$hetfert <- native$hetfert
     }
@@ -820,6 +861,9 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
       )
       new$move_id <- tx$move_id + previous
       new$initiator_id <- tx$initiator_id
+      if ("pre_migration" %in% names(population$transitions)) {
+        new$pre_migration <- rep(FALSE, nrow(new))
+      }
       result$transitions <- tibble::as_tibble(
         rbind(population$transitions, new)
       )
@@ -837,7 +881,9 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
         result$ancestry[[dimensions[k]]] <- table
       }
     }
-    unions <- result$unions
+    # Unions with external relatives come first, so the engine's new unions
+    # keep their row offset below.
+    unions <- engine_unions
     added_unions <- nrow(native$unions) - nrow(unions)
     if (added_unions > 0L) {
       unions <- rbind(
@@ -847,7 +893,11 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     for (column in names(native$unions)) {
       unions[[column]] <- native$unions[[column]]
     }
-    result$unions <- tibble::as_tibble(unions)
+    result$unions <- if (nrow(external_unions)) {
+      bind_columns(external_unions, unions)
+    } else {
+      tibble::as_tibble(unions)
+    }
     if (native$weighted_infeasible > 0) {
       searches <- as.integer(native$weighted_infeasible)
       warn_hammel(
@@ -933,11 +983,16 @@ run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
     )
   }
   if (!is.null(immigration_process)) {
+    arrivals <- if (years > 0) native$arrivals else NULL
     result$persons <- record_arrivals(
-      result$persons, if (years > 0) native$arrivals else NULL,
-      names(immigration_process$streams)
+      result$persons, arrivals, names(immigration_process$streams)
+    )
+    result <- import_histories(
+      result, arrivals, immigration_process, immigration_input, declaration,
+      registries
     )
   }
+  result <- mark_pre_migration(result)
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
   check_population(result)

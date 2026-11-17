@@ -10,7 +10,8 @@ hammel_population(
   end_time,
   ancestry = NULL,
   transitions = NULL,
-  groups = NULL
+  groups = NULL,
+  external_relatives = NULL
 )
 }
 \arguments{
@@ -44,11 +45,18 @@ even when empty, with character \code{group}, \code{origin} and \code{destinatio
 names (each with \code{\link[=group]{group()}} defaults) or a named list of \code{\link[=group]{group()}} objects.
 Persons columns that are not declared are ordinary custom columns. Models
 usually declare groups with \code{\link[=set_groups]{set_groups()}}.}
+
+\item{external_relatives}{Optional data frame of people referenced by
+immigrants' histories who are not population members, such as previous
+partners and children who did not migrate: the \code{persons} columns plus
+\code{censor_time}, the last time they are known to be alive. Usually created
+by \code{\link[=run_simulation]{run_simulation()}} with \code{\link[=immigration]{immigration()}}.}
 }
 \value{
 A named list of class \code{hammel_population} with components \code{persons},
 \code{unions}, and \code{end_time}, plus an \code{ancestry} tibble when supplied or when
-persons has groups, and a \code{transitions} tibble when groups are present.
+persons has groups, a \code{transitions} tibble when groups are present, and
+\code{external_relatives} when supplied.
 }
 \description{
 Create a \code{hammel_population} object to serve as the starting population for a

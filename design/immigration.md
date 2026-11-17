@@ -1,8 +1,9 @@
 # External immigration design
 
-Planning discussion, November 12 and 16, 2026. Phase 1 of external
-immigration is implemented; later phases are not. This document consolidates the approach selected in D177–D182
-and D184 for design review on the `external-migration` branch. Behavior
+Planning discussion, November 12 and 16, 2026. Phases 1 and 2 of external
+immigration are implemented; household parties (phase 3) are not. This document consolidates
+the approach selected in D177–D182 and D184–D186 for design review on the
+`external-migration` branch. Behavior
 depending on the unresolved modeling choices below requires further user
 decisions before implementation. Illustrative field names do not establish
 a public API.
@@ -47,6 +48,7 @@ remain separate responsibilities. The public interface is described in
 | Eligibility | No one arrives without their current partner | D184 |
 | Phasing | Individual arrivals without histories, then imported histories, then household parties | D184 |
 | Phase 1 contract | Unpartnered eligibility, per-stream clocks, arrival columns, observation from arrival, group compatibility, `migrant_assignment()`, ancestry fallback | D185 |
+| Phase 2 contract | Imported unions, children and transitions; flattened template external relatives; `censor_time`; stored `pre_migration`; population validation; kin extraction excludes external relatives by default | D186 |
 | Selective migration | A weight model selects among a stream's eligible template people; intensity is unchanged | D180, D184 |
 | Migration histories | Separate personal/family facts from reusable, named classifications | D181 |
 | Rate schedules | Stratify by personal immigration status and stream; generation rules stay outside the required rate-table schema | D182 |
@@ -208,8 +210,8 @@ documented limitation until household parties exist.
 **Imported histories.** Each party member brings their recorded births,
 unions (including ended unions) and group transitions, including events
 before arrival. An imported event is pre-migration when it occurred before
-the person's arrival time; a union is classified by its start time. Users
-can derive this from arrival time, and an explicit flag may be provided.
+the person's arrival time; a union is classified by its start time. Unions
+and transitions record this in a stored `pre_migration` column (D186).
 Pre-migration events are not destination events and contribute no
 destination exposure; calculation and observation functions must exclude
 them.
@@ -230,7 +232,7 @@ transition in each dimension, or from birth without one; arrival does not
 restart it.
 
 **External relatives.** `external_relatives` is a tibble with the same
-columns as `persons`, plus a last-observed time (name not selected). It
+columns as `persons`, plus a stored `censor_time` (D186). It
 holds people referenced by a party member's imported history who are not
 destination members: previous partners, alive or dead, and children not in
 the party, whether deceased or left behind. Under the eligibility rule no
@@ -242,9 +244,8 @@ current partner appears there.
 - Group values are the person's categories at the template endpoint, or at
   death if earlier, without transition history, parallel to a `persons`
   row.
-- Last-observed time is the death time if they died by the template
-  endpoint, and the party's arrival time otherwise. Nothing after it is
-  known.
+- `censor_time` is the death time if they died by the template endpoint,
+  and the party's arrival time otherwise. Nothing after it is known.
 - External relatives are never simulated. They join no rate cells or
   matching pools and contribute no exposure, events or population counts.
 - Their own relationships are not imported. A child's other parent who was
@@ -373,6 +374,102 @@ exposure begins at their age at arrival. Every calculation and observation
 function applies this rule; a population without arrival columns is
 treated as having no arrivals.
 
+## Phase 2 specification
+
+User decisions, November 16, 2026 (D186). Implemented November 16, 2026;
+see [testing](testing.md#external-immigration-phase-2-november-16-2026). Phase 2 adds imported histories to individual arrivals under
+D184; eligibility, selection, groups and ancestry of the arriving person are
+unchanged from [phase 1](#phase-1-specification).
+
+**What an arrival imports.** For the selected template person P:
+
+- **Unions.** Every template union in which P is a partner. By eligibility
+  all have ended. Each becomes a destination union with a fresh
+  `union_id`, dates shifted by the offset, its type and end reason, and
+  `previous_cohab_id` remapped to the new ID of the linked cohabitation.
+  P's partner in each union is imported as an external relative.
+- **Children.** Every template person whose mother or father is P. Each
+  becomes an external relative whose parent ID for P is P's new ID. The
+  other parent's ID is the new ID of that parent when they are a previous
+  partner of P imported above, and unknown (`NA`) otherwise.
+- **Transitions.** P's template transitions in dimensions the template
+  shares with the destination, with times shifted, fresh `move_id`s and
+  `initiator_id` set to P's new ID. Transitions in template-only
+  dimensions are dropped.
+- **P's own parents** are not imported; P's parent IDs are unknown.
+
+Template people are looked up in both the template's `persons` and its
+`external_relatives`; where they came from in the template does not matter
+in the destination. The template's own `arrival_time`, `stream` and
+`pre_migration` values are ignored: arrival records describe arrivals into
+the destination only.
+
+**External relatives.** Imported partners and children form the
+destination's `external_relatives`, a top-level element of
+`hammel_population`, with fresh person IDs from the same ID space as
+`persons`, shifted dates, sex, the parent IDs above, and group values as of
+the template endpoint or their death. In groups the template lacks, their
+values are `NA`: assignment applies only to arriving migrants, and external
+relatives never lived in the destination. `censor_time` is:
+
+- the death time, when they died by the template endpoint;
+- their template `censor_time`, shifted, when they were already an external
+  relative in the template;
+- otherwise P's arrival time.
+
+**`pre_migration`.** When a population has arrival records, `unions` and
+`transitions` gain a logical `pre_migration` column. It is TRUE for a union
+that started before either partner's arrival and for a transition before
+the person's arrival; FALSE otherwise, including every destination event.
+A birth is pre-migration when the child was born before the mother's
+arrival; no birth flag is stored.
+
+**Derived state at arrival.** Parity, last-birth time, previous-union
+status and its end time, legal previous-union status and group duration in
+shared groups are derived from the imported records, including children
+who are external relatives. In assigned groups, which the template lacks,
+group duration runs from the arrival time: arrival is entry into the
+assigned category. Each such entry is recorded as a `transitions` row at
+the arrival time with `origin = NA`, the assigned category as
+`destination` and `pre_migration = FALSE`. Observation and restarts read
+these rows as entries, never as moves, so transition counts and rates
+exclude them. These are computed before the run for
+every eligible template person and set when the migrant arrives. On
+restart, the same quantities are derived from `persons`, `unions`,
+`transitions` and `external_relatives` together.
+
+**Validation of populations.** `check_population()`, and so
+`validate_population()`, templates and restarts, requires:
+
+1. `external_relatives` has the required `persons` columns plus
+   `censor_time`.
+2. Person IDs are unique across `persons` and `external_relatives`.
+3. Union partner, mother and father IDs in either table resolve in one of
+   the two tables.
+4. Each external relative is referenced by a union or parent link of a
+   `persons` row.
+5. `censor_time` equals `death_time` for those who died; otherwise it lies
+   between `birth_time` and `end_time`.
+6. No external relative is in a union without an end time.
+7. Group values use declared categories; external relatives may have `NA`
+   group values, and have no ancestry or transition rows.
+8. `pre_migration` is present on `unions` and `transitions` exactly when
+   `persons` has arrival records, and has no missing values.
+9. A transition may have `origin = NA` only as an entry: the person's
+   first row in that group. Arrival entries are at the person's
+   `arrival_time`; entries imported from a template (its own arrival
+   entries) are pre-migration.
+
+**Observation.** External relatives are never counted: no exposure, births,
+deaths, population counts or rate cells. Observation still reads their
+records to build members' histories, so a migrant mother's parity includes
+children who stayed behind and her union status reflects pre-migration
+unions. Exposure and events before a person's arrival are excluded, as in
+phase 1; union-level calculations exclude pre-migration unions. Functions
+that look up partners or parents, such as `augment_unions()`, resolve IDs
+in both tables. `extract_kin()` and `count_kin()` exclude external
+relatives by default; `include_external = TRUE` includes them.
+
 ## Migration facts, family history and classifications
 
 Keep migration history separate from derived generation/origin classifications
@@ -469,14 +566,14 @@ The following choices are open; listing an option does not select it.
 | Area | Decisions still needed |
 | --- | --- |
 | Source sampling | Weight-model variables beyond age, sex and groups in later phases |
-| Imported state | Last-observed column name; whether kin extraction includes external relatives (proposed default: excluded); `external_relatives` restart representation |
+| Imported state | Settled for phase 2 (D186) |
 | Compatibility | Categories of future scheduled templates; calendar-scheduled assignments |
 | Calendar inputs | Template and weight-model schedules: interval columns, coverage, gaps and exact boundaries |
 | Households | Party membership, selection probabilities, rate units and reconstruction of internal person/union links |
 | Migration history | Stored facts, source provenance, history depth, starting-population unknowns and restart persistence |
 | Classifications | Rule interface, output types, update timing, custom-model inputs and imported-history inputs |
 | Rate strata | Declared group versus built-in migration variable, process support and coverage rules |
-| Observation | Pre-migration imported events and external relatives (phase 2) |
+| Observation | Settled for phase 2 (D186) |
 | Timing and interface | Remaining `immigration_stream()` and `migrant_assignment()` arguments; the non-immigrant label |
 
 No implementation milestone or scientific acceptance threshold is established
@@ -509,9 +606,9 @@ destination she is born at 2005.4 (age 30). Her union runs from 2023.4 to
 2033.4, ended by death, and is pre-migration. She arrives widowed, 2 years
 after that union ended, at parity two, with last birth at 2030.4. Her
 husband and children are external relatives born at 2001.4, 2025.4 and
-2030.4. The husband and first child have death and last-observed times
-2033.4 and 2027.4; the second child has no death time and last-observed
-time 2035.4.
+2030.4. The husband and first child have death and censor times 2033.4
+and 2027.4; the second child has no death time and censor time 2035.4. The
+union's `pre_migration` is TRUE.
 None of these records adds destination births, deaths or exposure, and her
 destination exposure begins at 2035.4.
 
@@ -556,6 +653,10 @@ with a valid, nonempty source, the initial analytical and accounting cases are:
 | Phase 1 observation | No exposure, events or population count before arrival; a migrant's own birth is not a destination birth |
 | No streams | Seeded output identical to a run without the immigration code, with no arrival columns |
 | Piecewise intensity | Expected arrivals equal the integral of intensity; 100 per year for 10 years then 50 for 10 years gives 1,500 |
+| Phase 2 import | Unions, partners and children arrive with shifted dates and fresh IDs; a child's other parent is known only when a previous partner |
+| Phase 2 derived state | Imported parity selects parity-specific fertility; imported last births keep spacing; imported widowhood selects remarriage schedules; group duration continues from the template or starts at arrival |
+| Phase 2 observation | External relatives add no counts; pre-migration unions add no union-years; entry rows are not counted as transitions |
+| Phase 2 restarts | IDs stay unique; parity from external children persists |
 
 Additional tests should cover multiple streams, age preservation, template
 schedule boundaries, future group categories, mixed-stream pedigrees,

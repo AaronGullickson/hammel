@@ -531,7 +531,7 @@ histories. Restart retains the history and reconstructs duration. Observation
 kernels use private indexed history adapters to split group exposure at moves
 and attribute events at their occurrence. See [the contract](group-transitions.md).
 
-## External immigration (phase 1)
+## External immigration (phases 1 and 2)
 
 `immigration(...)`/`set_immigration(model, ...)` attach one process of named
 `immigration_stream()`s; each call replaces every stream and a call without
@@ -548,3 +548,18 @@ otherwise all in the migrant's category. `persons` gains `arrival_time` and
 `stream` when the model has streams or the input has them. Observation
 kernels and living-kin counts start at the later of birth and arrival. See
 the [phase 1 specification](immigration.md#phase-1-specification) (D185).
+
+Phase 2 (D186) imports each migrant's template unions, with their partners
+and children as `external_relatives` (with `censor_time`), and transitions
+in shared groups, all shifted by the age offset with fresh IDs; R builds
+these records after the run from the engine's arrival records. Derived
+state (parity, last birth, previous-union state, group entry) is computed
+in R before the run and set at arrival; an assigned group's entry is a
+`transitions` row with `NA` origin. `unions` and `transitions` store
+`pre_migration` with arrival records. External relatives stay outside the
+engine: their unions are removed from its input and restored, births to
+external children are supplied as counts and latest times, and ID floors
+keep new IDs fresh. Observation appends them flagged so histories resolve,
+never counting them; union-level rates exclude pre-migration unions; kin
+functions include them with `include_external = TRUE`. See the
+[phase 2 specification](immigration.md#phase-2-specification).

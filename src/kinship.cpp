@@ -351,6 +351,8 @@ DataFrame extract_kin_cpp(
 // `strata` is person x observation time: zero means not living, otherwise a
 // one-based ego stratum. Relationship lookup entries are zero-based types,
 // or -1 for excluded distance pairs. Output varies time, stratum, then type.
+// `egos` optionally limits who is counted as an ego; others (such as external
+// relatives of immigrants, D186) are only counted as kin.
 // [[Rcpp::export]]
 List count_kin_cpp(
   DataFrame persons,
@@ -358,7 +360,8 @@ List count_kin_cpp(
   IntegerMatrix relationship_types,
   IntegerMatrix strata,
   int n_strata,
-  int n_types
+  int n_types,
+  Nullable<LogicalVector> egos = R_NilValue
 ) {
   const int n = persons.nrows();
   const int n_times = strata.ncol();
@@ -378,6 +381,13 @@ List count_kin_cpp(
   const R_xlen_t n_cells = static_cast<R_xlen_t>(n_times) * n_strata;
   IntegerVector persons_n(n_cells), kin_n(n_cells * n_types);
   IntegerVector with_n(n_cells * n_types);
+  std::vector<char> is_ego(n, 1);
+  if (egos.isNotNull()) {
+    LogicalVector mask(egos.get());
+    for (int person = 0; person < n; ++person) {
+      is_ego[person] = mask[person] == TRUE;
+    }
+  }
   std::vector<int> active;
   for (int person = 0; person < n; ++person) {
     bool living = false;
@@ -390,7 +400,9 @@ List count_kin_cpp(
         continue;
       }
       living = true;
-      ++persons_n[t + static_cast<R_xlen_t>(n_times) * (stratum - 1)];
+      if (is_ego[person]) {
+        ++persons_n[t + static_cast<R_xlen_t>(n_times) * (stratum - 1)];
+      }
     }
     if (living) {
       active.push_back(person);
@@ -432,6 +444,9 @@ List count_kin_cpp(
     static_cast<R_xlen_t>(n_times) * n_types, 0
   );
   for (int ego : active) {
+    if (!is_ego[ego]) {
+      continue;
+    }
     checkUserInterrupt();
     const auto& ego_ancestors = kinship.ancestors(ego);
     std::vector<int> candidates;

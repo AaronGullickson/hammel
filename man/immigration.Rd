@@ -41,14 +41,23 @@ streams set earlier, as \code{\link[=set_groups]{set_groups()}} replaces the who
 declaration. Calling \code{set_immigration(model)} without streams removes
 immigration from the model.
 
-Migrants arrive individually and without histories. A migrant keeps the age
-and sex of the template person they were drawn from, has unknown parents,
-no union history and parity zero, and enters every applicable rate process
-and matching pool at arrival. Simulated populations of models with
-immigration gain \code{arrival_time} and \code{stream} columns in \code{persons}, which
-are \code{NA} for people who did not immigrate. Observation functions such as
-\code{\link[=calculate_life_table]{calculate_life_table()}} count a migrant's exposure and events only from
-their arrival.
+Migrants arrive individually. A migrant keeps the age, sex and history of
+the template person they were drawn from, with every date shifted so that
+ages and durations at the template's \code{end_time} are unchanged at arrival.
+Their template unions arrive as pre-migration unions, and their previous
+partners and children become \code{external_relatives} of the simulated
+population: records that inform histories, such as parity and
+previous-union status, but are never simulated or counted. Their own
+parents are unknown. Group duration continues from the template, or for
+groups assigned by \code{\link[=migrant_assignment]{migrant_assignment()}} starts at arrival, recorded as a
+\code{transitions} row with no \code{origin}.
+
+Simulated populations of models with immigration gain \code{arrival_time} and
+\code{stream} columns in \code{persons}, which are \code{NA} for people who did not
+immigrate, and a \code{pre_migration} column in \code{unions} and \code{transitions}.
+External relatives have a \code{censor_time}, after which nothing is known about
+them. Observation functions such as \code{\link[=calculate_life_table]{calculate_life_table()}} count a
+migrant's exposure and events only from their arrival.
 }
 \examples{
 template <- generate_uniform_population(500)

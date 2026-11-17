@@ -1511,3 +1511,33 @@ through `R_MAKEVARS_USER` (D175). The branch's `simulate_cpp` result gains an
 Both runs made 1,830 calls, and all 1,830 hashes were identical. With default
 flags, `devtools::test()` passed 8,714 expectations (165 in the new file) with
 no failures or warnings and one skip (the opt-in live database test).
+
+## External immigration phase 2 (November 16, 2026)
+
+`tests/testthat/test-immigration-histories.R` covers the D186 contract with a
+hand-built template: a widow whose three children include one by a man who
+was never her partner. It checks the imported union (shifted dates, fresh
+IDs, `pre_migration`), external relatives (dates, parent links, the unknown
+non-partner father, `censor_time`) and per-arrival copies; derived state in
+the engine, by parity-only fertility (births only at imported parity 3+),
+birth spacing from an imported last birth, widowed-only remarriage, and
+group duration continuing from a template transition while an assigned group
+starts at arrival; entry rows and duration-based transition rates, alone and
+combined with another group; observation never counting external relatives
+or pre-migration union-years; `augment_unions()` and
+`extract_unpartnered_births()` resolving external partners; kin functions
+with and without `include_external`; restarts keeping histories, unique IDs
+and parity; flattening a template's own external relatives with their
+censor times; population validation; and the cohabitation-template error.
+
+The result or error of every native `*_cpp` call made by the existing
+offline test files (all but the two immigration files and the live database
+test) was again hashed in call order on `master` (5640556) and this branch,
+both built with `-ffp-contract=off` (D175), dropping `simulate_cpp`'s
+`arrivals` element. Both runs made 1,830 calls, and all hashes were
+identical. With default flags, `devtools::test()` passed 8,793 expectations
+with no failures or warnings and one skip (the opt-in live database test).
+
+A seeded run with 40,088 arrivals over 50 years from a 12,728-person
+template (24,375 external relatives) took 2.9 seconds in total, 0.25 of them
+importing histories, after the import was vectorized.

@@ -441,9 +441,11 @@ validate_group_declaration <- function(
       if (!is.null(tx) && "group" %in% names(tx)) {
         tx <- tx[tx$group == name, , drop = FALSE]
       }
+      # Entry rows have no origin (D186).
       values <- unique(
         as.character(c(persons[[name]], tx$origin, tx$destination))
       )
+      values <- values[!is.na(values)]
       missing <- setdiff(values, as.character(categories))
       if (length(missing)) {
         abort_hammel(

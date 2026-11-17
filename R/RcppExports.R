@@ -29,8 +29,8 @@ extract_kin_cpp <- function(persons, ego_ids, relative_ids, generations) {
     .Call(`_hammel_extract_kin_cpp`, persons, ego_ids, relative_ids, generations)
 }
 
-count_kin_cpp <- function(persons, generations, relationship_types, strata, n_strata, n_types) {
-    .Call(`_hammel_count_kin_cpp`, persons, generations, relationship_types, strata, n_strata, n_types)
+count_kin_cpp <- function(persons, generations, relationship_types, strata, n_strata, n_types, egos = NULL) {
+    .Call(`_hammel_count_kin_cpp`, persons, generations, relationship_types, strata, n_strata, n_types, egos)
 }
 
 inspect_matching_cpp <- function(age_difference, matching) {

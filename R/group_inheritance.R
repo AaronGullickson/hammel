@@ -336,6 +336,8 @@ validate_group_inheritance <- function(model, call = rlang::caller_env()) {
 }
 
 extend_identity_groups <- function(values, additions) {
+  # Entry rows have no origin (D186); NA is never a category.
+  additions <- additions[!is.na(additions)]
   extra <- setdiff(as.character(additions), as.character(values))
   if (!length(extra)) {
     return(values)

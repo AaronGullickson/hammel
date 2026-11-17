@@ -32,12 +32,14 @@ inline int break_bin(double value, const Rcpp::NumericVector& breaks) {
 }
 
 // Private observation adapter: labels are indexed in R, with one row per
-// change. The public population retains the original transition table.
+// change. The public population retains the original transition table. An
+// entry (D186) has no origin (`from` is NA): it starts group duration in
+// dimension `entry` without being a move; `entry` is -1 for moves.
 class GroupHistory {
  public:
   struct Change {
     double time;
-    int from, to;
+    int from, to, entry;
   };
 
  private:
@@ -54,8 +56,11 @@ class GroupHistory {
     Rcpp::IntegerVector person = history["row"], from = history["from"],
                         to = history["to"];
     Rcpp::NumericVector time = history["time"];
+    Rcpp::IntegerVector entry = history.containsElementNamed("entry")
+                                  ? Rcpp::IntegerVector(history["entry"])
+                                  : Rcpp::IntegerVector(person.size(), -1);
     for (int j = 0; j < person.size(); ++j) {
-      changes[person[j]].push_back({time[j], from[j], to[j]});
+      changes[person[j]].push_back({time[j], from[j], to[j], entry[j]});
     }
     for (auto& h : changes) {
       std::stable_sort(

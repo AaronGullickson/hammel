@@ -3861,3 +3861,42 @@ arrival times.
 **Open choices:** Remaining `immigration_stream()` and
 `migrant_assignment()` arguments, and the non-immigrant label.
 
+## D186 — Phase 2 imported histories contract (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026. The user approved
+the specification and authorized implementation the same day; phase 2 is
+implemented.
+
+**Decision:** Phase 2 of external immigration (D184) follows the
+[phase 2 specification](immigration.md#phase-2-specification):
+
+- An arrival imports the template person's unions, their partners and
+  children as external relatives, and transitions in shared dimensions,
+  with fresh IDs and dates shifted by the age offset.
+- Template people are looked up in the template's `persons` and
+  `external_relatives`; the distinction is flattened in the destination.
+  Template `arrival_time`, `stream` and `pre_migration` values are ignored.
+- `external_relatives` is a top-level element of `hammel_population` with
+  the `persons` columns plus a stored `censor_time`: the death time, a
+  template external relative's shifted `censor_time`, or the arrival time.
+- `unions` and `transitions` store a logical `pre_migration` column when the
+  population has arrival records.
+- Derived state comes from the imported records, including external
+  children; group duration in shared groups continues from the template,
+  and in assigned groups runs from the arrival time, recorded as a
+  `transitions` row at arrival with `origin = NA` that observation and
+  restarts treat as entry, never as a move.
+- External relatives have `NA` values in groups the template lacks.
+- `check_population()` enforces the specification's eight validation rules.
+- External relatives are never counted in observation but inform members'
+  histories. `extract_kin()` and `count_kin()` exclude them by default;
+  `include_external = TRUE` includes them.
+
+**Rationale:** Templates that passed `check_population()` already resolve
+every union and parent reference, so import needs no handling of missing
+records. Storing `pre_migration` gives users direct access and simplifies
+calculations. Template arrival records describe a different destination.
+
+**Consequence:** Group duration in assigned groups now differs from phase
+1, where it ran from birth.
+

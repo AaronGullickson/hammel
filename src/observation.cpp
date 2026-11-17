@@ -37,7 +37,8 @@ struct Change {
   double time, rank;
   int kind;   // 0 group, 1 union start, 2 union end, 3 birth
   int value;  // group index, union type, previous-union category
-  int legal;  // legal previous category after an ending
+  int legal;  // legal previous category after an ending; group entry's
+              // dimension (-1 for moves)
 };
 
 struct Snapshot {
@@ -63,7 +64,7 @@ struct Histories {
   int n;
   NumericVector ids, born, died, mothers;
   std::vector<double> entry;
-  std::vector<char> arrived;
+  std::vector<char> arrived, external;
   std::vector<int> female;
   std::vector<std::vector<Snapshot>> timelines;
   std::vector<std::vector<Formation>> formations;
@@ -96,6 +97,13 @@ Histories build_histories(
   h.n = h.ids.size();
   h.entry.assign(h.born.begin(), h.born.end());
   h.arrived.assign(h.n, 0);
+  h.external.assign(h.n, 0);
+  if (persons.containsElementNamed(".hammel_external")) {
+    LogicalVector external = persons[".hammel_external"];
+    for (int i = 0; i < h.n; ++i) {
+      h.external[i] = external[i] == TRUE;
+    }
+  }
   if (persons.containsElementNamed("arrival_time")) {
     NumericVector arrival = persons["arrival_time"];
     for (int i = 0; i < h.n; ++i) {
@@ -237,8 +245,12 @@ Histories build_histories(
     }
     const auto& moved = group_history.of(i);
     for (const auto& m : moved) {
-      changes.push_back({m.time, kTransition, 0, m.to, 0});
-      h.moves[i].push_back({m.time, m.from, m.to});
+      changes.push_back({m.time, kTransition, 0, m.to, m.entry});
+      // Entries (D186) start duration but are not moves; neither are
+      // changes from an unobserved category before an immigrant's entry.
+      if (m.entry < 0 && m.from >= 0 && m.to >= 0) {
+        h.moves[i].push_back({m.time, m.from, m.to});
+      }
     }
     std::stable_sort(
       changes.begin(), changes.end(), [](const Change& a, const Change& b) {
@@ -253,7 +265,14 @@ Histories build_histories(
     for (const auto& c : changes) {
       switch (c.kind) {
         case 0:
-          if (target.empty() || target[s.group] != target[c.value]) {
+          if (c.legal >= 0) {
+            // An entry starts duration in its own dimension (the target's
+            // dimension is index 0 of a combined history).
+            if (target.empty() || c.legal == 0) {
+              s.group_entry = c.time;
+            }
+          } else if (target.empty() || s.group < 0 || c.value < 0 ||
+                     target[s.group] != target[c.value]) {
             s.group_entry = c.time;
           }
           s.group = c.value;
@@ -389,6 +408,10 @@ List person_lexis_cpp(
     if (i % 1024 == 0) {
       checkUserInterrupt();
     }
+    // External relatives (D186) inform histories but are never observed.
+    if (h.external[i]) {
+      continue;
+    }
     const int s = L.sex && h.female[i] ? 1 : 0;
     const double life_end =
       NumericVector::is_na(h.died[i]) ? horizon : h.died[i];
@@ -511,7 +534,7 @@ List person_lexis_cpp(
   // Births with unknown mothers, by period. An immigrant's birth is not a
   // birth in the observed population.
   for (int i = 0; i < h.n; ++i) {
-    if (h.mother_row[i] < 0 && !h.arrived[i]) {
+    if (h.mother_row[i] < 0 && !h.arrived[i] && !h.external[i]) {
       const int t = break_bin(h.born[i], time_breaks);
       if (t >= 0) {
         unknown[t] += 1;
@@ -557,6 +580,9 @@ NumericVector person_snapshot_cpp(
   for (int i = 0; i < h.n; ++i) {
     if (i % 1024 == 0) {
       checkUserInterrupt();
+    }
+    if (h.external[i]) {
+      continue;
     }
     const int s = L.sex && h.female[i] ? 1 : 0;
     for (int t = 0; t < L.nt; ++t) {

@@ -368,7 +368,8 @@ calculate_cohab_convert_rate <- function(
     breaks <- c(breaks, Inf)
   }
   check_observation_end(population, tail(time_breaks, 1))
-  unions <- population$unions[population$unions$union_type == "cohab", ]
+  unions <- observed_unions(population$unions)
+  unions <- unions[unions$union_type == "cohab", ]
   wives <- match(unions$wife_id, population$persons$person_id)
   origins <- if (duration) {
     unions$start_time
@@ -441,7 +442,7 @@ calculate_dissolution_rates <- function(
   check_analysis_population(population)
   check_population(population)
   check_observation_end(population, tail(time_breaks, 1))
-  unions <- population$unions
+  unions <- observed_unions(population$unions)
   nt <- length(time_breaks) - 1L
   nd <- length(dur_breaks) - 1L
   strata <- union_strata(population, unions, by, stride = nt * nd)

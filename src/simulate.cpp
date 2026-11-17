@@ -264,13 +264,17 @@ double draw_threshold() {
 // and, for each eligible template person, age, sex, categories (-1 where
 // assigned at arrival), ancestry shares (NA in blocks filled at arrival),
 // cumulative selection probability and per-dimension assignment
-// probabilities. `next` is the stream's next arrival time.
+// probabilities. Imported histories (D186) give each person's state at the
+// template endpoint as elapsed times: since the last birth, since the last
+// union ended and since entering each group (NA: none, or for assigned
+// groups entry at arrival). `next` is the stream's next arrival time.
 struct ImmigrationStream {
   std::vector<double> time_start, time_end, intensity;
-  NumericVector age, cumulative;
+  NumericVector age, cumulative, since_birth, since_end;
   LogicalVector female;
+  IntegerVector parity, previous, legal;
   IntegerMatrix categories;
-  NumericMatrix ancestry;
+  NumericMatrix ancestry, since_entry;
   List assignment;
   double next = R_PosInf;
 };
@@ -624,7 +628,7 @@ class Simulation {
   std::vector<std::vector<int>> category_component;
   double immigration_min_birth = R_PosInf;
   std::vector<double> arrival_person, arrival_time;
-  std::vector<int> arrival_stream;
+  std::vector<int> arrival_stream, arrival_row, arrival_cats;
 
   // Unrealized births: (period, group, union type, parity start/end, age
   // start/end) -> count.
@@ -750,6 +754,11 @@ Simulation::Simulation(
   read_groups(group_input, persons.nrows());
   read_immigration(immigration_input);
   const std::map<double, int> index = read_people(persons, initial_ancestry);
+  // New IDs also follow records kept outside the engine, such as external
+  // relatives of immigrants and their unions (D186).
+  if (persons.containsElementNamed(".hammel_id_floor")) {
+    next_id = std::max(next_id, NumericVector(persons[".hammel_id_floor"])[0]);
+  }
 
   // Draw models for the union, father and cohabitation matching models. A
   // population that stays empty never draws, so custom-formula grids are
@@ -796,6 +805,10 @@ Simulation::Simulation(
   probability_schedules.resize(probability_spec.count * 3);
   load_probabilities();
   read_unions(index);
+  if (persons.containsElementNamed(".hammel_union_floor")) {
+    next_union_id =
+      std::max(next_union_id, NumericVector(persons[".hammel_union_floor"])[0]);
+  }
 
   union_weighted = applies_weights(matching);
   father_weighted = applies_weights(father_matching);
@@ -967,8 +980,19 @@ Simulation::read_people(DataFrame persons, NumericMatrix initial_ancestry) {
   }
   // Parity selects fertility cells when schedules are parity-specific; it is
   // always tracked because weight models may use it. On restart, the latest
-  // recorded birth, including to children who died, restores spacing.
+  // recorded birth, including to children who died, restores spacing; births
+  // to children who are external relatives (D186) are supplied by R.
   parity.assign(people.size(), 0);
+  if (persons.containsElementNamed(".hammel_external_births")) {
+    IntegerVector births = persons[".hammel_external_births"];
+    NumericVector latest = persons[".hammel_external_last_birth"];
+    for (int i = 0; i < static_cast<int>(people.size()); ++i) {
+      parity[i] = births[i];
+      if (!NumericVector::is_na(latest[i])) {
+        people[i].last_birth = latest[i];
+      }
+    }
+  }
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
     const int m = mother_of[i];
     if (m < 0) {
@@ -1253,6 +1277,12 @@ void Simulation::read_immigration(Nullable<List> immigration_input) {
     stream.categories = as<IntegerMatrix>(x["categories"]);
     stream.ancestry = as<NumericMatrix>(x["ancestry"]);
     stream.assignment = x["assignment"];
+    stream.parity = x["parity"];
+    stream.since_birth = x["since_birth"];
+    stream.previous = x["previous_union"];
+    stream.legal = x["legal_previous"];
+    stream.since_end = x["since_union_end"];
+    stream.since_entry = as<NumericMatrix>(x["since_entry"]);
     for (size_t j = 0; j < stream.time_start.size(); ++j) {
       add_calendar_time(stream.time_start[j]);
       add_calendar_time(stream.time_end[j]);
@@ -3260,10 +3290,14 @@ void Simulation::on_arrival(int k, double now) {
     {++next_id, now - stream.age[r], NA_REAL, NA_REAL, NA_REAL,
      -std::numeric_limits<double>::infinity(), female, 0}
   );
+  // Imported reproductive history (D186): parity and spacing.
+  if (!NumericVector::is_na(stream.since_birth[r])) {
+    people[i].last_birth = now - stream.since_birth[r];
+  }
   mother_of.push_back(-1);
   father_of.push_back(-1);
   kids.emplace_back();
-  parity.push_back(0);
+  parity.push_back(stream.parity[r]);
   cats.resize(static_cast<size_t>(i + 1) * dimensions);
   const size_t row = static_cast<size_t>(i) * ancestry_components;
   ancestry.resize(row + ancestry_components);
@@ -3308,22 +3342,32 @@ void Simulation::on_arrival(int k, double now) {
       calibrator->add_man(group, people[i].born, 1);
     }
   }
+  // Imported union history: previous-union state and when it began.
   person_unions.emplace_back();
   current_partner.push_back(-1);
-  previous_union.push_back(0);
-  legal_previous.push_back(0);
-  previous_union_end.push_back(NA_REAL);
+  previous_union.push_back(stream.previous[r]);
+  legal_previous.push_back(stream.legal[r]);
+  previous_union_end.push_back(
+    NumericVector::is_na(stream.since_end[r]) ? NA_REAL
+                                              : now - stream.since_end[r]
+  );
   if (calibrator) {
     counted_woman.push_back(0);
     add_counted_woman(i, now);
   }
-  // Without transition history, group duration runs from birth.
+  // Group duration continues from the template, or for an assigned group
+  // runs from arrival.
   for (auto& tp : tprocs) {
-    tp.entry.push_back(people[i].born);
+    const double since = stream.since_entry(r, tp.dim);
+    tp.entry.push_back(NumericVector::is_na(since) ? now : now - since);
   }
   arrival_person.push_back(people[i].id);
   arrival_time.push_back(now);
   arrival_stream.push_back(k);
+  arrival_row.push_back(r);
+  for (int d = 0; d < dimensions; ++d) {
+    arrival_cats.push_back(category(i, d));
+  }
   refresh_person(i, now);
   draw_arrival(stream, now);
 }
@@ -3594,7 +3638,8 @@ List Simulation::results() {
     _["diagnostic_log_weights"] = log_weights,
     _["arrivals"] = List::create(
       _["person_id"] = wrap(arrival_person), _["time"] = wrap(arrival_time),
-      _["stream"] = wrap(arrival_stream)
+      _["stream"] = wrap(arrival_stream), _["row"] = wrap(arrival_row),
+      _["categories"] = wrap(arrival_cats)
     )
   );
 }

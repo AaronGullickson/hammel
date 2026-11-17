@@ -41,7 +41,8 @@ prepare_group_observations <- function(persons, population, by_group) {
         row = match(h$person_id, persons$person_id) - 1L,
         time = h$time,
         from = h$from,
-        to = h$to
+        to = h$to,
+        entry = h$entry
       )
     }
     return(persons)
@@ -60,11 +61,14 @@ prepare_group_observations <- function(persons, population, by_group) {
     )
   )
   attr(persons, ".hammel_group_values") <- groups
+  # An entry row (NA origin, D186) starts group duration without a move;
+  # `entry` is its dimension's index, -1 for moves.
   attr(persons, ".hammel_group_history") <- list(
     row = match(tx$person_id, persons$person_id) - 1L,
     time = tx$time,
     from = match(as.character(tx$origin), as.character(groups)) - 1L,
-    to = match(as.character(tx$destination), as.character(groups)) - 1L
+    to = match(as.character(tx$destination), as.character(groups)) - 1L,
+    entry = ifelse(is.na(tx$origin), 0L, -1L)
   )
   persons
 }
@@ -241,6 +245,7 @@ person_observation <- function(
       call = call
     )
   }
+  persons <- with_external_rows(persons, population[["external_relatives"]])
   persons <- prepare_group_observations(persons, population, grouped)
   groups <- if (grouped) {
     observation_groups(persons, TRUE, call = call)
@@ -545,7 +550,8 @@ combine_dimensions <- function(population, dims) {
     person_id = numeric(),
     time = numeric(),
     from = integer(),
-    to = integer()
+    to = integer(),
+    entry = integer()
   )
   if (nrow(tx)) {
     tx <- tx[order(tx$person_id, tx$time, match(tx$group, dims)), ,
@@ -586,7 +592,8 @@ combine_dimensions <- function(population, dims) {
       person_id = tx$person_id,
       time = tx$time,
       from = as.integer(before),
-      to = as.integer(after)
+      to = as.integer(after),
+      entry = ifelse(is.na(tx$origin), match(tx$group, dims) - 1L, -1L)
     )
   }
   decode <- as.data.frame(

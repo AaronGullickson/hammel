@@ -35,6 +35,9 @@
 #'   side, default `2`. Zero returns no kin between distinct people.
 #' @param relative_ids Optional unique relative IDs to consider. `NULL` means
 #'   all recorded persons. Unknown IDs are errors; empty vectors return no rows.
+#' @param include_external If `TRUE`, immigrants' external relatives (see
+#'   [immigration()]) can be relatives, and `relative_ids` may name them. They
+#'   are never egos. Defaults to `FALSE`.
 #' @return A tibble with one row per ego and relative: `ego_id`, `relative_id`,
 #'   `relationship`, `ego_distance`, `relative_distance`, `n_common_ancestors`,
 #'   `ego_lineage`, `relative_lineage`, `ego_ancestry_complete`, and
@@ -59,19 +62,23 @@ extract_kin <- function(
   population,
   ego_ids,
   generations = 2,
-  relative_ids = NULL
+  relative_ids = NULL,
+  include_external = FALSE
 ) {
   check_population(population)
+  check_flag(include_external, "include_external")
   validate_kinship_generations(generations, "generations")
+  kin <- kin_people(population, include_external)
   ids <- population$persons$person_id
   if (is.null(relative_ids)) {
-    relative_ids <- ids
+    relative_ids <- kin$person_id
   }
   for (name in c("ego_ids", "relative_ids")) {
     values <- get(name)
+    allowed <- if (name == "ego_ids") ids else kin$person_id
     check_numeric_column(values, name, id = TRUE)
-    if (anyDuplicated(values) || any(!values %in% ids)) {
-      unknown <- setdiff(values, ids)
+    if (anyDuplicated(values) || any(!values %in% allowed)) {
+      unknown <- setdiff(values, allowed)
       abort_hammel(
         c(
           "{.arg {name}} must contain unique IDs of persons in the population.",
@@ -86,10 +93,7 @@ extract_kin <- function(
     }
   }
   kin <- call_native(
-    extract_kin_cpp(
-      population$persons, ego_ids, relative_ids,
-      as.integer(generations)
-    )
+    extract_kin_cpp(kin, ego_ids, relative_ids, as.integer(generations))
   )
   kin$relationship <- kin_relationship(kin$ego_distance, kin$relative_distance)
   tibble::as_tibble(
@@ -146,6 +150,9 @@ extract_kin <- function(
 #' @param relationships `NULL` (default) for all relationships, or a nonempty
 #'   character vector of unique relationship names within `generations`, such
 #'   as `"first_cousin"`. Retains the usual row order and ego denominators.
+#' @param include_external If `TRUE`, count immigrants' external relatives
+#'   (see [immigration()]) as kin while they are known to be alive, up to their
+#'   `censor_time`. They are never egos. Defaults to `FALSE`.
 #' @return A tibble with `time`, the `by` columns, `relationship`, `persons`
 #'   (living egos), `kin` (their living kin of that type), `mean_kin`
 #'   (`kin / persons`) and `share_with_kin` (share of egos with at least one).
@@ -171,8 +178,10 @@ count_kin <- function(
   times,
   generations = 2,
   by = NULL,
-  relationships = NULL
+  relationships = NULL,
+  include_external = FALSE
 ) {
+  check_flag(include_external, "include_external")
   if (!is.numeric(times) || !is.null(dim(times)) || !length(times) ||
         any(!is.finite(times))) {
     abort_hammel(
@@ -259,9 +268,20 @@ count_kin <- function(
     stratum[!alive] <- 0L
     strata[, i] <- as.integer(stratum)
   }
+  # External relatives (D186) are kin only, while known to be alive.
+  kin <- kin_people(population, include_external)
+  external <- kin[-seq_len(n), , drop = FALSE]
+  egos <- rep(c(TRUE, FALSE), c(n, nrow(external)))
+  if (nrow(external)) {
+    known <- outer(external$birth_time, times, "<=") &
+      outer(external$censor_time, times, ">=") &
+      (is.na(external$death_time) | outer(external$death_time, times, ">"))
+    strata <- rbind(strata, matrix(as.integer(known), ncol = length(times)))
+  }
   counts <- call_native(
     count_kin_cpp(
-      persons, as.integer(generations), lookup, strata, n_strata, n_types
+      kin, as.integer(generations), lookup, strata, n_strata, n_types,
+      egos = egos
     )
   )
   grid <- expand.grid(
@@ -376,6 +396,8 @@ living_kin_categories <- function(population, name) {
     moves <- if ("group" %in% names(tx)) tx[tx$group == name, ] else tx
     values <- c(values, moves$origin, moves$destination)
   }
+  # Entry rows have no origin (D186).
+  values <- values[!is.na(values)]
   sort(unique(as.character(values)), method = "radix")
 }
 
