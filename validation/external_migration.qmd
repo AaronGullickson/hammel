@@ -111,6 +111,28 @@ grp_gen <- group(
 
 ```
 
+```{r}
+
+# allow race exogamy to vary across combinations
+race_exogamy <- c(
+"White:Black" = -4,
+  "White:Asian" = -2,
+  "White:Latino" = -1.5,
+  "Black:Asian" = -4,
+  "Black:Latino" = -3,
+  "Asian:Latino" = -2
+)
+
+# for birthplace, all non-same birthplace cases get the same value
+birthplace_exogamy <- c(
+  "native:asia" = -0.7,
+  "native:latin_america" = -0.7,
+  "asia:latin_america" = -0.7
+)
+
+```
+
+
 
 
 ```{r}
@@ -126,14 +148,7 @@ model <- hammel_model() |>
       3, 5, 
       group_exogamy = list(
         region = NA,
-        race = c(
-          "White:Black" = -4,
-          "White:Asian" = -2,
-          "White:Latino" = -1.5,
-          "Black:Asian" = -4,
-          "Black:Latino" = -3,
-          "Asian:Latino" = -2
-        )
+        race = race_exogamy
       )
     )
   ) |>
@@ -261,6 +276,18 @@ model <- model |>
       household = household(),
       weights = migrant_selection_fun
     )
+  ) |>
+  # redo union formation for new exogamy
+  set_union_formation(
+    "on_demand",
+    matching = age_gap_matching_model(
+      3, 5, 
+      group_exogamy = list(
+        region = NA,
+        race = race_exogamy,
+        birthplace = birthplace_exogamy
+      )
+    )
   )
 
 pop_end <- run_simulation(model, 50, 42, progress = interactive())
@@ -273,9 +300,9 @@ summary(pop_end)
 pop_end$persons |>
   filter(!is.na(arrival_time)) |>
   mutate(arrival_year = floor(arrival_time)) |>
-  count(stream, arrival_year) |>
+  count(birthplace, arrival_year) |>
   #pivot_wider(id_cols = arrival_year, names_from = stream, values_from = n) |>
-  ggplot(aes(x = arrival_year, y = n, color = stream))+
+  ggplot(aes(x = arrival_year, y = n, color = birthplace))+
   geom_line()+
   geom_hline(yintercept = c(200, 600), linetype = 2)+
   scale_y_continuous(limits = c(0, NA))
@@ -342,6 +369,20 @@ temp |>
   geom_line()
 ```
 
+This won't work right because of the mixture of race and birthplace.
+
+```{r}
+augment_unions(pop_end) |>
+  filter(!pre_migration) |>
+  count(birthplace_h, birthplace_w) |>
+  pivot_wider(names_from = starts_with("birthplace"), values_from = n) |>
+  mutate(
+    log_odds_asia_native = log(asia_native) + log(native_asia) - log(native_native) - log(asia_asia)
+  ) |>
+  select(starts_with("log_odds"))
+
+
+```
 
 
 
