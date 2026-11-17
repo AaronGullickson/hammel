@@ -610,4 +610,6 @@ template truncated to the cut by the internal `population_at()`; without
 probabilities, imported state and their expected party size; cut times are
 calendar boundaries where the engine switches slice and redraws the clock,
 dividing intensity by the slice's expected size. Arrival records carry
-their slice, so histories are imported from that cut's template.
+their slice, so histories are imported from that cut's template. Weight
+schedules (D197) add slices at their boundaries, each with the active model
+and the latest cut's template.

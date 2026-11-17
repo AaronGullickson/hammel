@@ -4162,3 +4162,25 @@ approximates a co-simulated origin.
 
 **Supersedes:** D180's list of templates as the way to vary a stream's
 template over time.
+
+## D197 — Calendar schedules of immigration weights (November 17, 2026)
+
+**Status:** User decision, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** An immigration stream's `weights` may be a calendar schedule
+in the D123 format (`time_start`, `time_end` and a list column `model`),
+validated as for other processes: intervals cover the run, every row holds
+a complete model, and formulas and functions are not mixed. Stream slices
+start at every template cut (D196) and every schedule boundary inside the
+run; each uses its latest cut's template and the model active at its start,
+with its own selection probabilities and expected party size, so household
+streams keep their person intensity. A custom function's `bin` gains the
+interval's `time_start` and `time_end`. On cloning streams, no model in the
+schedule may use household variables.
+
+**Rationale:** Selection changes over time (such as younger migrants after
+a policy change) without separate streams, and the D123 format matches the
+other processes' weight schedules.
+
+**Supersedes:** the rejection of immigration weight schedules (D185).

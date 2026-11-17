@@ -137,12 +137,24 @@ test_that("stream weights and assignments are validated", {
     ),
     "specification", "immigration_stream"
   )
+  # Weight schedules (D197) must not mix formulas and functions.
   schedule <- tibble::tibble(
     time_start = 0, time_end = Inf,
     model = list(weight_model(~age, c(age = 1)))
   )
-  expect_hammel_error(
+  expect_s3_class(
     immigration_stream(per_year(1), template, weights = schedule),
+    "hammel_immigration_stream"
+  )
+  mixed <- tibble::tibble(
+    time_start = c(0, 5), time_end = c(5, Inf),
+    model = list(
+      weight_model(~age, c(age = 1)),
+      weight_model(fun = function(members, bin) rep(0, nrow(members)))
+    )
+  )
+  expect_hammel_error(
+    immigration_stream(per_year(1), template, weights = mixed),
     "specification", "immigration_stream"
   )
   expect_hammel_error(

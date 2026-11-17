@@ -50,7 +50,7 @@ remain separate responsibilities. The public interface is described in
 | Phasing | Individual arrivals without histories, then imported histories, then household parties | D184 |
 | Phase 1 contract | Unpartnered eligibility, per-stream clocks, arrival columns, observation from arrival, group compatibility, `migrant_assignment()`, ancestry fallback | D185 |
 | Phase 2 contract | Imported unions, children and transitions; flattened template external relatives; `censor_time`; stored `pre_migration`; population validation; kin extraction excludes external relatives by default | D186 |
-| Selective migration | A weight model selects among a stream's eligible template people; intensity is unchanged | D180, D184 |
+| Selective migration | A weight model, or a calendar schedule of them, selects among a stream's eligible template people; intensity is unchanged | D180, D184, D197 |
 | Migration histories | Separate personal/family facts from reusable, named classifications | D181 |
 | Rate schedules | Stratify by personal immigration status and stream; generation rules stay outside the required rate-table schema | D182 |
 | Birthplace | Automatic `birthplace` group (`"native"` or stream), replacing `stream`; optional heritage ancestry; never the only dimension | D190 |
@@ -838,6 +838,12 @@ truncated template exactly as for `step = NULL`, with c in place of the
 template's `end_time`: a migrant arrives as they were at c, with every date
 shifted by the arrival time minus c (less than `step`). Template IDs are
 the same at every cut, and custom weight functions' `bin` gains `cut`.
+
+**Weight schedules (D197).** A stream's `weights` may be a calendar
+schedule in the D123 format. Slices then start at every cut and every
+schedule boundary in the run, each with its latest cut's template and the
+weight model active at its start; a custom function's `bin` holds the
+interval's `time_start` and `time_end`.
 
 **Engine.** Each cut's parties, selection probabilities, assignment
 probabilities and imported state are prepared before the run. Cut times

@@ -1749,3 +1749,19 @@ made 400 native calls on commit 0f56650 and this branch, all identical, and
 complete results of seeded runs with and without cuts (persons, unions,
 transitions, ancestry and external relatives) were identical.
 `devtools::test()` passed 9,136 expectations with one skip.
+
+## Immigration weight schedules (November 17, 2026)
+
+Under D197, `test-immigration-cuts.R` checks that a weight schedule switches
+selection at its boundaries (one person, then both under a uniform model,
+then the other), that slices start at cuts and schedule boundaries with a
+custom function's `bin` holding both the cut and the interval, that a
+household stream favouring couples and then singles keeps its person
+intensity in both periods, and that schedules must cover the run and can't
+use household variables on cloning streams. In `test-immigration.R`, a
+schedule is now accepted and one mixing formulas and functions rejected.
+With `-ffp-contract=off`, the offline test files other than the six
+immigration files (without D195's two weight tests) made 1,830 native calls
+on `master` and this branch, and the five earlier immigration files 396 on
+commit 51c34e2 and this branch, all identical.
+`devtools::test()` passed 9,149 expectations with one skip.

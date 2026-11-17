@@ -27,9 +27,13 @@ have other columns: who arrives is set by \code{template} and \code{weights}.}
 
 \item{weights}{\code{NULL} (default) to draw eligible template people uniformly,
 or a \code{\link[=weight_model]{weight_model()}} whose formula or function may use \code{age} (at the
-template's \code{end_time}), \code{sex} and the template's groups shared with the
-simulation. Each eligible person is drawn with probability proportional
-to their weight; weights do not change the stream's intensity. For
+template's \code{end_time}, or the cut with \code{step}), \code{sex} and the template's
+groups shared with the simulation. It may also be a calendar schedule, a
+data frame with \code{time_start}, \code{time_end} and a list column \code{model} of
+weight models covering the run, as for other processes; a custom function's \code{bin} then holds the interval's
+\code{time_start} and \code{time_end}. Each eligible person is drawn with
+probability proportional to their weight; weights do not change the
+stream's intensity. For
 household streams, weights describe each household by its carrier, and
 may also use \code{partnered} (0/1), \code{household_size}, \code{n_dependents} and
 \code{partner_age} (\code{NA} for unpartnered carriers; in a formula the term then

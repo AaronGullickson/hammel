@@ -168,9 +168,13 @@ set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
 #' @param template A `hammel_population` from which migrants are drawn.
 #' @param weights `NULL` (default) to draw eligible template people uniformly,
 #'   or a [weight_model()] whose formula or function may use `age` (at the
-#'   template's `end_time`), `sex` and the template's groups shared with the
-#'   simulation. Each eligible person is drawn with probability proportional
-#'   to their weight; weights do not change the stream's intensity. For
+#'   template's `end_time`, or the cut with `step`), `sex` and the template's
+#'   groups shared with the simulation. It may also be a calendar schedule, a
+#'   data frame with `time_start`, `time_end` and a list column `model` of
+#'   weight models covering the run, as for other processes; a custom function's `bin` then holds the interval's
+#'   `time_start` and `time_end`. Each eligible person is drawn with
+#'   probability proportional to their weight; weights do not change the
+#'   stream's intensity. For
 #'   household streams, weights describe each household by its carrier, and
 #'   may also use `partnered` (0/1), `household_size`, `n_dependents` and
 #'   `partner_age` (`NA` for unpartnered carriers; in a formula the term then
@@ -597,7 +601,7 @@ new_immigration_stream <- function(
     list(
       template = template,
       intensity = intensity,
-      weights = weights,
+      weights = normalize_model_argument(weights),
       assignment = assignment,
       household = household,
       step = step
@@ -630,18 +634,8 @@ validate_immigration_stream <- function(stream, call = rlang::caller_env()) {
   check_population(stream$template, "template", call = call)
   check_intensity(stream$intensity, call = call)
   weights <- stream$weights
-  if (is_model_schedule(weights)) {
-    abort_hammel(
-      c(
-        "Immigration weights can't follow a calendar schedule.",
-        "i" = "Give a single {.fn weight_model}."
-      ),
-      "specification",
-      argument = "weights",
-      call = call
-    )
-  }
-  if (!is.null(weights) && !inherits(weights, "hammel_weight_model")) {
+  if (!is.null(weights) && !is_model_schedule(weights) &&
+        !inherits(weights, "hammel_weight_model")) {
     abort_hammel(
       c(
         "{.arg weights} must be {.code NULL} or a weight model.",
@@ -672,7 +666,9 @@ validate_immigration_stream <- function(stream, call = rlang::caller_env()) {
     )
   }
   household <- stream$household
-  used <- if (!is.null(weights$formula)) all.vars(weights$formula)
+  used <- unlist(lapply(model_entries(weights), function(model) {
+    if (!is.null(model$formula)) all.vars(model$formula)
+  }))
   clone_only <- intersect(used, household_variables)
   if (is.null(household) && length(clone_only)) {
     abort_hammel(
@@ -1214,13 +1210,31 @@ prepare_stream <- function(
   } else {
     lapply(cuts, function(cut) population_at(stream$template, cut))
   }
+  # Slices start at every cut and weight-schedule boundary in the run
+  # (D197); each uses its latest cut's template and its active weights.
+  weights <- stream$weights
+  check_model_coverage(weights, start, end, "stream's weight", call = call)
+  edges <- if (is_model_schedule(weights)) {
+    c(weights$time_start, weights$time_end)
+  }
+  starts <- sort(unique(c(cuts, edges[edges > start & edges < end])))
+  template_of <- findInterval(starts, cuts)
   slices <- lapply(
-    seq_along(templates),
+    seq_along(starts),
     function(k) {
+      period <- NULL
+      if (is_model_schedule(weights)) {
+        row <- which(
+          weights$time_start <= starts[k] & starts[k] < weights$time_end
+        )
+        period <- c(weights$time_start[row], weights$time_end[row])
+      }
       prepare_slice(
-        stream, templates[[k]], name, declaration, registries, components,
-        counts_cohab, cohab_enabled,
-        cut = if (is.null(stream$step)) NULL else cuts[k],
+        stream, templates[[template_of[k]]], name, declaration, registries,
+        components, counts_cohab, cohab_enabled,
+        weights = model_at(weights, starts[k]),
+        cut = if (is.null(stream$step)) NULL else cuts[template_of[k]],
+        period = period,
         call = call
       )
     }
@@ -1230,9 +1244,9 @@ prepare_stream <- function(
     time_end = intensity$time_end,
     intensity = intensity$intensity,
     per_person = identical(intensity$kind[1], "rate"),
-    cuts = as.numeric(cuts),
+    cuts = as.numeric(starts),
     slices = slices,
-    templates = templates
+    templates = templates[template_of]
   )
 }
 
@@ -1294,7 +1308,9 @@ prepare_slice <- function(
   components,
   counts_cohab,
   cohab_enabled,
+  weights = stream$weights,
   cut = NULL,
+  period = NULL,
   call = rlang::caller_env()
 ) {
   rules <- stream$assignment
@@ -1436,8 +1452,9 @@ prepare_slice <- function(
     )
   }
   probabilities <- migrant_probabilities(
-    stream$weights, members, registries[shared], name,
+    weights, members, registries[shared], name,
     cut = cut,
+    period = period,
     call = call
   )
   # Intensity is in persons per year; the clock counts parties (D187).
@@ -1719,6 +1736,7 @@ migrant_probabilities <- function(
   categories,
   name,
   cut = NULL,
+  period = NULL,
   call = rlang::caller_env()
 ) {
   n <- nrow(members)
@@ -1729,6 +1747,10 @@ migrant_probabilities <- function(
     bin <- list(process = "immigration", stream = name)
     if (!is.null(cut)) {
       bin$cut <- cut
+    }
+    if (!is.null(period)) {
+      bin$time_start <- period[1]
+      bin$time_end <- period[2]
     }
     eta <- weights$fun(members, bin)
     if (!is.numeric(eta) || !is.null(dim(eta)) || length(eta) != n ||
