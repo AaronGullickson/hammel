@@ -24,7 +24,9 @@ execute:
 #| include: false
 
 library(here)
-# installing will lead to faster computation
+# installing will lead to faster computation - but unload it
+# first to avoid errors
+if ("hammel" %in% loadedNamespaces()) pkgload::unload("hammel")
 devtools::install(here::here())
 library(hammel)
 library(dplyr)
@@ -37,6 +39,7 @@ library(stringr)
 library(ggplot2)
 library(gt)
 library(modelsummary)
+library(tictoc)
 set_theme(theme_bw())
 ```
 
@@ -50,7 +53,7 @@ Assess the external migration feature.
 
 ## Overview of Design
 
-
+The basic idea of this feature is that users can define multiple "immigration streams" which will add migrants to the population.
 
 
 ## Simulation Test
@@ -238,6 +241,7 @@ model_asian_template <- hammel_model() |>
   set_population(
     generate_uniform_population(
       20000,
+      end_time = 50,
       groups = list(race = c(White = 0, Black = 0, Asian = 1, Latino = 0))
     )
   )
@@ -258,6 +262,7 @@ model_latino_template <- hammel_model() |>
   set_population(
     generate_uniform_population(
       30000,
+      end_time = 50,
       groups = list(race = c(White = 0, Black = 0, Asian = 0, Latino = 1))
     )
   )
@@ -272,10 +277,10 @@ Ok, now lets add the migration streams. we will gradually ramp up rates in decad
 
 rate_immig_asia <- tribble(
   ~time_start, ~time_end, ~rate,
-  0,           10,        0.00034,
-  10,          20,        0.00045,
-  20,          30,        0.00057, 
-  30,          Inf,       0.00068
+  100,         110,        0.00041,
+  110,         120,        0.00054,
+  120,         130,        0.00068,
+  130,         Inf,        0.00082
 )
 
 # latin american rates will be 4x asian rates
@@ -299,6 +304,7 @@ model <- model |>
     asia = immigration_stream(
       rate_immig_asia,
       pop_asian_template,
+      step = NULL,
       assignment = list(
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.3, "MW" = 0.15, "S" = 0.15, "W" = 0.4)
@@ -311,6 +317,7 @@ model <- model |>
     latin_america = immigration_stream(
       rate_immig_la,
       pop_latino_template,
+      step = NULL,
       assignment = list(
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.25, "MW" = 0.2, "S" = 0.2, "W" = 0.35)
@@ -335,13 +342,27 @@ model <- model |>
     )
   )
 
+tic()
 pop_end <- run_simulation(model, 50, 42, progress = interactive())
+toc()
 summary(pop_end)
 ```
 
 ```{r}
 
-calculate_immigration_rates(pop_end, c(0, 10, 20, 30))
+calculate_immigration_rates(pop_end, c(100, 110, 120, 130, 150),
+                            streams = TRUE, conf_level = 0.95) |>
+  ggplot(aes(x = time_start, y = rate_immigration))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point()+
+  geom_line(
+    data = bind_rows(
+      rate_immig_asia |> mutate(birthplace = "asia"),
+      rate_immig_la |> mutate(birthplace = "latin_america")
+    ),
+    aes(y = rate), linetype =2, color = "red"
+  )+
+  facet_wrap(~birthplace)
 ```
 
 
@@ -378,9 +399,24 @@ pop_end |>
 ```{r}
 
 pop_end |>
-  calculate_population_size(seq(0, 50, 5), by = "generation") |>
-  ggplot(aes(x = time, y = population, fill = generation))+
+  calculate_population_size(seq(100, 150, 5), by = "generation") |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ungroup() |>
+  ggplot(aes(x = time, y = prop, fill = generation))+
   geom_area()
+```
+
+```{r}
+
+pop_end |>
+  calculate_population_size(seq(100, 150, 5), by = c("generation", "race")) |>
+  group_by(time, race) |>
+  mutate(prop = population / sum(population)) |>
+  ungroup() |>
+  ggplot(aes(x = time, y = prop, fill = generation))+
+  geom_area()+
+  facet_wrap(~race)
 ```
 
 ```{r}

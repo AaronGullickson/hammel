@@ -1734,3 +1734,18 @@ At report scale (a template of 29,744 people simulated from 0 to 150, a
 destination run from 100 to 150, `count = 800`), a run took 3.2 seconds
 without cuts, 4.7 with `step = 5` (10 cuts) and 10.6 with `step = 1` (50
 cuts).
+
+## Template cut performance (November 17, 2026)
+
+Profiling a report-like run (two household streams with custom selection
+weights, custom generation inheritance and assignment, three groups and
+birthplace ancestry, 50 years with yearly cuts) showed most of the cut
+overhead in `split()` and `factor()` on character keys over whole
+templates: history import rebuilt lookup lists per stream and cut, and
+imported state used `table()` and `tapply()` on mother IDs. Both now match
+numerically and index only each batch's arrivals. The run fell from 21.4 to
+10.1 seconds (5.6 without cuts). The five earlier immigration test files
+made 400 native calls on commit 0f56650 and this branch, all identical, and
+complete results of seeded runs with and without cuts (persons, unions,
+transitions, ancestry and external relatives) were identical.
+`devtools::test()` passed 9,136 expectations with one skip.

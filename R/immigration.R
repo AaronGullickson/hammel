@@ -1663,16 +1663,15 @@ migrant_history_state <- function(
     )
   }
   female <- persons$sex == "f"
-  children <- !is.na(people$mother_id)
-  key <- as.character(ids)
-  mothers <- as.character(people$mother_id[children])
-  counts <- c(table(mothers))
-  parity <- as.integer(counts[key])
-  parity[is.na(parity)] <- 0L
+  # Parity and the latest birth of each person, by numeric matching.
+  mother <- match(people$mother_id, ids)
+  births <- which(!is.na(mother))
+  parity <- tabulate(mother[births], nbins = length(ids))
   last <- rep(NA_real_, length(ids))
-  if (any(children)) {
-    latest <- c(tapply(people$birth_time[children], mothers, max))
-    last <- as.numeric(latest[key])
+  if (length(births)) {
+    o <- births[order(mother[births], -people$birth_time[births])]
+    first <- o[!duplicated(mother[o])]
+    last[mother[first]] <- people$birth_time[first]
   }
   parity[!female] <- 0L
   last[!female] <- NA_real_
@@ -1681,7 +1680,10 @@ migrant_history_state <- function(
     call = call
   )
   at <- match(ids, people$person_id)
-  since_entry <- matrix(NA_real_, nrow = length(ids), ncol = length(dimensions))
+  since_entry <- matrix(
+    NA_real_,
+    nrow = length(ids), ncol = length(dimensions)
+  )
   tx <- template$transitions
   for (k in seq_along(dimensions)) {
     d <- dimensions[k]
@@ -1692,9 +1694,9 @@ migrant_history_state <- function(
     if (!is.null(tx) && nrow(tx)) {
       moves <- tx[tx$group == d & tx$person_id %in% ids, , drop = FALSE]
       if (nrow(moves)) {
-        latest <- tapply(moves$time, moves$person_id, max)
-        i <- match(names(latest), as.character(ids))
-        entered[i] <- as.numeric(latest)
+        moves <- moves[order(moves$person_id, -moves$time), , drop = FALSE]
+        latest <- moves[!duplicated(moves$person_id), , drop = FALSE]
+        entered[match(latest$person_id, ids)] <- latest$time
       }
     }
     since_entry[, k] <- end - entered
@@ -2243,33 +2245,33 @@ import_histories <- function(
     tp <- template$persons$person_id[rows]
     key <- as.character(tp)
     member_key <- paste(party, tp)
-    # Records of each arrival's template person, as (arrival, record) pairs.
-    pairs <- function(index) {
-      found <- index[key]
-      list(
-        arrival = rep(seq_along(a), lengths(found)),
-        record = as.integer(unlist(found, use.names = FALSE))
-      )
+    # Records whose `ids` are an arrival's template person, as (arrival,
+    # record) pairs in arrival and record order. Only the batch's arrivals
+    # are indexed, not the whole template.
+    by_arrival <- split(seq_along(tp), tp)
+    pairs <- function(ids, records = seq_along(ids)) {
+      hit <- which(ids %in% tp)
+      found <- by_arrival[as.character(ids[hit])]
+      arrival <- as.integer(unlist(found, use.names = FALSE))
+      record <- as.integer(rep(records[hit], lengths(found)))
+      o <- order(arrival, record)
+      list(arrival = arrival[o], record = as.integer(record[o]))
     }
-    unions_of <- split(
-      rep(seq_len(nrow(t_unions)), 2L),
-      as.character(c(t_unions$wife_id, t_unions$husband_id))
-    )
     parents <- c(people$mother_id, people$father_id)
     known <- !is.na(parents)
-    children_of <- split(
-      rep(seq_len(nrow(people)), 2L)[known], as.character(parents[known])
-    )
     # Each party's ended unions, once each; current unions arrive live from
     # the engine (D187).
-    u <- pairs(unions_of)
+    u <- pairs(
+      c(t_unions$wife_id, t_unions$husband_id),
+      rep(seq_len(nrow(t_unions)), 2L)
+    )
     u_party <- party[u$arrival]
     keep <- !duplicated(paste(u_party, u$record)) &
       !is.na(t_unions$end_time[u$record])
     u_party <- u_party[keep]
     u_record <- u$record[keep]
     u_first <- u$arrival[keep]
-    k <- pairs(children_of)
+    k <- pairs(parents[known], rep(seq_len(nrow(people)), 2L)[known])
     # Relatives: partners and children outside the party, once per party.
     rel_party <- c(
       u_party, u_party, party[k$arrival]
@@ -2399,9 +2401,7 @@ import_histories <- function(
       imported <- list(arrival = integer(), record = integer())
       if (nrow(t_moves)) {
         shared <- which(t_moves$group %in% template_dims)
-        imported <- pairs(
-          split(shared, as.character(t_moves$person_id[shared]))
-        )
+        imported <- pairs(t_moves$person_id[shared], shared)
       }
       m <- t_moves[imported$record, , drop = FALSE]
       entry_arrival <- rep(seq_along(a), each = length(assigned))
