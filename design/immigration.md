@@ -109,14 +109,23 @@ Streams may mix counts and rates. Controlled/exact-count immigration is
 excluded.
 
 **Crude immigration rates.** `calculate_immigration_rates(population,
-time_breaks, by = NULL, conf_level = NULL)` reports, for each period,
-`arrivals`, `person_years` lived by the whole destination population
+time_breaks, by = NULL, streams = FALSE, conf_level = NULL)` reports, for
+each period, `arrivals`, `person_years` lived by the destination population
 (immigrants from arrival, everyone else from birth or the start, never
 external relatives) and `rate_immigration` = arrivals / person-years, with
-Poisson confidence intervals like the other calculators. With
-`by = "birthplace"`, arrivals are split by stream (natives have none and
-are omitted) over the same total person-years, so the streams' rates sum
-to the total, matching the crude-rate definition of `rate` intensities.
+Poisson confidence intervals like the other calculators. As elsewhere, `by`
+stratifies both: `by = "region"` gives arrivals into a region over
+person-years lived there, with arrivals classified by their category at
+arrival. `by` accepts `"sex"` and declared dimensions except `birthplace`,
+which is an error pointing to `streams`. `streams = TRUE` splits each
+stratum's arrivals by stream over the stratum's person-years, so stream
+rates sum to the stratum's rate, matching the crude-rate definition of
+`rate` intensities. Household arrivals are compound Poisson, so each row
+reports `dispersion`, the sum of squared household sizes over its arrivals
+(households identified by shared arrival time and stream), and confidence
+intervals are exact Poisson intervals for arrivals and person-years both
+divided by it; individual arrivals have dispersion 1 and unchanged
+intervals.
 
 ## Interface
 

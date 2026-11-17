@@ -1673,3 +1673,22 @@ template of about 25,000, 50 years), `count = 800` took 3.4 seconds for
 crude rates of 0.0202 and 0.0197 in the two 25-year halves. Household
 arrivals are compound Poisson, so the helper's Poisson intervals are too
 narrow for them.
+
+`calculate_immigration_rates()` now stratifies arrivals and person-years
+together with `by` (sex and declared dimensions) and splits streams with
+`streams = TRUE`. `test-immigration-intensity.R` checks that arrivals are
+classified by their region at arrival though some have since moved, that
+regional person-years sum to the total, that sex, region and stream strata
+partition arrivals, and the `birthplace` and unknown-`by` errors.
+`devtools::test()` passed 9,035 expectations with one skip (the opt-in live
+database test).
+
+Immigration-rate intervals now adjust for household clumping: each row's
+`dispersion` is the sum of squared household sizes over its arrivals, and
+the exact Poisson interval is taken for both counts divided by it.
+`test-immigration-intensity.R` checks that individual streams keep
+`poisson.test()`'s intervals exactly, that two-person households have
+dispersion 2 (1 when split by sex) with wider intervals, and adjusted 90%
+coverage across 40 replications. Over 200 replications at 95%, coverage was
+0.92 adjusted versus 0.81 plain for two-person households, and 0.95 versus
+0.76 for a simulated template (mean dispersion 2.62).

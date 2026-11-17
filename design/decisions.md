@@ -4104,7 +4104,9 @@ person-year lived by the destination's living population, immigrants
 included from arrival). Calendar columns are optional and follow D118. A
 bare number is no longer accepted. The argument stays `intensity` to mark
 that, unlike rate schedules, it has no strata.
-`calculate_immigration_rates()` reports crude immigration rates. The user
+`calculate_immigration_rates()` reports crude immigration rates; its `by`
+stratifies arrivals and person-years together, as in other calculators,
+and `streams = TRUE` splits arrivals by stream within strata. The user
 then made `intensity` the first argument of `immigration_stream()`, as rates
 come first in rate processes:
 `immigration_stream(intensity, template, weights, assignment, household)`.

@@ -725,7 +725,7 @@ calculate_union_rates <- function(
 #' DRAFT: agent-written documentation that needs user review and editing.
 #'
 #' Calculate crude immigration rates, arrivals per person-year lived in the
-#' population, by time interval and optionally by stream.
+#' population, by time interval and optionally by sex, group and stream.
 #'
 #' @details
 #'
@@ -735,26 +735,40 @@ calculate_union_rates <- function(
 #' are counted in the interval containing their `arrival_time`; intervals
 #' are half-open, inclusive at the lower bound.
 #'
-#' With `by = "birthplace"`, arrivals are split by stream (the immigrants'
-#' `birthplace`) over the same total person-years, so the streams' rates sum
-#' to the total. This is the rate a `rate` intensity in [immigration_stream()]
-#' specifies.
+#' As in other rate calculators, `by` stratifies both arrivals and
+#' person-years: with `by = "region"`, the rate for a region is the arrivals
+#' into that region over the person-years lived there. Arrivals are
+#' classified by their category at arrival. `birthplace` can't be used in
+#' `by`; use `streams` instead.
 #'
-#' Confidence intervals treat arrivals as Poisson. Household streams bring
-#' people in groups, so their counts vary more and the intervals are too
-#' narrow for them.
+#' With `streams = TRUE`, each stratum's arrivals are split by stream (the
+#' immigrants' `birthplace`) over the stratum's person-years, so the streams'
+#' rates sum to the stratum's rate. This is the rate a `rate` intensity in
+#' [immigration_stream()] specifies.
+#'
+#' Household streams bring people in groups, so arrivals vary more than a
+#' Poisson count. `dispersion` measures this in each row: the sum of squared
+#' household sizes over the number of arrivals, 1 when everyone arrives
+#' alone. Confidence intervals are exact Poisson intervals for arrivals and
+#' person-years both divided by `dispersion`, which widens them for
+#' household streams; members of a household are recognized by their shared
+#' arrival time and stream. With few households in a row, the dispersion is
+#' itself uncertain.
 #'
 #' @param population A `hammel_population` object returned from
 #'   [run_simulation()].
 #' @param time_breaks Strictly increasing finite calendar boundaries in
 #'   years that define the time intervals.
-#' @param by `NULL` (default) for the total, or `"birthplace"` to split
-#'   arrivals by stream.
+#' @param by `NULL` (default), or a character vector of `"sex"` and declared
+#'   group dimensions other than `birthplace` to stratify by.
+#' @param streams Whether to split arrivals by stream. Defaults to `FALSE`.
 #' @param conf_level `NULL` (default) for no confidence interval, or a
-#'   confidence level between 0 and 1 for exact Poisson intervals in
-#'   `conf_low` and `conf_high`.
-#' @return A tibble with `time_start`, `time_end`, `birthplace` (when
-#'   requested), `arrivals`, `person_years` and `rate_immigration`.
+#'   confidence level between 0 and 1 for intervals in `conf_low` and
+#'   `conf_high`, adjusted for household clumping as described in details.
+#' @return A tibble with `time_start`, `time_end`, the `by` columns,
+#'   `birthplace` (with `streams = TRUE`), `arrivals`, `person_years`,
+#'   `rate_immigration` and `dispersion`, plus `conf_low` and `conf_high`
+#'   when `conf_level` is given.
 #' @seealso [immigration_stream()], [calculate_rates]
 #' @export
 #' @examples
@@ -769,90 +783,113 @@ calculate_union_rates <- function(
 #'   )
 #' result <- run_simulation(model, years = 10, seed = 1)
 #' calculate_immigration_rates(result, c(0, 5, 10))
+#' calculate_immigration_rates(result, c(0, 10), by = "sex")
 calculate_immigration_rates <- function(
   population,
   time_breaks,
   by = NULL,
+  streams = FALSE,
   conf_level = NULL
 ) {
   validate_rate_conf_level(conf_level)
+  check_flag(streams, "streams")
   check_analysis_population(population)
   check_population(population)
   check_demographic_breaks(time_breaks, "time_breaks")
   check_observation_end(population, tail(time_breaks, 1))
-  if (!is.null(by) && !identical(by, "birthplace")) {
+  by <- check_immigration_by(population, by)
+  if (streams && !declared_group(population, "birthplace")) {
     abort_hammel(
       c(
-        "{.arg by} must be {.code NULL} or {.val birthplace}.",
-        "x" = "It is {describe_value(by)}."
+        "{.code streams = TRUE} needs a population with immigration.",
+        "i" = "The population has no {.field birthplace} group."
       ),
-      "argument",
-      argument = "by"
+      "groups",
+      argument = "streams"
     )
   }
+  groups <- setdiff(by, "sex")
+  # Person-years by period, sex and group, from the mortality observation
+  # with one open age band.
+  exposure <- calculate_mortality_rates(
+    population, time_breaks, c(0, Inf),
+    by = if (length(groups)) groups
+  )
+  keys <- c("time_start", "time_end", by)
+  exposure <- stats::aggregate(
+    exposure["person_years"], exposure[keys],
+    FUN = sum
+  )
+  exposure <- exposure[do.call(order, unname(as.list(exposure[keys]))), ]
+  # Arrivals by period and stratum at arrival.
   persons <- population$persons
   arrival <- if ("arrival_time" %in% names(persons)) {
     persons$arrival_time
   } else {
     rep(NA_real_, nrow(persons))
   }
-  entry <- pmax(persons$birth_time, arrival, na.rm = TRUE)
-  exit <- pmin(
-    ifelse(is.na(persons$death_time), Inf, persons$death_time),
-    population$end_time
+  arrived <- which(
+    !is.na(arrival) & arrival >= time_breaks[1] &
+      arrival < tail(time_breaks, 1)
   )
   nt <- length(time_breaks) - 1L
-  lo <- utils::head(time_breaks, -1)
-  hi <- utils::tail(time_breaks, -1)
-  person_years <- vapply(
-    seq_len(nt),
-    function(t) {
-      sum(pmax(0, pmin(exit, hi[t]) - pmax(entry, lo[t])))
-    },
-    numeric(1)
-  )
-  arrived <- !is.na(arrival)
   band <- findInterval(arrival[arrived], time_breaks)
-  band[band < 1L | band > nt] <- NA_integer_
-  if (is.null(by)) {
-    result <- tibble::tibble(
-      time_start = lo,
-      time_end = hi,
-      arrivals = as.numeric(tabulate(band, nt))
-    )
-    result$person_years <- person_years
-  } else {
-    if (!declared_group(population, "birthplace")) {
-      abort_hammel(
-        c(
-          "Splitting by {.val birthplace} needs a population with immigration.",
-          "i" = "The population has no {.field birthplace} group."
-        ),
-        "groups",
-        argument = "by"
-      )
+  events <- data.frame(
+    time_start = time_breaks[band],
+    time_end = time_breaks[band + 1L]
+  )
+  for (v in by) {
+    events[[v]] <- if (v == "sex") {
+      as.character(persons$sex[arrived])
+    } else {
+      category_at_arrival(population, v, arrived, arrival[arrived])
     }
-    streams <- setdiff(
-      as.character(population$groups$birthplace$categories), "native"
-    )
-    place <- match(persons$birthplace[arrived], streams)
-    result <- tibble::tibble(
-      time_start = rep(lo, each = length(streams)),
-      time_end = rep(hi, each = length(streams)),
-      birthplace = rep(streams, times = nt)
-    )
-    counts <- table(
-      factor(band, levels = seq_len(nt)),
-      factor(place, levels = seq_along(streams))
-    )
-    result$arrivals <- as.numeric(t(counts))
-    result$person_years <- rep(person_years, each = length(streams))
   }
+  if (streams) {
+    categories <- as.character(population$groups$birthplace$categories)
+    places <- setdiff(categories, "native")
+    events$birthplace <- as.character(persons$birthplace[arrived])
+    grid <- exposure[rep(seq_len(nrow(exposure)), each = length(places)), ]
+    grid$birthplace <- rep(places, times = nrow(exposure))
+    keys <- c(keys, "birthplace")
+  } else {
+    grid <- exposure
+  }
+  key <- function(x) {
+    do.call(paste, c(lapply(x[keys], as.character), sep = "\r"))
+  }
+  stratum <- key(events)
+  counts <- table(stratum)
+  grid$arrivals <- as.numeric(counts[key(grid)])
+  grid$arrivals[is.na(grid$arrivals)] <- 0
+  # Household clumping (D194): members of a household share their arrival
+  # time and stream. Within each stratum, the dispersion is the sum of
+  # squared household sizes over the arrivals; 1 when everyone arrives
+  # alone.
+  place <- if ("birthplace" %in% names(persons)) {
+    as.character(persons$birthplace[arrived])
+  } else {
+    rep("", length(arrived))
+  }
+  party <- paste(stratum, arrival[arrived], place, sep = "\r")
+  sizes <- table(party)
+  squares <- tapply(
+    as.numeric(sizes)^2, stratum[match(names(sizes), party)], sum
+  )
+  grid$dispersion <- as.numeric(squares[key(grid)]) / grid$arrivals
+  grid$dispersion[!(grid$arrivals > 0)] <- 1
+  result <- tibble::as_tibble(
+    grid[c(keys, "arrivals", "person_years", "dispersion")]
+  )
+  rownames(result) <- NULL
   result$rate_immigration <- ifelse(
     result$person_years > 0,
     result$arrivals / result$person_years, NA_real_
   )
-  add_rate_confidence(result, "arrivals", "person_years", conf_level)
+  result <- result[c(
+    keys, "arrivals", "person_years", "rate_immigration", "dispersion"
+  )]
+  scaled_rate_confidence(result, conf_level)
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------
@@ -1466,5 +1503,97 @@ add_rate_confidence <- function(
     table$conf_low[i] <- limits[1L]
     table$conf_high[i] <- limits[2L]
   }
+  table
+}
+
+# The `by` of calculate_immigration_rates(): "sex" and declared dimensions
+# other than birthplace, which streams = TRUE splits instead.
+check_immigration_by <- function(population, by, call = rlang::caller_env()) {
+  if (is.null(by)) {
+    return(character())
+  }
+  if (!is.character(by) || !is.null(dim(by)) || anyNA(by) ||
+        anyDuplicated(by)) {
+    abort_hammel(
+      c(
+        "{.arg by} must be {.code NULL} or distinct variable names.",
+        "x" = "It is {describe_value(by)}."
+      ),
+      "argument",
+      argument = "by",
+      call = call
+    )
+  }
+  if ("birthplace" %in% by) {
+    abort_hammel(
+      c(
+        "Immigration rates can't be split by {.val birthplace} in {.arg by}.",
+        "i" = paste(
+          "Use {.code streams = TRUE} to split arrivals by stream over each",
+          "stratum's person-years."
+        )
+      ),
+      "argument",
+      argument = "by",
+      call = call
+    )
+  }
+  allowed <- c("sex", setdiff(names(population$groups), "birthplace"))
+  unknown <- setdiff(by, allowed)
+  if (length(unknown)) {
+    abort_hammel(
+      c(
+        "{.arg by} can only use {.val {allowed}}.",
+        "x" = "Unknown: {.val {unknown}}."
+      ),
+      "argument",
+      argument = "by",
+      call = call
+    )
+  }
+  by
+}
+
+# Arrivals' categories in dimension `d` at arrival: the origin of their first
+# move after arriving, or their current category if they have not moved.
+# Entry rows at the arrival time are not moves.
+category_at_arrival <- function(population, d, rows, times) {
+  persons <- population$persons
+  current <- as.character(persons[[d]][rows])
+  tx <- population$transitions
+  if (is.null(tx) || !nrow(tx)) {
+    return(current)
+  }
+  ids <- persons$person_id[rows]
+  tx <- tx[tx$group == d & tx$person_id %in% ids, , drop = FALSE]
+  at <- times[match(tx$person_id, ids)]
+  later <- tx[tx$time > at, , drop = FALSE]
+  later <- later[order(later$person_id, later$time), , drop = FALSE]
+  first <- later[!duplicated(later$person_id), , drop = FALSE]
+  current[match(first$person_id, ids)] <- as.character(first$origin)
+  current
+}
+
+# Exact Poisson intervals for immigration rates, scaled for household
+# clumping: the interval for arrivals / dispersion events over
+# person-years / dispersion, from gamma quantiles that allow non-integer
+# counts. With dispersion 1 these are poisson.test()'s exact intervals.
+scaled_rate_confidence <- function(table, conf_level) {
+  if (is.null(conf_level)) {
+    return(table)
+  }
+  alpha <- 1 - conf_level
+  phi <- table$dispersion
+  x <- table$arrivals / phi
+  exposure <- table$person_years / phi
+  observed <- table$person_years > 0
+  table$conf_low <- ifelse(
+    observed,
+    ifelse(x > 0, stats::qgamma(alpha / 2, x), 0) / exposure,
+    NA_real_
+  )
+  table$conf_high <- ifelse(
+    observed, stats::qgamma(1 - alpha / 2, x + 1) / exposure, NA_real_
+  )
   table
 }

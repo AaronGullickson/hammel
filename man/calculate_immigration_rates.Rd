@@ -8,6 +8,7 @@ calculate_immigration_rates(
   population,
   time_breaks,
   by = NULL,
+  streams = FALSE,
   conf_level = NULL
 )
 }
@@ -18,22 +19,26 @@ calculate_immigration_rates(
 \item{time_breaks}{Strictly increasing finite calendar boundaries in
 years that define the time intervals.}
 
-\item{by}{\code{NULL} (default) for the total, or \code{"birthplace"} to split
-arrivals by stream.}
+\item{by}{\code{NULL} (default), or a character vector of \code{"sex"} and declared
+group dimensions other than \code{birthplace} to stratify by.}
+
+\item{streams}{Whether to split arrivals by stream. Defaults to \code{FALSE}.}
 
 \item{conf_level}{\code{NULL} (default) for no confidence interval, or a
-confidence level between 0 and 1 for exact Poisson intervals in
-\code{conf_low} and \code{conf_high}.}
+confidence level between 0 and 1 for intervals in \code{conf_low} and
+\code{conf_high}, adjusted for household clumping as described in details.}
 }
 \value{
-A tibble with \code{time_start}, \code{time_end}, \code{birthplace} (when
-requested), \code{arrivals}, \code{person_years} and \code{rate_immigration}.
+A tibble with \code{time_start}, \code{time_end}, the \code{by} columns,
+\code{birthplace} (with \code{streams = TRUE}), \code{arrivals}, \code{person_years},
+\code{rate_immigration} and \code{dispersion}, plus \code{conf_low} and \code{conf_high}
+when \code{conf_level} is given.
 }
 \description{
 DRAFT: agent-written documentation that needs user review and editing.
 
 Calculate crude immigration rates, arrivals per person-year lived in the
-population, by time interval and optionally by stream.
+population, by time interval and optionally by sex, group and stream.
 }
 \details{
 Person-years are lived by everyone in \code{persons}: immigrants from their
@@ -42,14 +47,25 @@ population's \code{end_time}. External relatives are never counted. Arrivals
 are counted in the interval containing their \code{arrival_time}; intervals
 are half-open, inclusive at the lower bound.
 
-With \code{by = "birthplace"}, arrivals are split by stream (the immigrants'
-\code{birthplace}) over the same total person-years, so the streams' rates sum
-to the total. This is the rate a \code{rate} intensity in \code{\link[=immigration_stream]{immigration_stream()}}
-specifies.
+As in other rate calculators, \code{by} stratifies both arrivals and
+person-years: with \code{by = "region"}, the rate for a region is the arrivals
+into that region over the person-years lived there. Arrivals are
+classified by their category at arrival. \code{birthplace} can't be used in
+\code{by}; use \code{streams} instead.
 
-Confidence intervals treat arrivals as Poisson. Household streams bring
-people in groups, so their counts vary more and the intervals are too
-narrow for them.
+With \code{streams = TRUE}, each stratum's arrivals are split by stream (the
+immigrants' \code{birthplace}) over the stratum's person-years, so the streams'
+rates sum to the stratum's rate. This is the rate a \code{rate} intensity in
+\code{\link[=immigration_stream]{immigration_stream()}} specifies.
+
+Household streams bring people in groups, so arrivals vary more than a
+Poisson count. \code{dispersion} measures this in each row: the sum of squared
+household sizes over the number of arrivals, 1 when everyone arrives
+alone. Confidence intervals are exact Poisson intervals for arrivals and
+person-years both divided by \code{dispersion}, which widens them for
+household streams; members of a household are recognized by their shared
+arrival time and stream. With few households in a row, the dispersion is
+itself uncertain.
 }
 \examples{
 template <- generate_uniform_population(200)
@@ -63,6 +79,7 @@ model <- hammel_model() |>
   )
 result <- run_simulation(model, years = 10, seed = 1)
 calculate_immigration_rates(result, c(0, 5, 10))
+calculate_immigration_rates(result, c(0, 10), by = "sex")
 }
 \seealso{
 \code{\link[=immigration_stream]{immigration_stream()}}, \link{calculate_rates}

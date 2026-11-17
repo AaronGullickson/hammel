@@ -49,7 +49,7 @@ test_that("crude immigration rates recover a rate intensity", {
     rates,
     c(
       "time_start", "time_end", "arrivals", "person_years",
-      "rate_immigration", "conf_low", "conf_high"
+      "rate_immigration", "dispersion", "conf_low", "conf_high"
     )
   )
   expect_gt(rates$arrivals, 100)
@@ -99,7 +99,7 @@ test_that("streams can mix counts and rates", {
     )
   )
   result <- run_simulation(model, 10, seed = 3)
-  rates <- calculate_immigration_rates(result, c(0, 10), by = "birthplace")
+  rates <- calculate_immigration_rates(result, c(0, 10), streams = TRUE)
   expect_identical(rates$birthplace, c("counted", "scaled"))
   expect_lt(abs(rates$arrivals[1] - 200), 4 * sqrt(200))
   scaled <- rates[rates$birthplace == "scaled", ]
@@ -164,15 +164,144 @@ test_that("crude immigration rate arguments are validated", {
   rates <- calculate_immigration_rates(plain, c(0, 1))
   expect_identical(rates$arrivals, 0)
   expect_hammel_error(
-    calculate_immigration_rates(plain, c(0, 1), by = "birthplace"),
+    calculate_immigration_rates(plain, c(0, 1), streams = TRUE),
     "groups", "calculate_immigration_rates"
   )
   expect_hammel_error(
-    calculate_immigration_rates(plain, c(0, 1), by = "sex"),
+    calculate_immigration_rates(plain, c(0, 1), by = "race"),
     "argument", "calculate_immigration_rates"
   )
+  migrated <- run_simulation(
+    set_immigration(
+      static_model(10),
+      a = immigration_stream(per_year(5), rate_template(), household = NULL)
+    ),
+    1,
+    seed = 7
+  )
+  error <- expect_hammel_error(
+    calculate_immigration_rates(migrated, c(0, 1), by = "birthplace"),
+    "argument", "calculate_immigration_rates"
+  )
+  expect_identical(error$argument, "by")
   summary_text <- cli::cli_fmt(print(summary(immigration(
     a = immigration_stream(data.frame(rate = 0.01), rate_template())
   ))))
   expect_true(any(grepl("0.01 per person-year", summary_text, fixed = TRUE)))
+})
+
+test_that("immigration rates stratify arrivals and person-years together", {
+  # Arrivals settle in the north; everyone moves south at rate 0.5.
+  model <- static_model(100)
+  model$population$persons$region <- "n"
+  model <- model |>
+    set_groups(region = group(categories = c("n", "s"))) |>
+    set_group_transition(
+      data.frame(
+        origin = "n", destination = "s", age_start = 0, age_end = Inf,
+        rate = 0.5
+      ),
+      group = "region"
+    ) |>
+    set_immigration(
+      a = immigration_stream(
+        per_year(30), rate_template(),
+        assignment = list(
+          region = migrant_assignment("fixed", fixed_value = "n")
+        ),
+        household = NULL
+      )
+    )
+  result <- run_simulation(model, 4, seed = 8)
+  by_region <- calculate_immigration_rates(result, c(0, 4), by = "region")
+  total <- calculate_immigration_rates(result, c(0, 4))
+  expect_identical(by_region$region, c("n", "s"))
+  # Everyone arrives in the north, even those who have since moved south.
+  expect_gt(sum(result$persons$region[!is.na(result$persons$arrival_time)] ==
+                  "s"), 0)
+  expect_identical(by_region$arrivals, c(total$arrivals, 0))
+  expect_equal(sum(by_region$person_years), total$person_years)
+  expect_equal(
+    by_region$rate_immigration[1],
+    total$arrivals / by_region$person_years[1]
+  )
+  # By sex and stream: strata partition arrivals and person-years.
+  split <- calculate_immigration_rates(
+    result, c(0, 2, 4),
+    by = c("sex", "region"),
+    streams = TRUE
+  )
+  expect_named(
+    split,
+    c(
+      "time_start", "time_end", "sex", "region", "birthplace", "arrivals",
+      "person_years", "rate_immigration", "dispersion"
+    )
+  )
+  expect_identical(sum(split$arrivals), total$arrivals)
+  women <- split[split$sex == "f", ]
+  expect_identical(
+    sum(women$arrivals),
+    sum(result$persons$sex == "f" & !is.na(result$persons$arrival_time)) + 0
+  )
+})
+
+# A template of two-person households: a couple and a mother with a child.
+couple_template <- function() {
+  persons <- data.frame(
+    person_id = 1:4, sex = c("f", "m", "f", "m"),
+    birth_time = c(-30, -32, -35, -5), death_time = NA_real_,
+    mother_id = c(NA, NA, NA, 3), father_id = NA_integer_
+  )
+  unions <- data.frame(
+    union_id = 1, wife_id = 1, husband_id = 2, start_time = -5,
+    end_time = NA_real_, end_reason = NA_character_
+  )
+  hammel_population(persons, unions = unions, end_time = 0)
+}
+
+test_that("individual arrivals keep exact Poisson intervals", {
+  model <- set_immigration(
+    static_model(200),
+    a = immigration_stream(
+      data.frame(rate = 0.03), rate_template(),
+      household = NULL
+    )
+  )
+  result <- run_simulation(model, 5, seed = 9)
+  rates <- calculate_immigration_rates(result, c(0, 5), conf_level = 0.9)
+  expect_identical(rates$dispersion, 1)
+  exact <- stats::poisson.test(
+    rates$arrivals, rates$person_years,
+    conf.level = 0.9
+  )$conf.int
+  expect_equal(c(rates$conf_low, rates$conf_high), as.numeric(exact))
+})
+
+test_that("household arrivals widen intervals by their dispersion", {
+  model <- set_immigration(
+    static_model(300),
+    a = immigration_stream(data.frame(rate = 0.03), couple_template())
+  )
+  result <- run_simulation(model, 5, seed = 10)
+  rates <- calculate_immigration_rates(result, c(0, 5), conf_level = 0.95)
+  # Every household brings two people: dispersion 4 / 2.
+  expect_equal(rates$dispersion, 2)
+  plain <- stats::poisson.test(
+    rates$arrivals, rates$person_years,
+    conf.level = 0.95
+  )$conf.int
+  expect_gt(rates$conf_high - rates$conf_low, diff(plain))
+  # Split by sex, each household has one member in each stratum.
+  by_sex <- calculate_immigration_rates(result, c(0, 5), by = "sex")
+  expect_equal(by_sex$dispersion, c(1, 1))
+  # Across replications the adjusted 90% intervals cover the input rate.
+  covered <- vapply(1:40, function(seed) {
+    r <- calculate_immigration_rates(
+      run_simulation(model, 5, seed = 100 + seed), c(0, 5),
+      conf_level = 0.9
+    )
+    r$conf_low <= 0.03 && 0.03 <= r$conf_high
+  }, logical(1))
+  expect_gt(mean(covered), 0.75)
 })
