@@ -41,7 +41,7 @@ remain separate responsibilities. The public interface is described in
 | Topic | Current position | Record |
 | --- | --- | --- |
 | Interface | One `immigration()` process of named `immigration_stream()` components; `set_immigration()` replaces all streams | D184 |
-| Arrival flow | Absolute stochastic intensity; no controlled/exact-count option | D177 |
+| Arrival flow | Stochastic intensity as a count per year or a crude rate per destination person-year; no controlled/exact-count option | D177, D194 |
 | Origins | Multiple streams with separate intensities | D178 |
 | Source | Sample an existing population with replacement; preserve age, sex and groups; assign fresh IDs | D179 |
 | Template schedules | Support calendar-scheduled templates; truncation deferred | D180, D184 |
@@ -60,34 +60,63 @@ remain separate responsibilities. The public interface is described in
 
 ## Arrival process and streams
 
-Use an absolute arrival intensity in migrants per year (D177), rather than a
-hazard applied to residents. For individual arrivals at constant intensity
-lambda, exponential interarrival times produce a Poisson count over T years,
-with mean and variance lambda * T. An intensity of 100 implies an expected
-100 migrants in one year and a standard deviation of 10, not a guaranteed
-count. Resident population changes do not themselves change the intensity.
-Controlled/exact-count immigration is excluded.
+User decisions, November 12 and 17, 2026 (D177, D184, D194). The intensity
+tables of D194 were implemented November 17, 2026; see
+[testing](testing.md#intensity-tables-november-17-2026).
+
+**Intensity tables (D194).** A stream's `intensity` is a table, as other
+processes take rate tables, with exactly one of two value columns:
+
+- `count`: an absolute intensity in arrivals per year (D177). The stream's
+  hazard is the count, whatever the destination's size.
+- `rate`: a crude immigration rate in arrivals per person-year lived in the
+  destination. The stream's hazard at time t is the rate times N(t), the
+  number of living people in the destination, counting immigrants once they
+  have arrived and never external relatives. Arrivals, births and deaths all
+  change N(t), so arrivals feed back into later arrivals, as births do.
+
+A table with both columns or neither is an error; a stream has one kind.
+The argument keeps the name `intensity` to mark that it differs from other
+rate schedules: it has no age, sex or group strata (who arrives is decided
+by the template and weight model), and other columns are an error. A bare
+number is no longer accepted; the error points to `tibble(count = ...)`.
+
+**Calendar columns** follow D118, as for other rate tables. Without
+`time_start` and `time_end`, the value applies throughout the run. With
+them, intervals are half-open `[time_start, time_end)` in absolute calendar
+years, ends may be `Inf`, values are constant within an interval, intervals
+must not overlap and must cover the run, and an explicit zero pauses a
+stream. Boundary changes take effect before same-time events.
+
+**Arrivals as a point process.** With counts, arrivals form a
+piecewise-constant Poisson process: over a period the expected count is the
+integral of the count, so 100 per year for 2000–2010 then 50 for 2010–2020
+gives an expected 1,500 over 2000–2020, with Poisson spread. With rates,
+the expected count is the integral of rate × N(t); for a destination near
+10,000 people, a rate of 0.004 gives about 40 arrivals a year. Household
+streams convert either kind from persons to parties through E[size] (D187).
+
+**Engine.** A count stream keeps its exponential clock, redrawn at
+boundaries. A rate stream has one Exp(1) cumulative-hazard threshold: its
+hazard is constant between changes in N(t), so the engine accumulates
+rate × N × elapsed time at each change and fires the arrival when the total
+reaches the threshold, as rate cells do (D128). Exact ties keep D185's
+order, with arrivals after group transitions.
 
 Allow multiple streams (D178), potentially representing countries or world
-regions of origin, each with its own intensity and source template. Stream
-identity does not automatically become current group membership, ancestry or
-an inherited origin category. Clock organization still needs
-specification.
+regions of origin, each with its own intensity and source template.
+Streams may mix counts and rates. Controlled/exact-count immigration is
+excluded.
 
-A stream's intensity is either one non-negative number, constant over the
-run, or a rate-style tibble with `time_start`, `time_end` and an intensity
-column (name not selected), following the calendar-rate conventions of D118
-(D184). Intervals are half-open `[time_start, time_end)` in absolute
-calendar years, ends may be `Inf`, and intensity is constant within an
-interval, without interpolation. Overlapping intervals are invalid, a gap
-during the requested run is an error, and an explicit zero disables a
-stream for an interval. Boundary changes take effect before same-time
-events, as for rates. Arrivals then form a piecewise-constant Poisson
-process: over a period, the expected count is the integral of intensity,
-and an intensity of 100 per year for 2000–2010 followed by 50 for
-2010–2020 gives an expected 1,500 arrivals over 2000–2020. The table has no
-age, sex or group columns: who arrives is decided by the template and
-weight model.
+**Crude immigration rates.** `calculate_immigration_rates(population,
+time_breaks, by = NULL, conf_level = NULL)` reports, for each period,
+`arrivals`, `person_years` lived by the whole destination population
+(immigrants from arrival, everyone else from birth or the start, never
+external relatives) and `rate_immigration` = arrivals / person-years, with
+Poisson confidence intervals like the other calculators. With
+`by = "birthplace"`, arrivals are split by stream (natives have none and
+are omitted) over the same total person-years, so the streams' rates sum
+to the total, matching the crude-rate definition of `rate` intensities.
 
 ## Interface
 
@@ -97,18 +126,18 @@ model, made of named streams, following the `set_groups()` pattern:
 ```r
 model |>
   set_immigration(
-    mexico = immigration_stream(mexico_2000, intensity = 100),
+    mexico = immigration_stream(tibble(count = 100), mexico_2000),
     philippines = immigration_stream(
+      tibble(rate = 0.002),
       philippines_2000,
-      intensity = 40,
       weights = weight_model(...)
     )
   )
 ```
 
-- `immigration_stream()` describes one stream: its template (or calendar
-  schedule of templates), intensity (a number or calendar tibble) and
-  optional weight model. It is a
+- `immigration_stream(intensity, template, weights, assignment, household)`
+  describes one stream. Intensity comes first, as rates do in rate
+  processes; it is a table with a `count` or `rate` column (D194). It is a
   component, like `group()` or `matching_model()`, not a process.
 - `immigration(...)` is the process, holding named streams; argument names
   are stream names. It attaches with `set_process()` like any process.
@@ -122,10 +151,8 @@ model |>
   names identify streams in arrival records, D182 rate strata and D181
   classifications.
 
-Grouping streams in one process does not decide whether they share one clock
-with stream selection or have separate clocks. Argument names and order for
-`immigration_stream()` beyond those shown, and the non-immigrant label, are
-not selected.
+Each stream has its own clock (D185), and people who have not immigrated are
+`"native"` in the `birthplace` group (D190).
 
 ## Population templates and selection
 
@@ -793,7 +820,7 @@ The following choices are open; listing an option does not select it.
 | Classifications | Generation is user-defined (D192): a declared group with custom inheritance and migrant assignment; per-member assignment for arriving households; recency shares by generation depth await quantitative characteristics |
 | Rate strata | Personal status and stream via the `birthplace` group (D190); generation strata |
 | Observation | Settled for phase 2 (D186) |
-| Timing and interface | Remaining `immigration_stream()` and `migrant_assignment()` arguments; the non-immigrant label |
+| Timing and interface | Settled: argument order (intensity first, D194), the `"native"` label (D190) |
 
 No implementation milestone or scientific acceptance threshold is established
 here.
@@ -873,6 +900,8 @@ with a valid, nonempty source, the initial analytical and accounting cases are:
 | Phase 1 observation | No exposure, events or population count before arrival; a migrant's own birth is not a destination birth |
 | No streams | Seeded output identical to a run without the immigration code, with no arrival columns |
 | Piecewise intensity | Expected arrivals equal the integral of intensity; 100 per year for 10 years then 50 for 10 years gives 1,500 |
+| Rate intensity | With no births or deaths and individual arrivals, the destination grows as a pure-birth (Yule) process: E[N(T)] = N(0) e^(rate T); `calculate_immigration_rates()` recovers the input rate within Poisson error |
+| Intensity tables | One of `count` or `rate`; bare numbers, both, neither and extra columns are errors; D118 coverage rules apply |
 | Phase 2 import | Unions, partners and children arrive with shifted dates and fresh IDs; a child's other parent is known only when a previous partner |
 | Phase 2 derived state | Imported parity selects parity-specific fertility; imported last births keep spacing; imported widowhood selects remarriage schedules; group duration continues from the template or starts at arrival |
 | Phase 2 observation | External relatives add no counts; pre-migration unions add no union-years; entry rows are not counted as transitions |

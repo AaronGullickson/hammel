@@ -4092,3 +4092,26 @@ template person independent and gives the function the calendar time.
 
 **Supersedes:** the probability-returning, carrier-level custom contract
 of D185 and D189.
+
+## D194 — Intensity tables with counts or crude rates (November 17, 2026)
+
+**Status:** User decisions, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** A stream's `intensity` is a table with exactly one of a
+`count` column (arrivals per year, D177) or a `rate` column (arrivals per
+person-year lived by the destination's living population, immigrants
+included from arrival). Calendar columns are optional and follow D118. A
+bare number is no longer accepted. The argument stays `intensity` to mark
+that, unlike rate schedules, it has no strata.
+`calculate_immigration_rates()` reports crude immigration rates. The user
+then made `intensity` the first argument of `immigration_stream()`, as rates
+come first in rate processes:
+`immigration_stream(intensity, template, weights, assignment, household)`.
+
+**Rationale:** Counts suit known flows; rates let immigration scale with
+the destination, as in crude-rate projections. One table format with the
+column naming the kind matches other processes' rate tables.
+
+**Supersedes:** D177's restriction to absolute intensity, and the numeric
+and `intensity`-column forms of D184.

@@ -39,7 +39,7 @@ arrivals_of <- function(result) {
 }
 
 test_that("immigration processes need named, unique streams", {
-  stream <- immigration_stream(immigration_template(30), 1)
+  stream <- immigration_stream(per_year(1), immigration_template(30))
   process <- immigration(a = stream, b = stream)
   expect_s3_class(process, c("hammel_immigration", "hammel_process"))
   expect_identical(names(process$streams), c("a", "b"))
@@ -55,7 +55,7 @@ test_that("immigration processes need named, unique streams", {
 })
 
 test_that("set_immigration replaces every stream and can remove them", {
-  stream <- immigration_stream(immigration_template(30), 1)
+  stream <- immigration_stream(per_year(1), immigration_template(30))
   model <- set_immigration(hammel_model(), a = stream, b = stream)
   expect_identical(names(model$processes$immigration$streams), c("a", "b"))
   model <- set_immigration(model, c = stream)
@@ -68,38 +68,63 @@ test_that("set_immigration replaces every stream and can remove them", {
 
 test_that("stream intensities are validated", {
   template <- immigration_template(30)
+  # Bare numbers, both or neither kind, and extra rows are errors.
   expect_hammel_error(
-    immigration_stream(template, -1), "argument", "immigration_stream"
-  )
-  expect_hammel_error(
-    immigration_stream(template, c(1, 2)), "argument", "immigration_stream"
+    immigration_stream(1, template), "argument", "immigration_stream"
   )
   expect_hammel_error(
-    immigration_stream(template), "argument", "immigration_stream"
-  )
-  table <- data.frame(time_start = c(0, 5), time_end = c(5, Inf),
-                      intensity = c(1, 2))
-  expect_s3_class(
-    immigration_stream(template, table), "hammel_immigration_stream"
-  )
-  overlap <- transform(table, time_start = c(0, 4))
-  error <- expect_hammel_error(
-    immigration_stream(template, overlap), "rates", "immigration_stream"
-  )
-  expect_identical(error$rows, 1:2)
-  expect_hammel_error(
-    immigration_stream(template, transform(table, sex = "f")), "rates",
+    immigration_stream(data.frame(count = 1, rate = 1), template), "rates",
     "immigration_stream"
   )
   expect_hammel_error(
-    immigration_stream(template, transform(table, intensity = c(1, -1))),
+    immigration_stream(data.frame(intensity = 1), template), "rates",
+    "immigration_stream"
+  )
+  expect_hammel_error(
+    immigration_stream(data.frame(count = c(1, 2)), template), "rates",
+    "immigration_stream"
+  )
+  expect_hammel_error(
+    immigration_stream(data.frame(count = -1), template), "table",
+    "immigration_stream"
+  )
+  # Both arguments are required; intensity comes first.
+  error <- expect_hammel_error(
+    immigration_stream(template = template), "argument", "immigration_stream"
+  )
+  expect_identical(error$argument, "intensity")
+  error <- expect_hammel_error(
+    immigration_stream(per_year(1)), "argument", "immigration_stream"
+  )
+  expect_identical(error$argument, "template")
+  expect_s3_class(
+    immigration_stream(data.frame(rate = 0.01), template),
+    "hammel_immigration_stream"
+  )
+  table <- data.frame(time_start = c(0, 5), time_end = c(5, Inf),
+                      count = c(1, 2))
+  expect_s3_class(
+    immigration_stream(table, template), "hammel_immigration_stream"
+  )
+  overlap <- transform(table, time_start = c(0, 4))
+  error <- expect_hammel_error(
+    immigration_stream(overlap, template), "rates", "immigration_stream"
+  )
+  expect_identical(error$rows, 1:2)
+  expect_hammel_error(
+    immigration_stream(transform(table, sex = "f"), template), "rates",
+    "immigration_stream"
+  )
+  expect_hammel_error(
+    immigration_stream(transform(table, count = c(1, -1)), template),
     "table", "immigration_stream"
   )
   expect_hammel_error(
-    immigration_stream(template, table[0, ]), "rates", "immigration_stream"
+    immigration_stream(table[0, ], template), "rates", "immigration_stream"
   )
   expect_hammel_error(
-    immigration_stream(data.frame(), 1), "population", "immigration_stream"
+    immigration_stream(per_year(1), data.frame()), "population",
+    "immigration_stream"
   )
 })
 
@@ -107,7 +132,7 @@ test_that("stream weights and assignments are validated", {
   template <- immigration_template(30)
   expect_hammel_error(
     immigration_stream(
-      template, 1,
+      per_year(1), template,
       weights = weight_model(~parity, c(parity = 1))
     ),
     "specification", "immigration_stream"
@@ -117,17 +142,17 @@ test_that("stream weights and assignments are validated", {
     model = list(weight_model(~age, c(age = 1)))
   )
   expect_hammel_error(
-    immigration_stream(template, 1, weights = schedule), "specification",
-    "immigration_stream"
+    immigration_stream(per_year(1), template, weights = schedule),
+    "specification", "immigration_stream"
   )
   expect_hammel_error(
-    immigration_stream(template, 1, assignment = migrant_assignment(
+    immigration_stream(per_year(1), template, assignment = migrant_assignment(
       "fixed", fixed_value = "a"
     )),
     "specification", "immigration_stream"
   )
   expect_hammel_error(
-    immigration_stream(template, 1, assignment = list(region = 1)),
+    immigration_stream(per_year(1), template, assignment = list(region = 1)),
     "specification", "immigration_stream"
   )
 })
@@ -166,7 +191,7 @@ test_that("migrant assignments are validated", {
 test_that("arrival counts follow the stream intensity", {
   template <- immigration_template(c(20, 30, 40))
   model <- set_immigration(
-    quiet_model(), a = immigration_stream(template, intensity = 30)
+    quiet_model(), a = immigration_stream(template, intensity = per_year(30))
   )
   counts <- vapply(1:30, function(seed) {
     nrow(arrivals_of(run_simulation(model, 2, seed = seed)))
@@ -179,9 +204,9 @@ test_that("arrival counts follow the stream intensity", {
 test_that("calendar intensities apply piecewise and zero pauses a stream", {
   template <- immigration_template(c(20, 30))
   intensity <- data.frame(time_start = c(0, 2, 4), time_end = c(2, 4, Inf),
-                          intensity = c(50, 0, 10))
+                          count = c(50, 0, 10))
   model <- set_immigration(
-    quiet_model(), a = immigration_stream(template, intensity)
+    quiet_model(), a = immigration_stream(intensity, template)
   )
   times <- unlist(lapply(1:10, function(seed) {
     arrivals_of(run_simulation(model, 6, seed = seed))$arrival_time
@@ -190,10 +215,10 @@ test_that("calendar intensities apply piecewise and zero pauses a stream", {
   expect_count(sum(times < 2), 10 * 100)
   expect_count(sum(times >= 4), 10 * 20)
   gap <- data.frame(time_start = c(0, 3), time_end = c(2, Inf),
-                    intensity = 1)
+                    count = 1)
   expect_hammel_error(
     run_simulation(
-      set_immigration(quiet_model(), a = immigration_stream(template, gap)), 5
+      set_immigration(quiet_model(), a = immigration_stream(gap, template)), 5
     ),
     "coverage", "run_simulation"
   )
@@ -202,7 +227,7 @@ test_that("calendar intensities apply piecewise and zero pauses a stream", {
 test_that("migrants keep age and sex and arrive without relatives", {
   template <- immigration_template(c(25, 61), c("f", "m"))
   model <- set_immigration(
-    quiet_model(), origin = immigration_stream(template, 40)
+    quiet_model(), origin = immigration_stream(per_year(40), template)
   )
   result <- run_simulation(model, 3, seed = 4)
   arrived <- arrivals_of(result)
@@ -236,7 +261,7 @@ test_that("cloning streams draw anyone alive without their histories", {
   region <- list(region = migrant_assignment("fixed", fixed_value = "n"))
   expect_warning(
     stream <- immigration_stream(
-      template, 50,
+      per_year(50), template,
       assignment = region, household = NULL
     ),
     class = "hammel_warning_no_effect"
@@ -269,13 +294,17 @@ test_that("cloning streams draw anyone alive without their histories", {
   )
   # Templates without histories do not warn.
   expect_no_warning(
-    immigration_stream(immigration_template(30), 1, household = NULL)
+    immigration_stream(per_year(1), immigration_template(30), household = NULL)
   )
   # Nobody alive is an error before the run.
   nobody <- immigration_template(30, death_time = -1)
   expect_hammel_error(
     run_simulation(
-      set_immigration(quiet_model(), a = immigration_stream(nobody, 1)), 1
+      set_immigration(
+        quiet_model(),
+        a = immigration_stream(per_year(1), nobody)
+      ),
+      1
     ),
     "population", "run_simulation"
   )
@@ -300,7 +329,8 @@ test_that("weights select template people in proportion", {
   # In simulation, draws follow the probabilities.
   template <- immigration_template(c(20, 40))
   sim <- set_immigration(
-    quiet_model(), a = immigration_stream(template, 200, weights = model)
+    quiet_model(),
+    a = immigration_stream(per_year(200), template, weights = model)
   )
   arrived <- arrivals_of(run_simulation(sim, 5, seed = 3))
   old <- sum(round(arrived$arrival_time - arrived$birth_time) == 40)
@@ -343,7 +373,7 @@ test_that("shared groups come from the template; missing ones are assigned", {
   )
   model <- grouped_destination()
   stream <- immigration_stream(
-    template, 100,
+    per_year(100), template,
     assignment = list(region = migrant_assignment("fixed", fixed_value = "w"))
   )
   result <- run_simulation(set_immigration(model, a = stream), 1, seed = 9)
@@ -364,7 +394,7 @@ test_that("assignment probabilities are drawn per migrant", {
   )
   model <- grouped_destination()
   probability <- immigration_stream(
-    template, 300,
+    per_year(300), template,
     assignment = list(region = migrant_assignment(
       "probability", probs = c(n = 0.25, s = 0.75)
     ))
@@ -376,7 +406,7 @@ test_that("assignment probabilities are drawn per migrant", {
   expect_false(any(arrived$region == "w"))
   expect_lt(abs(sum(arrived$region == "s") - 0.75 * n), 4 * sqrt(n * 0.1875))
   custom <- immigration_stream(
-    template, 300,
+    per_year(300), template,
     assignment = list(region = migrant_assignment(
       "custom", fun = function(members) {
         ifelse(members$age < 40, "n", "w")
@@ -405,7 +435,9 @@ test_that("template ancestry is copied where the template tracks it", {
     race = group(categories = c("A", "B"))
   )
   result <- run_simulation(
-    set_immigration(model, a = immigration_stream(template, 100)), 1, seed = 2
+    set_immigration(model, a = immigration_stream(per_year(100), template)),
+    1,
+    seed = 2
   )
   arrived <- arrivals_of(result)
   shares <- result$ancestry$region
@@ -419,7 +451,9 @@ test_that("template ancestry is copied where the template tracks it", {
     groups = list(region = group(), race = race_group())
   )
   result <- run_simulation(
-    set_immigration(model, a = immigration_stream(plain, 100)), 1, seed = 2
+    set_immigration(model, a = immigration_stream(per_year(100), plain)),
+    1,
+    seed = 2
   )
   arrived <- arrivals_of(result)
   shares <- result$ancestry$region
@@ -435,18 +469,22 @@ test_that("group compatibility errors name the problem", {
                                   groups = list(race = race_group()))
   error <- expect_hammel_error(
     run_simulation(
-      set_immigration(model, a = immigration_stream(lacking, 1)), 1
+      set_immigration(
+        model,
+        a = immigration_stream(per_year(1), lacking)
+      ),
+      1
     ),
     "specification", "run_simulation"
   )
   expect_identical(error$group, "region")
   overriding <- immigration_stream(
+    per_year(1),
     immigration_template(30, race = "A", region = "n",
                          groups = list(
                            race = race_group(),
                            region = group(categories = c("n", "s", "w"))
                          )),
-    1,
     assignment = list(region = migrant_assignment("fixed", fixed_value = "n"))
   )
   error <- expect_hammel_error(
@@ -459,7 +497,7 @@ test_that("group compatibility errors name the problem", {
     region = "n"
   )
   stream <- immigration_stream(
-    mismatch, 1,
+    per_year(1), mismatch,
     assignment = list(region = migrant_assignment("fixed", fixed_value = "n"))
   )
   error <- expect_hammel_error(
@@ -468,8 +506,8 @@ test_that("group compatibility errors name the problem", {
   )
   expect_identical(error$group, "race")
   unknown_category <- immigration_stream(
+    per_year(1),
     immigration_template(30, race = "A", groups = list(race = race_group())),
-    1,
     assignment = list(region = migrant_assignment("fixed", fixed_value = "e"))
   )
   expect_hammel_error(
@@ -481,7 +519,7 @@ test_that("group compatibility errors name the problem", {
 test_that("observation starts at arrival", {
   template <- immigration_template(30, "f")
   model <- set_immigration(
-    quiet_model(death_rate = 0), a = immigration_stream(template, 20)
+    quiet_model(death_rate = 0), a = immigration_stream(per_year(20), template)
   )
   result <- run_simulation(model, 4, seed = 5)
   arrived <- arrivals_of(result)
@@ -513,7 +551,10 @@ test_that("population change is arrivals plus births minus deaths", {
   model <- make_model(300, birth_rate = 0.2, death_rate = 0.05)
   model$population$persons$sex[1:150] <- "f"
   template <- immigration_template(c(20, 25, 70), c("f", "m", "m"))
-  model <- set_immigration(model, a = immigration_stream(template, 25))
+  model <- set_immigration(
+    model,
+    a = immigration_stream(per_year(25), template)
+  )
   result <- run_simulation(model, 8, seed = 21)
   persons <- result$persons
   living <- sum(is.na(persons$death_time))
@@ -530,7 +571,8 @@ test_that("a constant death rate is recovered from migrants' exposure", {
   # would understate it badly.
   template <- immigration_template(60, "m")
   model <- set_immigration(
-    quiet_model(death_rate = 0.2), a = immigration_stream(template, 100)
+    quiet_model(death_rate = 0.2),
+    a = immigration_stream(per_year(100), template)
   )
   result <- run_simulation(model, 5, seed = 8)
   rates <- calculate_mortality_rates(
@@ -549,7 +591,7 @@ test_that("arrival columns appear only with immigration and survive restarts", {
     any(c("arrival_time", "birthplace") %in% names(plain$persons))
   )
   migrating <- set_immigration(
-    model, a = immigration_stream(immigration_template(30), 20)
+    model, a = immigration_stream(per_year(20), immigration_template(30))
   )
   none <- run_simulation(migrating, 0)
   expect_true(all(c("arrival_time", "birthplace") %in% names(none$persons)))
@@ -567,7 +609,10 @@ test_that("models without streams are unchanged", {
   model$population$persons$sex[1:100] <- "f"
   a <- run_simulation(model, 10, seed = 11)
   removed <- set_immigration(
-    set_immigration(model, a = immigration_stream(immigration_template(30), 5))
+    set_immigration(
+      model,
+      a = immigration_stream(per_year(5), immigration_template(30))
+    )
   )
   b <- run_simulation(removed, 10, seed = 11)
   expect_identical(a, b)
@@ -576,7 +621,8 @@ test_that("models without streams are unchanged", {
 test_that("arrival records are validated in populations", {
   result <- run_simulation(
     set_immigration(
-      quiet_model(), a = immigration_stream(immigration_template(30), 20)
+      quiet_model(),
+      a = immigration_stream(per_year(20), immigration_template(30))
     ),
     1, seed = 1
   )
@@ -601,23 +647,26 @@ test_that("arrival records are validated in populations", {
 test_that("immigration summaries describe each stream", {
   template <- immigration_template(c(20, 30))
   process <- immigration(
-    a = immigration_stream(template, 5),
+    a = immigration_stream(per_year(5), template),
     b = immigration_stream(
+      data.frame(time_start = 0, time_end = Inf, count = 2),
       template,
-      data.frame(time_start = 0, time_end = Inf, intensity = 2),
       weights = weight_model(~age, c(age = 0.1))
     )
   )
   x <- summary(process)
   expect_s3_class(x, "summary.hammel_immigration")
   expect_identical(x$streams$a$eligible, 2L)
-  expect_identical(x$streams$a$intensity, 5)
+  expect_identical(x$streams$a$intensity, tibble::tibble(count = 5))
   expect_s3_class(x$streams$b$intensity, "tbl_df")
   text <- cli::cli_fmt(value <- print(x))
   expect_identical(value, x)
   expect_true(any(grepl("Immigration process", text, fixed = TRUE)))
   expect_true(any(grepl("Stream: b", text, fixed = TRUE)))
-  expect_true(any(grepl("2 per year in [0, Inf)", text, fixed = TRUE)))
+  expect_true(any(grepl("5 arrivals per year", text, fixed = TRUE)))
+  expect_true(
+    any(grepl("2 arrivals per year in [0, Inf)", text, fixed = TRUE))
+  )
   model <- set_process(quiet_model(), process)
   text <- cli::cli_fmt(print(summary(model)))
   expect_true(any(grepl("Immigration process", text, fixed = TRUE)))
@@ -627,8 +676,8 @@ test_that("population summaries count immigrants by stream", {
   template <- immigration_template(c(30, 40))
   model <- set_immigration(
     quiet_model(),
-    b = immigration_stream(template, 10),
-    a = immigration_stream(template, 20)
+    b = immigration_stream(per_year(10), template),
+    a = immigration_stream(per_year(20), template)
   )
   result <- run_simulation(model, 2, seed = 3)
   s <- summary(result)

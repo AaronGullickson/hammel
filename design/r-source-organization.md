@@ -100,7 +100,7 @@ Observe population counts at specified instants.
 
 Calculate observed event rates from counts and exposure; retain calculator-specific helpers.
 
-- Functions: **`calculate_mortality_rates()`**, `person_rate_rows()`, **`calculate_fertility_rates()`**, `add_unrealized_births()`, `person_breaks()`, `check_demographic_breaks()`, **`calculate_cohab_convert_rate()`**, **`calculate_dissolution_rates()`**, **`calculate_marriage_rates()`**, **`calculate_transition_rates()`**, **`calculate_union_rates()`**, `calculate_entry_rates()`, `prepare_union_group_observations()`, `run_person_lexis()`, `order_rows_keep()`, `band_dim()`, `union_strata()`, `encode_combined()`, `validate_rate_conf_level()`, `add_rate_confidence()`.
+- Functions: **`calculate_mortality_rates()`**, `person_rate_rows()`, **`calculate_fertility_rates()`**, `add_unrealized_births()`, `person_breaks()`, `check_demographic_breaks()`, **`calculate_cohab_convert_rate()`**, **`calculate_dissolution_rates()`**, **`calculate_marriage_rates()`**, **`calculate_transition_rates()`**, **`calculate_immigration_rates()`**, **`calculate_union_rates()`**, `calculate_entry_rates()`, `prepare_union_group_observations()`, `run_person_lexis()`, `order_rows_keep()`, `band_dim()`, `union_strata()`, `encode_combined()`, `validate_rate_conf_level()`, `add_rate_confidence()`.
 
 ### `R/calculate_tfr.R`
 

@@ -25,7 +25,7 @@ stream holding
 \code{template_size} (persons in the template), \code{eligible} (households, or for
 cloning streams template people, that can be drawn), \code{household} (the
 household rule's \code{age_independence}, or \code{NULL} for cloning streams),
-\code{intensity} (a number, or a tibble of calendar intervals),
+\code{intensity} (a tibble with a \code{count} or \code{rate} column),
 \code{weights} (a weight model summary, or \code{NULL} for uniform draws) and
 \code{assignment} (the method assigning each group dimension, named by
 dimension).
@@ -37,7 +37,9 @@ Summary method for class \code{"hammel_immigration"}
 }
 \examples{
 process <- immigration(
-  origin = immigration_stream(generate_uniform_population(100), 10)
+  origin = immigration_stream(
+    data.frame(count = 10), generate_uniform_population(100)
+  )
 )
 summary(process)
 }

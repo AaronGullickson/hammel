@@ -49,7 +49,7 @@ household_stream <- function(
   ...
 ) {
   immigration_stream(
-    template, intensity,
+    per_year(intensity), template,
     weights = if (!is.null(carrier)) only_carrier(carrier),
     household = household(),
     ...
@@ -247,7 +247,7 @@ test_that("intensity counts people and households arrive in proportion", {
     ifelse(members$person_id == 1, log(3), 0)
   })
   stream <- immigration_stream(
-    template, 90,
+    per_year(90), template,
     weights = weights, household = household()
   )
   prepared <- prepare_immigration(
@@ -403,7 +403,7 @@ test_that("households persist through restarts", {
 
 test_that("household rules are validated", {
   expect_hammel_error(
-    immigration_stream(household_template(), 1, household = 18),
+    immigration_stream(per_year(1), household_template(), household = 18),
     "specification", "immigration_stream"
   )
   process <- immigration(a = household_stream(carrier = NULL))
@@ -426,7 +426,10 @@ test_that("household variables describe each carrier's household", {
     seen <<- members
     rep(0, nrow(members))
   })
-  stream <- immigration_stream(household_template(), 10, weights = weights)
+  stream <- immigration_stream(
+    per_year(10), household_template(),
+    weights = weights
+  )
   party_probabilities(stream)
   # Carriers 1 (married to 2, three dependents), 8, 9 (one child) and 11.
   expect_identical(seen$person_id, c(1L, 8L, 9L, 11L))
@@ -440,7 +443,7 @@ test_that("formula weights use household variables", {
   template <- household_template()
   stream <- function(formula, coefficients) {
     immigration_stream(
-      template, 10,
+      per_year(10), template,
       weights = weight_model(formula, coefficients)
     )
   }
@@ -476,7 +479,7 @@ test_that("custom assignment sees household variables", {
     set_groups(region = group(categories = c("n", "s"))) |>
     set_immigration(
       a = immigration_stream(
-        household_template(), 60,
+        per_year(60), household_template(),
         assignment = list(region = rule)
       )
     )
@@ -492,7 +495,7 @@ test_that("cloning streams can't weight by household variables", {
   template <- generate_uniform_population(20)
   expect_hammel_error(
     immigration_stream(
-      template, 1,
+      per_year(1), template,
       weights = weight_model(~partnered, c(partnered = 1)),
       household = NULL
     ),
@@ -533,7 +536,7 @@ generation_model <- function(rule, template = household_template(), ...) {
     set_groups(generation = group(categories = c("1", "1.5", "2", "3+"))) |>
     set_immigration(
       a = immigration_stream(
-        template, 60,
+        per_year(60), template,
         assignment = list(generation = rule), ...
       )
     )

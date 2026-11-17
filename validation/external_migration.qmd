@@ -266,9 +266,22 @@ pop_latino_template <- run_simulation(model_latino_template, 100, 42, progress =
 summary(pop_latino_template)
 ```
 
-Ok, now lets add the migration streams.
+Ok, now lets add the migration streams. we will gradually ramp up rates in decade intervals until we hit 30 years at which point they will remain constant.apply steady rates for the first 50 years of the simulation and then cut them off
 
 ```{r}
+
+rate_immig_asia <- tribble(
+  ~time_start, ~time_end, ~rate,
+  0,           10,        0.00034,
+  10,          20,        0.00045,
+  20,          30,        0.00057, 
+  30,          Inf,       0.00068
+)
+
+# latin american rates will be 4x asian rates
+rate_immig_la <- rate_immig_asia |>
+  mutate(rate = rate * 4)
+
 
 # custom weight model to highly select working age pop
 migrant_selection_fun <- weight_model(fun = function(members, bin) {
@@ -283,10 +296,9 @@ migrant_selection_fun <- weight_model(fun = function(members, bin) {
 
 model <- model |>
   set_immigration(
-    birthplace_ancestry = TRUE,
     asia = immigration_stream(
+      rate_immig_asia,
       pop_asian_template,
-      intensity = 200,
       assignment = list(
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.3, "MW" = 0.15, "S" = 0.15, "W" = 0.4)
@@ -297,8 +309,8 @@ model <- model |>
       weights = migrant_selection_fun
     ),
     latin_america = immigration_stream(
+      rate_immig_la,
       pop_latino_template,
-      intensity = 600,
       assignment = list(
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.25, "MW" = 0.2, "S" = 0.2, "W" = 0.35)
@@ -307,7 +319,8 @@ model <- model |>
       ),
       household = household(),
       weights = migrant_selection_fun
-    )
+    ),
+    birthplace_ancestry = TRUE
   ) |>
   # redo union formation for new exogamy
   set_union_formation(
@@ -328,17 +341,7 @@ summary(pop_end)
 
 ```{r}
 
-# get flows
-pop_end$persons |>
-  filter(!is.na(arrival_time)) |>
-  mutate(arrival_year = floor(arrival_time)) |>
-  count(birthplace, arrival_year) |>
-  #pivot_wider(id_cols = arrival_year, names_from = stream, values_from = n) |>
-  ggplot(aes(x = arrival_year, y = n, color = birthplace))+
-  geom_line()+
-  geom_hline(yintercept = c(200, 600), linetype = 2)+
-  scale_y_continuous(limits = c(0, NA))
-
+calculate_immigration_rates(pop_end, c(0, 10, 20, 30))
 ```
 
 
@@ -370,6 +373,14 @@ pop_end |>
   geom_line(data = usa_2000_mortality, aes(y = rate), linetype = 2, color = "red")+
   facet_wrap(~sex)+
   scale_y_log10()
+```
+
+```{r}
+
+pop_end |>
+  calculate_population_size(seq(0, 50, 5), by = "generation") |>
+  ggplot(aes(x = time, y = population, fill = generation))+
+  geom_area()
 ```
 
 ```{r}

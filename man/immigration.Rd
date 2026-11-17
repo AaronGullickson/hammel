@@ -88,7 +88,9 @@ model <- hammel_model() |>
   set_mortality(usa_2000_mortality) |>
   set_fertility(usa_2000_fertility) |>
   set_union_formation("on_demand") |>
-  set_immigration(origin = immigration_stream(template, intensity = 20))
+  set_immigration(
+    origin = immigration_stream(data.frame(count = 20), template)
+  )
 result <- run_simulation(model, years = 10, seed = 1)
 table(result$persons$birthplace)
 }

@@ -19,8 +19,8 @@ birthplace_template <- function() {
 test_that("birthplace is native for the born and the stream for arrivals", {
   model <- birthplace_model(birth_rate = 1) |>
     set_immigration(
-      asia = immigration_stream(birthplace_template(), 10),
-      latam = immigration_stream(birthplace_template(), 10)
+      asia = immigration_stream(per_year(10), birthplace_template()),
+      latam = immigration_stream(per_year(10), birthplace_template())
     )
   result <- run_simulation(model, 5, seed = 1)
   persons <- result$persons
@@ -43,7 +43,7 @@ test_that("birthplace is native for the born and the stream for arrivals", {
 test_that("birthplace ancestry is opt-in and passes to descendants", {
   model <- birthplace_model(birth_rate = 1) |>
     set_immigration(
-      asia = immigration_stream(birthplace_template(), 10),
+      asia = immigration_stream(per_year(10), birthplace_template()),
       birthplace_ancestry = TRUE
     )
   result <- run_simulation(model, 5, seed = 2)
@@ -67,7 +67,7 @@ test_that("birthplace ancestry is opt-in and passes to descendants", {
   expect_equal(child$asia[!known], mother$asia[!known] / 2)
   expect_equal(child$unknown[!known], rep(0.5, sum(!known)))
   expect_true(summary(immigration(
-    a = immigration_stream(birthplace_template(), 1),
+    a = immigration_stream(per_year(1), birthplace_template()),
     birthplace_ancestry = TRUE
   ))$birthplace_ancestry)
 })
@@ -76,14 +76,14 @@ test_that("a template's own birthplace is ignored", {
   first <- run_simulation(
     set_immigration(
       birthplace_model(),
-      asia = immigration_stream(birthplace_template(), 10)
+      asia = immigration_stream(per_year(10), birthplace_template())
     ),
     2, seed = 3
   )
   # Drawn from a template whose people are native or from asia.
   # Its entry rows are transitions that clones leave behind.
   expect_warning(
-    stream <- immigration_stream(first, 20, household = NULL),
+    stream <- immigration_stream(per_year(20), first, household = NULL),
     class = "hammel_warning_no_effect"
   )
   model <- set_immigration(birthplace_model(), europe = stream)
@@ -98,7 +98,8 @@ test_that("a template's own birthplace is ignored", {
 
 test_that("birthplace persists through restarts and supplied values", {
   model <- set_immigration(
-    birthplace_model(), asia = immigration_stream(birthplace_template(), 10)
+    birthplace_model(),
+    asia = immigration_stream(per_year(10), birthplace_template())
   )
   first <- run_simulation(model, 2, seed = 5)
   # Without immigration, the dimension and its records continue.
@@ -109,7 +110,7 @@ test_that("birthplace persists through restarts and supplied values", {
   # A new stream adds its category; earlier ones stay.
   again <- set_immigration(
     set_population(birthplace_model(), first),
-    latam = immigration_stream(birthplace_template(), 10)
+    latam = immigration_stream(per_year(10), birthplace_template())
   )
   second <- run_simulation(again, 2, seed = 7)
   expect_identical(
@@ -119,7 +120,7 @@ test_that("birthplace persists through restarts and supplied values", {
   supplied <- birthplace_model()
   supplied$population$persons$birthplace <- rep(c("native", "asia"), 10)
   supplied <- set_immigration(
-    supplied, latam = immigration_stream(birthplace_template(), 5)
+    supplied, latam = immigration_stream(per_year(5), birthplace_template())
   )
   result <- run_simulation(supplied, 1, seed = 8)
   expect_identical(
@@ -137,7 +138,9 @@ test_that("rates can be stratified by birthplace", {
     birthplace = c("native", "asia"), rate = c(0, 2)
   )
   model <- birthplace_model() |>
-    set_immigration(asia = immigration_stream(birthplace_template(), 20)) |>
+    set_immigration(
+      asia = immigration_stream(per_year(20), birthplace_template())
+    ) |>
     set_mortality(mortality)
   result <- run_simulation(model, 3, seed = 9)
   dead <- result$persons[!is.na(result$persons$death_time), ]
@@ -157,7 +160,7 @@ test_that("birthplace never becomes the only dimension", {
     set_groups(race = group(categories = c("A", "B"))) |>
     set_immigration(
       asia = immigration_stream(
-        birthplace_template(), 10,
+        per_year(10), birthplace_template(),
         assignment = list(race = migrant_assignment("fixed", fixed_value = "A"))
       )
     ) |>
@@ -195,15 +198,18 @@ test_that("birthplace never becomes the only dimension", {
 test_that("birthplace names and settings are validated", {
   template <- birthplace_template()
   expect_hammel_error(
-    immigration(native = immigration_stream(template, 1)),
+    immigration(native = immigration_stream(per_year(1), template)),
     "specification", "immigration"
   )
   expect_hammel_error(
-    immigration(a = immigration_stream(template, 1), birthplace_ancestry = 1),
+    immigration(
+      a = immigration_stream(per_year(1), template),
+      birthplace_ancestry = 1
+    ),
     "argument", "immigration"
   )
   stream <- immigration_stream(
-    template, 1,
+    per_year(1), template,
     assignment = list(
       birthplace = migrant_assignment("fixed", fixed_value = "x")
     )
@@ -216,7 +222,7 @@ test_that("birthplace names and settings are validated", {
   model$population$persons$birthplace <- "native"
   model <- model |>
     set_groups(birthplace = group()) |>
-    set_immigration(a = immigration_stream(template, 1))
+    set_immigration(a = immigration_stream(per_year(1), template))
   expect_hammel_error(run_simulation(model, 1), "groups", "run_simulation")
 })
 
@@ -227,7 +233,7 @@ test_that("redeclaring groups keeps birthplace", {
     set_groups(race = group(categories = "A", ancestry = TRUE)) |>
     set_immigration(
       asia = immigration_stream(
-        birthplace_template(), 10,
+        per_year(10), birthplace_template(),
         assignment = list(race = migrant_assignment("fixed", fixed_value = "A"))
       ),
       birthplace_ancestry = TRUE

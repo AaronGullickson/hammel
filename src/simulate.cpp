@@ -282,6 +282,11 @@ struct ImmigrationStream {
   NumericMatrix ancestry, since_entry;
   List assignment;
   double next = R_PosInf;
+  // A crude-rate stream (D194): its hazard is `rate` per living person, and
+  // it arrives when the hazard `used` since its last draw reaches
+  // `threshold`; `since` is when `used` was last brought up to date.
+  bool per_person = false;
+  double rate = 0, threshold = 0, used = 0, since = 0;
 };
 
 // The strata of each non-fertility process from the active schedules.
@@ -488,6 +493,8 @@ class Simulation {
   void on_birth(int i, double now);
   void on_arrival(int k, double now);
   void draw_arrival(ImmigrationStream& stream, double now);
+  void schedule_rate_arrival(ImmigrationStream& stream, double now);
+  void population_change(int delta, double now);
   void append_ancestry(int child, int mother, int father);
   int newborn_category(
     int d,
@@ -638,6 +645,9 @@ class Simulation {
   std::vector<double> arrival_union;
   std::vector<int> arrival_union_row, arrival_union_party;
   int party_count = 0;
+  // Living destination people, for crude-rate streams (D194).
+  bool any_rate_stream = false;
+  double living = 0;
 
   // Unrealized births: (period, group, union type, parity start/end, age
   // start/end) -> count.
@@ -859,6 +869,11 @@ Simulation::Simulation(
   }
   collect_sources();
   // Arrival clocks draw last, so runs without immigration draw nothing more.
+  for (const Person& p : people) {
+    if (NumericVector::is_na(p.died)) {
+      ++living;
+    }
+  }
   for (auto& stream : streams) {
     draw_arrival(stream, start);
   }
@@ -1299,6 +1314,8 @@ void Simulation::read_immigration(Nullable<List> immigration_input) {
     stream.union_since = x["union_since"];
     stream.union_cohab = x["union_cohab"];
     stream.union_row = x["union_row"];
+    stream.per_person = as<bool>(x["per_person"]);
+    any_rate_stream = any_rate_stream || stream.per_person;
     for (size_t j = 0; j < stream.time_start.size(); ++j) {
       add_calendar_time(stream.time_start[j]);
       add_calendar_time(stream.time_end[j]);
@@ -3090,6 +3107,7 @@ void Simulation::on_transition(int i, int slot, double now) {
 // Retain the person's history, record death, widow any partner, and leave
 // every process.
 void Simulation::on_death(int i, double now) {
+  population_change(-1, now);
   people[i].died = now;
   std::vector<int> widowed, ended;
   for (int u : person_unions[i]) {
@@ -3274,6 +3292,7 @@ void Simulation::on_birth(int i, double now) {
     tp.entry.push_back(now);
   }
   ++birth_count;
+  population_change(1, now);
   // The newborn enters its cells; the mother's spacing (and possibly her
   // union state, in on-demand mode) has changed.
   refresh_person(child, now);
@@ -3461,10 +3480,13 @@ void Simulation::on_arrival(int k, double now) {
   for (int i = base; i < base + size; ++i) {
     refresh_person(i, now);
   }
+  population_change(size, now);
   draw_arrival(stream, now);
 }
 
 // The stream's next arrival under its intensity at now; none while zero.
+// A count stream's hazard is constant; a crude-rate stream (D194) draws a
+// cumulative-hazard threshold and schedules from the living population.
 void Simulation::draw_arrival(ImmigrationStream& stream, double now) {
   double rate = 0;
   for (size_t j = 0; j < stream.intensity.size(); ++j) {
@@ -3473,7 +3495,45 @@ void Simulation::draw_arrival(ImmigrationStream& stream, double now) {
       break;
     }
   }
-  stream.next = rate > 0 ? now + draw_threshold() / rate : R_PosInf;
+  if (!stream.per_person) {
+    stream.next = rate > 0 ? now + draw_threshold() / rate : R_PosInf;
+    return;
+  }
+  stream.rate = rate;
+  stream.threshold = rate > 0 ? draw_threshold() : 0;
+  stream.used = 0;
+  stream.since = now;
+  schedule_rate_arrival(stream, now);
+}
+
+// A crude-rate stream's next arrival at its current hazard, rate x living.
+void Simulation::schedule_rate_arrival(ImmigrationStream& stream, double now) {
+  const double hazard = stream.rate * living;
+  // Rounding can leave `used` just past the threshold; never schedule in
+  // the past.
+  const double remaining = std::max(0.0, stream.threshold - stream.used);
+  stream.next = hazard > 0 ? now + remaining / hazard : R_PosInf;
+}
+
+// The living population changes by `delta` at now (D194): crude-rate streams
+// add the hazard accumulated at the old size, then reschedule at the new.
+void Simulation::population_change(int delta, double now) {
+  if (any_rate_stream) {
+    for (auto& stream : streams) {
+      if (stream.per_person) {
+        stream.used += stream.rate * living * (now - stream.since);
+        stream.since = now;
+      }
+    }
+  }
+  living += delta;
+  if (any_rate_stream) {
+    for (auto& stream : streams) {
+      if (stream.per_person) {
+        schedule_rate_arrival(stream, now);
+      }
+    }
+  }
 }
 
 // A newborn's ancestry is the average of the parents'. A missing father

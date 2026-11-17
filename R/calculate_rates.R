@@ -718,6 +718,143 @@ calculate_union_rates <- function(
   )
 }
 
+#' Calculate crude immigration rates
+#'
+#' @description
+#'
+#' DRAFT: agent-written documentation that needs user review and editing.
+#'
+#' Calculate crude immigration rates, arrivals per person-year lived in the
+#' population, by time interval and optionally by stream.
+#'
+#' @details
+#'
+#' Person-years are lived by everyone in `persons`: immigrants from their
+#' arrival, everyone else from birth, and no one after death or the
+#' population's `end_time`. External relatives are never counted. Arrivals
+#' are counted in the interval containing their `arrival_time`; intervals
+#' are half-open, inclusive at the lower bound.
+#'
+#' With `by = "birthplace"`, arrivals are split by stream (the immigrants'
+#' `birthplace`) over the same total person-years, so the streams' rates sum
+#' to the total. This is the rate a `rate` intensity in [immigration_stream()]
+#' specifies.
+#'
+#' Confidence intervals treat arrivals as Poisson. Household streams bring
+#' people in groups, so their counts vary more and the intervals are too
+#' narrow for them.
+#'
+#' @param population A `hammel_population` object returned from
+#'   [run_simulation()].
+#' @param time_breaks Strictly increasing finite calendar boundaries in
+#'   years that define the time intervals.
+#' @param by `NULL` (default) for the total, or `"birthplace"` to split
+#'   arrivals by stream.
+#' @param conf_level `NULL` (default) for no confidence interval, or a
+#'   confidence level between 0 and 1 for exact Poisson intervals in
+#'   `conf_low` and `conf_high`.
+#' @return A tibble with `time_start`, `time_end`, `birthplace` (when
+#'   requested), `arrivals`, `person_years` and `rate_immigration`.
+#' @seealso [immigration_stream()], [calculate_rates]
+#' @export
+#' @examples
+#' template <- generate_uniform_population(200)
+#' model <- hammel_model() |>
+#'   set_population(generate_uniform_population(1000)) |>
+#'   set_mortality(usa_2000_mortality) |>
+#'   set_fertility(usa_2000_fertility) |>
+#'   set_union_formation("on_demand") |>
+#'   set_immigration(
+#'     origin = immigration_stream(data.frame(rate = 0.01), template)
+#'   )
+#' result <- run_simulation(model, years = 10, seed = 1)
+#' calculate_immigration_rates(result, c(0, 5, 10))
+calculate_immigration_rates <- function(
+  population,
+  time_breaks,
+  by = NULL,
+  conf_level = NULL
+) {
+  validate_rate_conf_level(conf_level)
+  check_analysis_population(population)
+  check_population(population)
+  check_demographic_breaks(time_breaks, "time_breaks")
+  check_observation_end(population, tail(time_breaks, 1))
+  if (!is.null(by) && !identical(by, "birthplace")) {
+    abort_hammel(
+      c(
+        "{.arg by} must be {.code NULL} or {.val birthplace}.",
+        "x" = "It is {describe_value(by)}."
+      ),
+      "argument",
+      argument = "by"
+    )
+  }
+  persons <- population$persons
+  arrival <- if ("arrival_time" %in% names(persons)) {
+    persons$arrival_time
+  } else {
+    rep(NA_real_, nrow(persons))
+  }
+  entry <- pmax(persons$birth_time, arrival, na.rm = TRUE)
+  exit <- pmin(
+    ifelse(is.na(persons$death_time), Inf, persons$death_time),
+    population$end_time
+  )
+  nt <- length(time_breaks) - 1L
+  lo <- utils::head(time_breaks, -1)
+  hi <- utils::tail(time_breaks, -1)
+  person_years <- vapply(
+    seq_len(nt),
+    function(t) {
+      sum(pmax(0, pmin(exit, hi[t]) - pmax(entry, lo[t])))
+    },
+    numeric(1)
+  )
+  arrived <- !is.na(arrival)
+  band <- findInterval(arrival[arrived], time_breaks)
+  band[band < 1L | band > nt] <- NA_integer_
+  if (is.null(by)) {
+    result <- tibble::tibble(
+      time_start = lo,
+      time_end = hi,
+      arrivals = as.numeric(tabulate(band, nt))
+    )
+    result$person_years <- person_years
+  } else {
+    if (!declared_group(population, "birthplace")) {
+      abort_hammel(
+        c(
+          "Splitting by {.val birthplace} needs a population with immigration.",
+          "i" = "The population has no {.field birthplace} group."
+        ),
+        "groups",
+        argument = "by"
+      )
+    }
+    streams <- setdiff(
+      as.character(population$groups$birthplace$categories), "native"
+    )
+    place <- match(persons$birthplace[arrived], streams)
+    result <- tibble::tibble(
+      time_start = rep(lo, each = length(streams)),
+      time_end = rep(hi, each = length(streams)),
+      birthplace = rep(streams, times = nt)
+    )
+    counts <- table(
+      factor(band, levels = seq_len(nt)),
+      factor(place, levels = seq_along(streams))
+    )
+    result$arrivals <- as.numeric(t(counts))
+    result$person_years <- rep(person_years, each = length(streams))
+  }
+  result$rate_immigration <- ifelse(
+    result$person_years > 0,
+    result$arrivals / result$person_years, NA_real_
+  )
+  add_rate_confidence(result, "arrivals", "person_years", conf_level)
+}
+
 # HELPER FUNCTIONS ---------------------------------------------------------
 
 # Observed event rates and their rate-specific calculation helpers.

@@ -591,3 +591,10 @@ A `"custom"` migrant assignment (D193) is an R closure the engine calls at
 each arrival with the arriving members' rows, the arrival time and a
 household number, saving and restoring R's RNG state around the call as for
 custom inheritance; it returns one category code per member.
+
+Intensity tables (D194) carry a `count` or a `rate` column. Count streams
+keep an exponential clock; rate streams hold a cumulative-hazard threshold,
+and every change in the living population (births, deaths, arrivals) adds
+rate × N × elapsed time to each rate stream's used hazard and reschedules
+it. `calculate_immigration_rates()` divides arrivals by the person-years of
+the whole population.

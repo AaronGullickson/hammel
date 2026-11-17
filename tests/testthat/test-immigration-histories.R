@@ -39,7 +39,7 @@ only_first <- function() {
 
 history_stream <- function(template = history_template(), intensity = 5, ...) {
   immigration_stream(
-    template, intensity,
+    per_year(intensity), template,
     weights = only_first(), household = alone(), ...
   )
 }
@@ -147,7 +147,11 @@ test_that("imported previous unions select remarriage schedules", {
   })
   model <- set_immigration(
     model,
-    a = immigration_stream(template, 5, weights = weights, household = alone())
+    a = immigration_stream(
+      per_year(5), template,
+      weights = weights,
+      household = alone()
+    )
   )
   result <- run_simulation(model, 4, seed = 4)
   arrived <- result$persons[!is.na(result$persons$arrival_time), ]
@@ -317,7 +321,11 @@ test_that("template external relatives are flattened with their censor times", {
   })
   again <- set_immigration(
     make_model(10),
-    b = immigration_stream(first, 3, weights = weights, household = alone())
+    b = immigration_stream(
+      per_year(3), first,
+      weights = weights,
+      household = alone()
+    )
   )
   second <- run_simulation(again, 1, seed = 11)
   q <- first_arrival(second)

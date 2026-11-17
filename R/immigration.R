@@ -82,7 +82,9 @@
 #'   set_mortality(usa_2000_mortality) |>
 #'   set_fertility(usa_2000_fertility) |>
 #'   set_union_formation("on_demand") |>
-#'   set_immigration(origin = immigration_stream(template, intensity = 20))
+#'   set_immigration(
+#'     origin = immigration_stream(data.frame(count = 20), template)
+#'   )
 #' result <- run_simulation(model, years = 10, seed = 1)
 #' table(result$persons$birthplace)
 #' @order 1
@@ -109,9 +111,13 @@ set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
 #'
 #' @details
 #'
-#' Arrivals follow a Poisson process with the given intensity in migrants per
-#' year. The expected number of arrivals over a period is the integral of the
-#' intensity; the actual number is random.
+#' Arrivals follow a Poisson process. With a `count` intensity, the expected
+#' number of arrivals per year is the count, whatever the population's size.
+#' With a `rate` intensity, it is the rate times the number of people living
+#' in the simulated population at each moment, including earlier immigrants,
+#' so immigration grows and shrinks with the population. Either way, the
+#' expected number over a period is the integral of the intensity, and the
+#' actual number is random.
 #'
 #' By default, the template's living people are divided into households as
 #' for household moves in [set_group_transition()]: a woman in a union and
@@ -143,12 +149,15 @@ set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
 #' migrants take their template ancestry shares if the template tracks them,
 #' and otherwise have all their ancestry in their category.
 #'
+#' @param intensity A data frame with exactly one nonnegative intensity
+#'   column: `count`, the expected arrivals per year, or `rate`, the expected
+#'   arrivals per person-year lived in the simulated population. Without
+#'   calendar columns it has one row, applying throughout. Optional
+#'   `time_start` and `time_end` columns give piecewise-constant intensities
+#'   over half-open calendar intervals, which must not overlap and must cover
+#'   the simulation run; use a zero to pause a stream. The intensity can't
+#'   have other columns: who arrives is set by `template` and `weights`.
 #' @param template A `hammel_population` from which migrants are drawn.
-#' @param intensity The expected number of arrivals per year: a single
-#'   nonnegative number, or a data frame with numeric `time_start`, `time_end`
-#'   and `intensity` columns giving piecewise-constant intensities over
-#'   half-open calendar intervals. Intervals must not overlap and must cover
-#'   the simulation run; use a zero intensity to pause a stream.
 #' @param weights `NULL` (default) to draw eligible template people uniformly,
 #'   or a [weight_model()] whose formula or function may use `age` (at the
 #'   template's `end_time`), `sex` and the template's groups shared with the
@@ -168,26 +177,29 @@ set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
 #' @export
 #' @examples
 #' template <- generate_uniform_population(500)
-#' immigration_stream(template, intensity = 20)
+#' immigration_stream(data.frame(count = 20), template)
+#'
+#' # Immigration at 5 per 1,000 person-years lived in the population.
+#' immigration_stream(data.frame(rate = 0.005), template)
 #'
 #' # Fewer arrivals after 2010, and younger migrants are more likely.
 #' immigration_stream(
-#'   template,
-#'   intensity = data.frame(
+#'   data.frame(
 #'     time_start = c(2000, 2010),
 #'     time_end = c(2010, Inf),
-#'     intensity = c(40, 20)
+#'     count = c(40, 20)
 #'   ),
+#'   template,
 #'   weights = weight_model(~age, c(age = log(0.97)))
 #' )
 immigration_stream <- function(
-  template,
   intensity,
+  template,
   weights = NULL,
   assignment = NULL,
   household = hammel::household()
 ) {
-  new_immigration_stream(template, intensity, weights, assignment, household)
+  new_immigration_stream(intensity, template, weights, assignment, household)
 }
 
 #' Assign migrants to a group category
@@ -296,7 +308,7 @@ migrant_assignment <- function(
 #' `template_size` (persons in the template), `eligible` (households, or for
 #' cloning streams template people, that can be drawn), `household` (the
 #' household rule's `age_independence`, or `NULL` for cloning streams),
-#' `intensity` (a number, or a tibble of calendar intervals),
+#' `intensity` (a tibble with a `count` or `rate` column),
 #' `weights` (a weight model summary, or `NULL` for uniform draws) and
 #' `assignment` (the method assigning each group dimension, named by
 #' dimension).
@@ -304,7 +316,9 @@ migrant_assignment <- function(
 #' @seealso [immigration()]
 #' @examples
 #' process <- immigration(
-#'   origin = immigration_stream(generate_uniform_population(100), 10)
+#'   origin = immigration_stream(
+#'     data.frame(count = 10), generate_uniform_population(100)
+#'   )
 #' )
 #' summary(process)
 #' @export
@@ -312,12 +326,7 @@ summary.hammel_immigration <- function(object, ...) {
   streams <- lapply(
     object$streams,
     function(stream) {
-      intensity <- stream$intensity
-      if (is.data.frame(intensity)) {
-        intensity <- tibble::as_tibble(
-          intensity[c("time_start", "time_end", "intensity")]
-        )
-      }
+      intensity <- tibble::as_tibble(stream$intensity)
       parties <- migrant_parties(stream$template, stream$household)
       list(
         template_size = nrow(stream$template$persons),
@@ -366,17 +375,22 @@ print.summary.hammel_immigration <- function(x, ...) {
         paste("dependents under", stream$household, "years")
       )
     }
-    intensity <- stream$intensity
+    intensity <- intensity_table(stream$intensity)
+    unit <- if (intensity$kind[1] == "rate") {
+      " per person-year"
+    } else {
+      " arrivals per year"
+    }
     print_stat(
       "Intensity",
-      if (is.data.frame(intensity)) {
+      if ("time_start" %in% names(stream$intensity)) {
         paste0(
-          intensity$intensity, " per year in ",
+          intensity$intensity, unit, " in ",
           format_band(intensity$time_start, intensity$time_end),
           collapse = "; "
         )
       } else {
-        paste(intensity, "per year")
+        paste0(intensity$intensity, unit)
       }
     )
     print_model_argument("Weight model", stream$weights, none = "uniform")
@@ -410,6 +424,9 @@ native_birthplace <- "native"
 reserved_stream_names <- c(native_birthplace, "birthplace_ancestry")
 
 assignment_methods <- c("fixed", "probability", "custom")
+
+# Value columns of intensity tables (D194).
+intensity_kinds <- c("count", "rate")
 
 # Carrier variables of household streams, for weights and assignment (D189).
 household_variables <- c(
@@ -524,8 +541,8 @@ validate_immigration <- function(process, call = rlang::caller_env()) {
 
 # Build a validated stream for immigration_stream(); errors name `call`.
 new_immigration_stream <- function(
-  template,
   intensity,
+  template,
   weights,
   assignment,
   household,
@@ -535,10 +552,21 @@ new_immigration_stream <- function(
     abort_hammel(
       c(
         "{.arg intensity} is required.",
-        "i" = "Give the expected number of arrivals per year."
+        "i" = "Give arrivals per year or per person-year in a table."
       ),
       "argument",
       argument = "intensity",
+      call = call
+    )
+  }
+  if (missing(template)) {
+    abort_hammel(
+      c(
+        "{.arg template} is required.",
+        "i" = "Give the population migrants are drawn from."
+      ),
+      "argument",
+      argument = "template",
       call = call
     )
   }
@@ -669,31 +697,49 @@ validate_immigration_stream <- function(stream, call = rlang::caller_env()) {
   invisible(stream)
 }
 
-# A stream's intensity: one nonnegative number, or calendar intervals with
-# nonnegative intensities that do not overlap.
+# A stream's intensity (D194): a table with exactly one of a `count` column
+# (arrivals per year) or a `rate` column (arrivals per destination
+# person-year), and optional calendar columns that do not overlap.
 check_intensity <- function(intensity, call = rlang::caller_env()) {
   if (!is.data.frame(intensity)) {
-    if (!is.numeric(intensity) || length(intensity) != 1L ||
-          !is.null(dim(intensity)) || !is.finite(intensity) ||
-          intensity < 0) {
-      abort_hammel(
-        c(
-          paste(
-            "{.arg intensity} must be a single nonnegative number or a data",
-            "frame of calendar intervals."
-          ),
-          "x" = "It is {describe_value(intensity)}."
+    abort_hammel(
+      c(
+        paste(
+          "{.arg intensity} must be a table with a {.field count} or a",
+          "{.field rate} column."
         ),
-        "argument",
-        argument = "intensity",
-        call = call
-      )
-    }
-    return(invisible(intensity))
+        "x" = "It is {describe_value(intensity)}.",
+        "i" = paste(
+          "For a constant flow of 200 arrivals a year, use",
+          "{.code tibble(count = 200)}."
+        )
+      ),
+      "argument",
+      argument = "intensity",
+      call = call
+    )
   }
-  required <- c("time_start", "time_end", "intensity")
-  check_columns(intensity, required, "intensity", call = call)
-  extra <- setdiff(names(intensity), required)
+  kinds <- intersect(intensity_kinds, names(intensity))
+  if (length(kinds) != 1L) {
+    abort_hammel(
+      c(
+        paste(
+          "{.arg intensity} must have exactly one of {.field count} or",
+          "{.field rate}."
+        ),
+        "x" = if (length(kinds)) "It has both." else "It has neither.",
+        "i" = paste(
+          "Use {.field count} for arrivals per year, or {.field rate} for",
+          "arrivals per person-year lived in the population."
+        )
+      ),
+      "rates",
+      argument = "intensity",
+      call = call
+    )
+  }
+  calendar <- intersect(c("time_start", "time_end"), names(intensity))
+  extra <- setdiff(names(intensity), c(calendar, kinds))
   if (length(extra)) {
     abort_hammel(
       c(
@@ -713,7 +759,7 @@ check_intensity <- function(intensity, call = rlang::caller_env()) {
   if (!nrow(intensity)) {
     abort_hammel(
       c(
-        "{.arg intensity} must contain at least one calendar interval.",
+        "{.arg intensity} must contain at least one row.",
         "x" = "It has no rows."
       ),
       "rates",
@@ -721,12 +767,25 @@ check_intensity <- function(intensity, call = rlang::caller_env()) {
       call = call
     )
   }
+  column <- paste0("intensity$", kinds)
+  check_numeric_column(intensity[[kinds]], column, call = call)
+  check_nonnegative(intensity[[kinds]], column, call = call)
+  if (!length(calendar)) {
+    if (nrow(intensity) != 1L) {
+      abort_hammel(
+        c(
+          "An {.arg intensity} without calendar columns must have one row.",
+          "x" = "It has {nrow(intensity)} rows.",
+          "i" = "Add {.field time_start} and {.field time_end} to vary it."
+        ),
+        "rates",
+        argument = "intensity",
+        call = call
+      )
+    }
+    return(invisible(intensity))
+  }
   check_bands(intensity, "time", "intensity", minimum = -Inf, call = call)
-  check_numeric_column(
-    intensity$intensity, "intensity$intensity",
-    call = call
-  )
-  check_nonnegative(intensity$intensity, "intensity$intensity", call = call)
   rows <- order(intensity$time_start)
   starts <- intensity$time_start[rows]
   ends <- intensity$time_end[rows]
@@ -990,18 +1049,25 @@ with_birthplace <- function(
   list(population = population, declaration = declaration)
 }
 
-# A stream's intensity as calendar intervals; a constant applies throughout.
+# A stream's intensity as calendar intervals and its kind ("count" or
+# "rate"); a table without calendar columns applies throughout.
 intensity_table <- function(intensity) {
-  if (!is.data.frame(intensity)) {
+  kind <- intersect(intensity_kinds, names(intensity))
+  if (!"time_start" %in% names(intensity)) {
     return(
-      data.frame(time_start = -Inf, time_end = Inf, intensity = intensity)
+      data.frame(
+        time_start = -Inf, time_end = Inf,
+        intensity = as.numeric(intensity[[kind]]),
+        kind = kind
+      )
     )
   }
   rows <- order(intensity$time_start)
   data.frame(
     time_start = as.numeric(intensity$time_start[rows]),
     time_end = as.numeric(intensity$time_end[rows]),
-    intensity = as.numeric(intensity$intensity[rows])
+    intensity = as.numeric(intensity[[kind]][rows]),
+    kind = kind
   )
 }
 
@@ -1111,7 +1177,7 @@ prepare_stream <- function(
       fixed_value = name
     )
   }
-  if (is.data.frame(stream$intensity)) {
+  if ("time_start" %in% names(stream$intensity)) {
     check_time_coverage(
       intensity$time_start, intensity$time_end, start, end,
       "The stream's intensity",
@@ -1276,6 +1342,7 @@ prepare_stream <- function(
     time_start = intensity$time_start,
     time_end = intensity$time_end,
     intensity = intensity$intensity / expected_size,
+    per_person = identical(intensity$kind[1], "rate"),
     age = as.numeric(people$age),
     female = people$sex == "f",
     categories = categories,
@@ -1589,7 +1656,10 @@ custom_assignment <- function(
         c(
           "A custom assignment function returned an undeclared category.",
           "x" = "It returned {.val {unknown}}.",
-          "i" = "The categories of {.field {dimension}} are {.val {categories}}."
+          "i" = paste(
+            "The categories of {.field {dimension}} are",
+            "{.val {categories}}."
+          )
         ),
         "runtime",
         group = dimension,

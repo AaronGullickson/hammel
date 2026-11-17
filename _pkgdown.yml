@@ -92,6 +92,7 @@ reference:
       - calculate_dissolution_rates
       - calculate_cohab_convert_rate
       - calculate_transition_rates
+      - calculate_immigration_rates
 
   - title: Family and union histories
     desc: Extract kin relationships and enrich recorded person, birth, and union histories.

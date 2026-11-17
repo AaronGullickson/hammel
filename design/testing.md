@@ -1648,3 +1648,28 @@ validation. Declarations now keep a population's automatic dimensions;
 `test-immigration-birthplace.R` checks that the dimension and its ancestry
 survive such a restart. `devtools::test()` passed 8,983 expectations with
 one skip (the opt-in live database test).
+
+## Intensity tables (November 17, 2026)
+
+`tests/testthat/test-immigration-intensity.R` covers D194: a closed
+population growing as a pure-birth process under a rate intensity
+(E[N(T)] = N(0) exp(rT), over 20 seeds); `calculate_immigration_rates()`
+recovering a rate in a shrinking population, a household rate stream and a
+rate stream mixed with a count stream (stream rates summing to the total
+over shared person-years); calendar rate tables pausing and resuming; exact
+person-years and arrival counts against a direct loop; and argument
+validation. The immigration tests now pass intensities as tables (a
+`per_year()` test helper), and the validation test checks bare numbers,
+both or neither kind, extra rows and negative values.
+
+The offline test files other than the five immigration files made 1,830
+native calls on `master` and this branch with `-ffp-contract=off`, all with
+identical hashes; `devtools::test()` passed 9,018 expectations with no
+failures or warnings and one skip (the opt-in live database test).
+
+At report scale (a 20,000-person destination, a household stream from a
+template of about 25,000, 50 years), `count = 800` took 3.4 seconds for
+40,339 arrivals and `rate = 0.02` 3.0 seconds for 37,486 arrivals, with
+crude rates of 0.0202 and 0.0197 in the two 25-year halves. Household
+arrivals are compound Poisson, so the helper's Poisson intervals are too
+narrow for them.

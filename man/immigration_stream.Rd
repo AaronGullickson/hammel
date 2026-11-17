@@ -5,21 +5,24 @@
 \title{Describe one stream of immigrants}
 \usage{
 immigration_stream(
-  template,
   intensity,
+  template,
   weights = NULL,
   assignment = NULL,
   household = hammel::household()
 )
 }
 \arguments{
-\item{template}{A \code{hammel_population} from which migrants are drawn.}
+\item{intensity}{A data frame with exactly one nonnegative intensity
+column: \code{count}, the expected arrivals per year, or \code{rate}, the expected
+arrivals per person-year lived in the simulated population. Without
+calendar columns it has one row, applying throughout. Optional
+\code{time_start} and \code{time_end} columns give piecewise-constant intensities
+over half-open calendar intervals, which must not overlap and must cover
+the simulation run; use a zero to pause a stream. The intensity can't
+have other columns: who arrives is set by \code{template} and \code{weights}.}
 
-\item{intensity}{The expected number of arrivals per year: a single
-nonnegative number, or a data frame with numeric \code{time_start}, \code{time_end}
-and \code{intensity} columns giving piecewise-constant intensities over
-half-open calendar intervals. Intervals must not overlap and must cover
-the simulation run; use a zero intensity to pause a stream.}
+\item{template}{A \code{hammel_population} from which migrants are drawn.}
 
 \item{weights}{\code{NULL} (default) to draw eligible template people uniformly,
 or a \code{\link[=weight_model]{weight_model()}} whose formula or function may use \code{age} (at the
@@ -49,9 +52,13 @@ migrants are drawn from, how many arrive, who is selected and how groups
 the template lacks are assigned.
 }
 \details{
-Arrivals follow a Poisson process with the given intensity in migrants per
-year. The expected number of arrivals over a period is the integral of the
-intensity; the actual number is random.
+Arrivals follow a Poisson process. With a \code{count} intensity, the expected
+number of arrivals per year is the count, whatever the population's size.
+With a \code{rate} intensity, it is the rate times the number of people living
+in the simulated population at each moment, including earlier immigrants,
+so immigration grows and shrinks with the population. Either way, the
+expected number over a period is the integral of the intensity, and the
+actual number is random.
 
 By default, the template's living people are divided into households as
 for household moves in \code{\link[=set_group_transition]{set_group_transition()}}: a woman in a union and
@@ -85,16 +92,19 @@ and otherwise have all their ancestry in their category.
 }
 \examples{
 template <- generate_uniform_population(500)
-immigration_stream(template, intensity = 20)
+immigration_stream(data.frame(count = 20), template)
+
+# Immigration at 5 per 1,000 person-years lived in the population.
+immigration_stream(data.frame(rate = 0.005), template)
 
 # Fewer arrivals after 2010, and younger migrants are more likely.
 immigration_stream(
-  template,
-  intensity = data.frame(
+  data.frame(
     time_start = c(2000, 2010),
     time_end = c(2010, Inf),
-    intensity = c(40, 20)
+    count = c(40, 20)
   ),
+  template,
   weights = weight_model(~age, c(age = log(0.97)))
 )
 }
