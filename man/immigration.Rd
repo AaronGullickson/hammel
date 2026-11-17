@@ -41,16 +41,22 @@ streams set earlier, as \code{\link[=set_groups]{set_groups()}} replaces the who
 declaration. Calling \code{set_immigration(model)} without streams removes
 immigration from the model.
 
-Migrants arrive individually. A migrant keeps the age, sex and history of
-the template person they were drawn from, with every date shifted so that
-ages and durations at the template's \code{end_time} are unchanged at arrival.
+Migrants arrive as households, or as clones of individuals when their
+stream has no household rule (see \code{\link[=immigration_stream]{immigration_stream()}}). A household
+member keeps the age, sex and history of the template person they were
+drawn from, with every date shifted so that ages and durations at the
+template's \code{end_time} are unchanged at arrival.
 Their template unions arrive as pre-migration unions, and their previous
 partners and children become \code{external_relatives} of the simulated
 population: records that inform histories, such as parity and
 previous-union status, but are never simulated or counted. Their own
-parents are unknown. Group duration continues from the template, or for
-groups assigned by \code{\link[=migrant_assignment]{migrant_assignment()}} starts at arrival, recorded as a
-\code{transitions} row with no \code{origin}.
+parents are unknown unless they arrive in the same household. Group
+duration continues from the template, or for groups assigned by
+\code{\link[=migrant_assignment]{migrant_assignment()}} starts at arrival, recorded as a \code{transitions} row
+with no \code{origin}. A household's current union arrives with it, at its
+imported duration; it is a pre-migration union, so rate calculations count
+its dissolution and conversion only from arrival and never count its
+formation.
 
 Simulated populations of models with immigration gain \code{arrival_time} and
 \code{stream} columns in \code{persons}, which are \code{NA} for people who did not

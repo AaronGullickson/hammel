@@ -180,7 +180,8 @@ model <- model |>
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.3, "MW" = 0.15, "S" = 0.15, "W" = 0.4)
         )
-      )
+      ),
+      weights = weight_model(~ age + sex, c(age = log(1), sexm = log(1)))
     ),
     latin_america = immigration_stream(
       pop_latino_template,
@@ -189,7 +190,8 @@ model <- model |>
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.25, "MW" = 0.2, "S" = 0.2, "W" = 0.35)
         )
-      )
+      ),
+      weights =  weight_model(~ age + sex, c(age = log(1), sexm = log(1)))
     )
   )
 
@@ -241,6 +243,18 @@ pop_end |>
   facet_wrap(~sex)+
   scale_y_log10()
 ```
+
+```{r}
+
+pop_end$persons |>
+  filter(!is.na(arrival_time)) |>
+  mutate(age_arrival = arrival_time - birth_time) |>
+  ggplot(aes(x = age_arrival))+
+  geom_histogram()+
+  facet_wrap(~sex)
+```
+
+
 
 
 

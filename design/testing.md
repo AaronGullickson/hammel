@@ -1541,3 +1541,48 @@ with no failures or warnings and one skip (the opt-in live database test).
 A seeded run with 40,088 arrivals over 50 years from a 12,728-person
 template (24,375 external relatives) took 2.9 seconds in total, 0.25 of them
 importing histories, after the import was vectorized.
+
+## External immigration phase 3 (November 16, 2026)
+
+`tests/testthat/test-immigration-households.R` covers the D187 contract with
+the specification's worked example as a hand-built template. It checks that
+households partition the template's living persons, with carriers, partners,
+dependents attached to the living mother or else the father, and
+`age_independence`; that a dependent whose mother is a template external
+relative joins the father; a household's arrival (shared time and stream,
+the live union at its imported duration, parent links within the party, the
+son's mother created once as an external relative); an orphan's unknown
+parents; imported parity with destination births fathered by the imported
+husband; shared assigned categories, ancestry and entry rows; intensity
+conversion by expected household size, party and person counts against
+their Poisson and compound Poisson spread, and selection by carrier weights;
+duration-dependent dissolution of live unions and their left-truncated
+dissolution rates; no destination formations; no searches while partnered;
+cohabitation links and conversions after arrival; restarts; and validation
+of the household argument.
+
+The result or error of every native `*_cpp` call was hashed in call order
+with `-ffp-contract=off` (D175), dropping `simulate_cpp`'s `arrivals`
+element. The offline test files other than the three immigration files
+made 1,830 calls on `master` (5640556) and on this branch, all identical.
+The phase 1 and 2 immigration test files made 151 calls on the phase 2
+commit (f354b10) and on this branch, all identical, so individual streams
+are unchanged. With default flags, `devtools::test()` passed 8,877
+expectations with no failures or warnings and one skip (the opt-in live
+database test).
+
+A seeded run with a household stream of intensity 800 over 50 years from a
+24,784-person template had 39,737 arrivals in 20,559 households and took 2.0
+seconds.
+
+## Household default and cloning streams (November 16, 2026)
+
+Under D188, `test-immigration.R` checks that a cloning stream draws partnered
+and unpartnered living people but not the dead, that clones arrive never
+partnered with unknown parents, no external relatives and an entry row at
+arrival, and that a template with unions warns (`no_effect`) while one
+without does not. The phase 2 history tests now use household streams with
+`household(age_independence = 0)`, so the drawn widow still arrives alone
+with her history. The engine was unchanged. `devtools::test()` passed 8,885
+expectations with no failures or warnings and one skip (the opt-in live
+database test).

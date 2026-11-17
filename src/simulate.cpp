@@ -261,18 +261,23 @@ double draw_threshold() {
 }
 
 // One external immigration stream (D185): its piecewise-constant intensity
-// and, for each eligible template person, age, sex, categories (-1 where
-// assigned at arrival), ancestry shares (NA in blocks filled at arrival),
-// cumulative selection probability and per-dimension assignment
-// probabilities. Imported histories (D186) give each person's state at the
+// (in parties per year) and its parties (D187). Party p's members are rows
+// party_start[p] to party_start[p + 1] - 1; individual streams have one-person
+// parties. Parties have a cumulative selection probability and per-dimension
+// assignment probabilities. Each member has an age, sex, categories (-1
+// where assigned at arrival) and ancestry shares (NA in blocks filled at
+// arrival). Imported histories (D186) give each member's state at the
 // template endpoint as elapsed times: since the last birth, since the last
 // union ended and since entering each group (NA: none, or for assigned
-// groups entry at arrival). `next` is the stream's next arrival time.
+// groups entry at arrival). Links within a party are member offsets (-1
+// none): parents, and for a woman her current partner, with the union's
+// elapsed duration, type and template row. `next` is the next arrival time.
 struct ImmigrationStream {
   std::vector<double> time_start, time_end, intensity;
-  NumericVector age, cumulative, since_birth, since_end;
-  LogicalVector female;
-  IntegerVector parity, previous, legal;
+  NumericVector age, cumulative, since_birth, since_end, union_since;
+  LogicalVector female, union_cohab;
+  IntegerVector parity, previous, legal, party_start, mother, father, partner,
+    union_row;
   IntegerMatrix categories;
   NumericMatrix ancestry, since_entry;
   List assignment;
@@ -628,7 +633,11 @@ class Simulation {
   std::vector<std::vector<int>> category_component;
   double immigration_min_birth = R_PosInf;
   std::vector<double> arrival_person, arrival_time;
-  std::vector<int> arrival_stream, arrival_row, arrival_cats;
+  std::vector<int> arrival_stream, arrival_row, arrival_cats, arrival_party;
+  // Unions that arrive live (D187): engine ID, template row and party.
+  std::vector<double> arrival_union;
+  std::vector<int> arrival_union_row, arrival_union_party;
+  int party_count = 0;
 
   // Unrealized births: (period, group, union type, parity start/end, age
   // start/end) -> count.
@@ -1283,6 +1292,13 @@ void Simulation::read_immigration(Nullable<List> immigration_input) {
     stream.legal = x["legal_previous"];
     stream.since_end = x["since_union_end"];
     stream.since_entry = as<NumericMatrix>(x["since_entry"]);
+    stream.party_start = x["party_start"];
+    stream.mother = x["mother"];
+    stream.father = x["father"];
+    stream.partner = x["partner"];
+    stream.union_since = x["union_since"];
+    stream.union_cohab = x["union_cohab"];
+    stream.union_row = x["union_row"];
     for (size_t j = 0; j < stream.time_start.size(); ++j) {
       add_calendar_time(stream.time_start[j]);
       add_calendar_time(stream.time_end[j]);
@@ -3264,17 +3280,14 @@ void Simulation::on_birth(int i, double now) {
   refresh_person(i, now);
 }
 
-// An immigrant (D185): draw an eligible template person by selection
-// probability, then create a destination person of the same age and sex,
-// with unknown parents and no unions, and categories from the template or
-// drawn from the assignment probabilities. Ancestry comes from the template,
-// or is all in the person's category for assigned dimensions.
+// An arriving party (D185, D187): draw a party by selection probability and
+// one category per assigned dimension, shared by its members. Each member is
+// a destination person of the same age and sex, with categories and ancestry
+// from the template or the assignment, parents linked within the party and
+// unknown otherwise. A woman's current partner arrives with her in a live
+// union of the same duration and type.
 void Simulation::on_arrival(int k, double now) {
   ImmigrationStream& stream = streams[k];
-  if (next_id >= kMaxExactId ||
-      people.size() >= static_cast<size_t>(std::numeric_limits<int>::max())) {
-    stop("[limits] Population exceeds supported ID or row limits.");
-  }
   const double u = R::runif(0, 1);
   const int n = stream.cumulative.size();
   const int r = std::min(
@@ -3284,91 +3297,140 @@ void Simulation::on_arrival(int k, double now) {
       stream.cumulative.begin()
     )
   );
-  const bool female = stream.female[r];
-  const int i = static_cast<int>(people.size());
-  people.push_back(
-    {++next_id, now - stream.age[r], NA_REAL, NA_REAL, NA_REAL,
-     -std::numeric_limits<double>::infinity(), female, 0}
-  );
-  // Imported reproductive history (D186): parity and spacing.
-  if (!NumericVector::is_na(stream.since_birth[r])) {
-    people[i].last_birth = now - stream.since_birth[r];
+  const int first = stream.party_start[r], last = stream.party_start[r + 1];
+  const int size = last - first;
+  if (next_id + size >= kMaxExactId ||
+      people.size() + size >=
+        static_cast<size_t>(std::numeric_limits<int>::max())) {
+    stop("[limits] Population exceeds supported ID or row limits.");
   }
-  mother_of.push_back(-1);
-  father_of.push_back(-1);
-  kids.emplace_back();
-  parity.push_back(stream.parity[r]);
-  cats.resize(static_cast<size_t>(i + 1) * dimensions);
-  const size_t row = static_cast<size_t>(i) * ancestry_components;
-  ancestry.resize(row + ancestry_components);
-  for (size_t g = 0; g < ancestry_components; ++g) {
-    ancestry[row + g] = stream.ancestry(r, g);
-  }
+  // Assigned dimensions are the same for every member of a stream.
+  std::vector<int> assigned(dimensions, -1);
   for (int d = 0; d < dimensions; ++d) {
-    int c = stream.categories(r, d);
+    if (stream.categories(first, d) >= 0) {
+      continue;
+    }
+    NumericMatrix probs = stream.assignment[d];
+    const double draw = R::runif(0, 1);
+    double cumulative = 0;
+    int c = -1;
+    for (int j = 0; j < probs.ncol(); ++j) {
+      if (probs(r, j) > 0) {
+        c = j;  // protect the final positive category against rounding
+        cumulative += probs(r, j);
+        if (draw < cumulative) {
+          break;
+        }
+      }
+    }
     if (c < 0) {
-      NumericMatrix probs = stream.assignment[d];
-      const double draw = R::runif(0, 1);
-      double cumulative = 0;
-      c = -1;
-      for (int j = 0; j < probs.ncol(); ++j) {
-        if (probs(r, j) > 0) {
-          c = j;  // protect the final positive category against rounding
-          cumulative += probs(r, j);
-          if (draw < cumulative) {
-            break;
-          }
-        }
+      stop("Invalid migrant assignment probabilities.");
+    }
+    assigned[d] = c;
+  }
+  const int base = static_cast<int>(people.size());
+  const int party = party_count++;
+  for (int m = first; m < last; ++m) {
+    const int i = static_cast<int>(people.size());
+    const int mother = stream.mother[m] < 0 ? -1 : base + stream.mother[m];
+    const int father = stream.father[m] < 0 ? -1 : base + stream.father[m];
+    people.push_back(
+      {++next_id, now - stream.age[m], NA_REAL,
+       mother < 0 ? NA_REAL : people[mother].id,
+       father < 0 ? NA_REAL : people[father].id,
+       -std::numeric_limits<double>::infinity(), stream.female[m] != 0, 0}
+    );
+    // Imported reproductive history (D186): parity and spacing.
+    if (!NumericVector::is_na(stream.since_birth[m])) {
+      people[i].last_birth = now - stream.since_birth[m];
+    }
+    mother_of.push_back(mother);
+    father_of.push_back(father);
+    kids.emplace_back();
+    for (int parent : {mother, father}) {
+      if (parent >= 0) {
+        kids[parent].push_back(i);
       }
+    }
+    parity.push_back(stream.parity[m]);
+    cats.resize(static_cast<size_t>(i + 1) * dimensions);
+    const size_t row = static_cast<size_t>(i) * ancestry_components;
+    ancestry.resize(row + ancestry_components);
+    for (size_t g = 0; g < ancestry_components; ++g) {
+      ancestry[row + g] = stream.ancestry(m, g);
+    }
+    for (int d = 0; d < dimensions; ++d) {
+      int c = stream.categories(m, d);
       if (c < 0) {
-        stop("Invalid migrant assignment probabilities.");
-      }
-      const InheritanceRule& rule = inheritance_rules[d];
-      if (rule.size) {
-        for (size_t g = 0; g < rule.size; ++g) {
-          ancestry[row + rule.offset + g] = 0;
+        c = assigned[d];
+        const InheritanceRule& rule = inheritance_rules[d];
+        if (rule.size) {
+          for (size_t g = 0; g < rule.size; ++g) {
+            ancestry[row + rule.offset + g] = 0;
+          }
+          ancestry[row + category_component[d][c]] = 1;
         }
-        ancestry[row + category_component[d][c]] = 1;
       }
+      cats[static_cast<size_t>(i) * dimensions + d] = c;
     }
-    cats[static_cast<size_t>(i) * dimensions + d] = c;
-  }
-  const int group = person_stratum(matching_spec, i);
-  people[i].group = group;
-  kinship->append(-1, -1);
-  if (!female) {
-    pool.add(i, group, people[i].born);
+    people[i].group = person_stratum(matching_spec, i);
+    kinship->append(mother, father);
+    // Imported union history: previous-union state and when it began.
+    person_unions.emplace_back();
+    current_partner.push_back(-1);
+    previous_union.push_back(stream.previous[m]);
+    legal_previous.push_back(stream.legal[m]);
+    previous_union_end.push_back(
+      NumericVector::is_na(stream.since_end[m]) ? NA_REAL
+                                                : now - stream.since_end[m]
+    );
     if (calibrator) {
-      calibrator->add_man(group, people[i].born, 1);
+      counted_woman.push_back(0);
+    }
+    // Group duration continues from the template, or for an assigned group
+    // runs from arrival.
+    for (auto& tp : tprocs) {
+      const double since = stream.since_entry(m, tp.dim);
+      tp.entry.push_back(NumericVector::is_na(since) ? now : now - since);
     }
   }
-  // Imported union history: previous-union state and when it began.
-  person_unions.emplace_back();
-  current_partner.push_back(-1);
-  previous_union.push_back(stream.previous[r]);
-  legal_previous.push_back(stream.legal[r]);
-  previous_union_end.push_back(
-    NumericVector::is_na(stream.since_end[r]) ? NA_REAL
-                                              : now - stream.since_end[r]
-  );
-  if (calibrator) {
-    counted_woman.push_back(0);
+  // A current union arrives live, with its imported duration (D187).
+  for (int m = first; m < last; ++m) {
+    if (!stream.female[m] || stream.partner[m] < 0) {
+      continue;
+    }
+    check_union_capacity();
+    const int wife = base + (m - first), husband = base + stream.partner[m];
+    const int u = static_cast<int>(union_history.size());
+    union_history.push_back(
+      {++next_union_id, now - stream.union_since[m], NA_REAL, wife, husband}
+    );
+    union_history.back().cohab = stream.union_cohab[m];
+    person_unions[wife].push_back(u);
+    person_unions[husband].push_back(u);
+    current_partner[wife] = husband;
+    current_partner[husband] = wife;
+    arrival_union.push_back(union_history.back().id);
+    arrival_union_row.push_back(stream.union_row[m]);
+    arrival_union_party.push_back(party);
+  }
+  for (int i = base; i < base + size; ++i) {
+    if (!people[i].female) {
+      add_male(i);
+    }
     add_counted_woman(i, now);
+    arrival_person.push_back(people[i].id);
+    arrival_time.push_back(now);
+    arrival_stream.push_back(k);
+    arrival_row.push_back(first + (i - base));
+    arrival_party.push_back(party);
+    for (int d = 0; d < dimensions; ++d) {
+      arrival_cats.push_back(category(i, d));
+    }
   }
-  // Group duration continues from the template, or for an assigned group
-  // runs from arrival.
-  for (auto& tp : tprocs) {
-    const double since = stream.since_entry(r, tp.dim);
-    tp.entry.push_back(NumericVector::is_na(since) ? now : now - since);
+  for (int i = base; i < base + size; ++i) {
+    refresh_person(i, now);
   }
-  arrival_person.push_back(people[i].id);
-  arrival_time.push_back(now);
-  arrival_stream.push_back(k);
-  arrival_row.push_back(r);
-  for (int d = 0; d < dimensions; ++d) {
-    arrival_cats.push_back(category(i, d));
-  }
-  refresh_person(i, now);
   draw_arrival(stream, now);
 }
 
@@ -3639,7 +3701,10 @@ List Simulation::results() {
     _["arrivals"] = List::create(
       _["person_id"] = wrap(arrival_person), _["time"] = wrap(arrival_time),
       _["stream"] = wrap(arrival_stream), _["row"] = wrap(arrival_row),
-      _["categories"] = wrap(arrival_cats)
+      _["categories"] = wrap(arrival_cats), _["party"] = wrap(arrival_party),
+      _["union_id"] = wrap(arrival_union),
+      _["union_row"] = wrap(arrival_union_row),
+      _["union_party"] = wrap(arrival_union_party)
     )
   );
 }

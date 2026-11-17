@@ -3900,3 +3900,68 @@ calculations. Template arrival records describe a different destination.
 **Consequence:** Group duration in assigned groups now differs from phase
 1, where it ran from birth.
 
+
+## D187 — Phase 3 household parties contract (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026. The user approved
+the specification, including attaching a dependent whose mother is a
+template external relative to their father and storing no party
+identifier, and authorized implementation the same day; phase 3 is
+implemented.
+
+**Decision:** Phase 3 of external immigration (D184) follows the
+[phase 3 specification](immigration.md#phase-3-specification):
+
+- `immigration_stream()` takes a `household()` rule, reusing D140's object
+  and membership rule unchanged; `NULL` keeps individual arrivals.
+- Households partition the template's living persons; any future household
+  rule, such as multigenerational households, must keep membership
+  exclusive.
+- A household stream samples D140 carriers: the woman in a current union,
+  or an unpartnered independent person. Weight models and `custom`
+  assignment use the carrier's characteristics; household-level
+  characteristics are deferred.
+- `intensity` stays in persons per year. The stream's clock runs at
+  `intensity / E[size]` parties per year, where E[size] is the expected
+  party size under the selection probabilities.
+- Members share arrival time, stream and assigned categories.
+- A current union arrives live. It is pre-migration, so it is not a
+  destination formation, but from arrival it is simulated and observed:
+  dissolution and conversion exposure count from the arrival time in the
+  duration band implied by its original start. Union calculations
+  left-truncate at arrival instead of dropping pre-migration unions.
+
+**Rationale:** Sampling carriers gives each household one selection unit,
+as one clock per household does for moves (D140), so large households are
+not over-sampled. Converting intensity internally keeps one meaning of
+`intensity` for individual and household streams. Left truncation keeps
+imported couples' duration-dependent dissolution while excluding events
+the destination did not observe.
+
+**Consequence:** Person arrivals are compound Poisson for household
+streams, with variance above the mean.
+
+## D188 — Household parties by default; cloning without households (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026, authorizing
+implementation.
+
+**Decision:** `immigration_stream()`'s `household` defaults to `household()`.
+`household = NULL` makes a [cloning stream](immigration.md#cloning-streams):
+
+- Everyone alive at the template's `end_time` is eligible.
+- A clone keeps age, sex, shared group categories and ancestry. Their
+  history begins at arrival: never partnered, parity zero, unknown parents,
+  no imported unions, transitions or external relatives, and group duration
+  from arrival in every dimension, with an entry row per dimension.
+- Constructing a cloning stream from a template with unions or transitions
+  warns (`no_effect`) that these histories are not imported.
+
+**Rationale:** Individual arrivals with histories had to exclude partnered
+people (D184), which distorted age profiles. Households are the realistic
+default. Cloning remains for restricted templates, such as young adults
+sampled as labor migrants, where histories do not matter; dropping every
+relationship makes the partner restriction unnecessary.
+
+**Supersedes:** the individual-arrival eligibility of D185 and the
+individual-arrival imports of D186, which now apply to household members.

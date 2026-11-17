@@ -4,7 +4,13 @@
 \alias{immigration_stream}
 \title{Describe one stream of immigrants}
 \usage{
-immigration_stream(template, intensity, weights = NULL, assignment = NULL)
+immigration_stream(
+  template,
+  intensity,
+  weights = NULL,
+  assignment = NULL,
+  household = hammel::household()
+)
 }
 \arguments{
 \item{template}{A \code{hammel_population} from which migrants are drawn.}
@@ -19,11 +25,15 @@ the simulation run; use a zero intensity to pause a stream.}
 or a \code{\link[=weight_model]{weight_model()}} whose formula or function may use \code{age} (at the
 template's \code{end_time}), \code{sex} and the template's groups shared with the
 simulation. Each eligible person is drawn with probability proportional
-to their weight; weights do not change the stream's intensity.}
+to their weight; weights do not change the stream's intensity. For
+household streams, weights use the carrier's characteristics.}
 
 \item{assignment}{\code{NULL} (default) or a list of \code{\link[=migrant_assignment]{migrant_assignment()}}
 objects named by the simulation's group dimensions that the template
 lacks.}
+
+\item{household}{A \code{\link[=household]{household()}} rule (default) to draw whole households
+with their histories, or \code{NULL} to clone individuals without histories.}
 }
 \value{
 An \code{hammel_immigration_stream} object.
@@ -40,11 +50,27 @@ Arrivals follow a Poisson process with the given intensity in migrants per
 year. The expected number of arrivals over a period is the integral of the
 intensity; the actual number is random.
 
-At each arrival one eligible person is drawn, with replacement, from the
-template. Eligible people are alive at the template's \code{end_time} and have
-no current partner. The migrant keeps their age at the template's
-\code{end_time}, so their birth time is the arrival time minus that age. Drawing
-does not change the template.
+By default, the template's living people are divided into households as
+for household moves in \code{\link[=set_group_transition]{set_group_transition()}}: a woman in a union and
+her partner, or an unpartnered adult, together with the dependents of
+either. Each arrival draws one household, with replacement, represented
+by its carrier: the woman in a union, or the unpartnered adult. Every
+member arrives at the same time, keeps their age at the template's
+\code{end_time} (so their birth time is the arrival time minus that age) and
+their history, and shares the categories assigned by \code{assignment}.
+\code{intensity} still counts people, so households arrive at \code{intensity}
+divided by the expected household size, and arrivals come in groups, with
+more variation than individual arrivals. Drawing does not change the
+template.
+
+With \code{household = NULL}, the stream clones individuals instead: anyone
+alive at the template's \code{end_time} can be drawn, and keeps their age, sex
+and groups but none of their history. Clones arrive never partnered, with
+no children, unknown parents and group durations starting at arrival.
+This suits templates built for the purpose, such as young adults sampled
+as labor migrants; for templates with histories, household streams are
+more realistic, and a cloning stream warns that the histories will not
+be imported.
 
 Group dimensions that both the template and the simulation declare must
 have the same categories, and migrants keep their template category.

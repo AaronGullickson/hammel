@@ -24,6 +24,12 @@ history_template <- function(groups = NULL, ..., transitions = NULL) {
   )
 }
 
+# Households without dependents: each template person arrives alone, with
+# their history (D188).
+alone <- function() {
+  household(age_independence = 0)
+}
+
 # Draw only template person 1.
 only_first <- function() {
   weight_model(fun = function(members, bin) {
@@ -32,7 +38,10 @@ only_first <- function() {
 }
 
 history_stream <- function(template = history_template(), intensity = 5, ...) {
-  immigration_stream(template, intensity, weights = only_first(), ...)
+  immigration_stream(
+    template, intensity,
+    weights = only_first(), household = alone(), ...
+  )
 }
 
 first_arrival <- function(result) {
@@ -137,7 +146,8 @@ test_that("imported previous unions select remarriage schedules", {
     ifelse(members$person_id %in% c(1, 5), 0, -1000)
   })
   model <- set_immigration(
-    model, a = immigration_stream(template, 5, weights = weights)
+    model,
+    a = immigration_stream(template, 5, weights = weights, household = alone())
   )
   result <- run_simulation(model, 4, seed = 4)
   arrived <- result$persons[!is.na(result$persons$arrival_time), ]
@@ -306,7 +316,8 @@ test_that("template external relatives are flattened with their censor times", {
     ifelse(members$person_id == p$person_id, 0, -1000)
   })
   again <- set_immigration(
-    make_model(10), b = immigration_stream(first, 3, weights = weights)
+    make_model(10),
+    b = immigration_stream(first, 3, weights = weights, household = alone())
   )
   second <- run_simulation(again, 1, seed = 11)
   q <- first_arrival(second)

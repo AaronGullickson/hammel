@@ -1,8 +1,9 @@
 # External immigration design
 
-Planning discussion, November 12 and 16, 2026. Phases 1 and 2 of external
-immigration are implemented; household parties (phase 3) are not. This document consolidates
-the approach selected in D177–D182 and D184–D186 for design review on the
+Planning discussion, November 12 and 16, 2026. Phases 1 to 3 of external
+immigration, including household parties, are implemented. This document
+consolidates
+the approach selected in D177–D182 and D184–D187 for design review on the
 `external-migration` branch. Behavior
 depending on the unresolved modeling choices below requires further user
 decisions before implementation. Illustrative field names do not establish
@@ -45,14 +46,16 @@ remain separate responsibilities. The public interface is described in
 | Source | Sample an existing population with replacement; preserve age, sex and groups; assign fresh IDs | D179 |
 | Template schedules | Support calendar-scheduled templates; truncation deferred | D180, D184 |
 | Imported histories | Arrivals bring their birth, union and transition histories, with dates shifted by the age offset; referenced non-members go in `external_relatives` | D184 |
-| Eligibility | No one arrives without their current partner | D184 |
+| Eligibility | No one arrives without their current partner; cloning streams import no relationships, so anyone alive can be cloned | D184, D188 |
 | Phasing | Individual arrivals without histories, then imported histories, then household parties | D184 |
 | Phase 1 contract | Unpartnered eligibility, per-stream clocks, arrival columns, observation from arrival, group compatibility, `migrant_assignment()`, ancestry fallback | D185 |
 | Phase 2 contract | Imported unions, children and transitions; flattened template external relatives; `censor_time`; stored `pre_migration`; population validation; kin extraction excludes external relatives by default | D186 |
 | Selective migration | A weight model selects among a stream's eligible template people; intensity is unchanged | D180, D184 |
 | Migration histories | Separate personal/family facts from reusable, named classifications | D181 |
 | Rate schedules | Stratify by personal immigration status and stream; generation rules stay outside the required rate-table schema | D182 |
-| Households | Arrivals are parties; household parties are phase 3; sampling and intensity units deferred | D179–D180, D184 |
+| Phase 3 contract | Household parties under D140's rule; carriers sampled; intensity in persons converted by expected party size; ongoing unions arrive live and are left-truncated | D187 |
+| Households | Arrivals are parties; household parties are phase 3 | D179–D180, D184, D187 |
+| Cloning | Household streams are the default; `household = NULL` clones age, sex and groups without history | D188 |
 
 ## Arrival process and streams
 
@@ -201,11 +204,10 @@ party whom a member's history references are recorded in
 external relatives.
 
 **Eligibility.** No one arrives without their current partner, whether
-married or cohabiting. With individual parties, only source people without a
-current partner can be sampled; household parties bring the partner along.
-No destination record therefore has a partner whose future is not simulated.
-This biases individual-arrival composition against partnered adults, a
-documented limitation until household parties exist.
+married or cohabiting: household parties bring the partner along. No
+destination record therefore has a partner whose future is not simulated.
+Cloning streams (D188) import no relationships, so anyone alive can be
+cloned.
 
 **Imported histories.** Each party member brings their recorded births,
 unions (including ended unions) and group transitions, including events
@@ -282,7 +284,7 @@ Proposed order (D184):
 2. **Imported histories.** Histories, date translation, derived state,
    carried-over group duration and `external_relatives`.
 3. **Household parties.** Party sampling under D140's membership rule;
-   arriving children become links instead of external relatives.
+   arriving children become links instead of external relatives (D187).
 
 Weight-model selection is part of phase 1 (D185). Template schedules,
 D182 rate strata and D181 classifications follow once arrivals and
@@ -301,9 +303,10 @@ imported histories and external relatives (phase 2), household parties
 (phase 3), calendar-scheduled templates, weight models and assignments,
 D182 rate strata and D181 classifications.
 
-**Eligibility.** A template person is eligible when alive at the template's
-`end_time` and without a current partner: they have no union, married or
-cohabiting, without an end time. Their relationships are otherwise ignored.
+**Eligibility.** A template person was eligible when alive at the
+template's `end_time` and without a current partner. Under D188, phase 1's
+individual arrivals became cloning streams, where anyone alive is
+eligible.
 
 **Arrival times.** Each stream has its own exponential clock at its current
 intensity (D128's one clock per process). At an intensity boundary the
@@ -377,9 +380,10 @@ treated as having no arrivals.
 ## Phase 2 specification
 
 User decisions, November 16, 2026 (D186). Implemented November 16, 2026;
-see [testing](testing.md#external-immigration-phase-2-november-16-2026). Phase 2 adds imported histories to individual arrivals under
-D184; eligibility, selection, groups and ancestry of the arriving person are
-unchanged from [phase 1](#phase-1-specification).
+see [testing](testing.md#external-immigration-phase-2-november-16-2026). Phase 2 added imported histories to individual arrivals under D184;
+under D188 they apply to every member of a household party, and cloning
+streams import none. Selection, groups and ancestry of the arriving person
+are unchanged from [phase 1](#phase-1-specification).
 
 **What an arrival imports.** For the selected template person P:
 
@@ -469,6 +473,136 @@ phase 1; union-level calculations exclude pre-migration unions. Functions
 that look up partners or parents, such as `augment_unions()`, resolve IDs
 in both tables. `extract_kin()` and `count_kin()` exclude external
 relatives by default; `include_external = TRUE` includes them.
+
+## Phase 3 specification
+
+User decisions, November 16, 2026 (D187). Implemented November 16, 2026;
+see [testing](testing.md#external-immigration-phase-3-november-16-2026).
+Phase 3 adds household parties under D140's membership rule.
+
+**Interface.** `immigration_stream()` gains `household`, which defaults to
+`household()` (D188), the same object `set_group_transition()` takes.
+`NULL` makes a [cloning stream](#cloning-streams). Household and cloning
+streams may be mixed in one model.
+
+**Households in the template.** Households are read from the template's
+living `persons` at its endpoint with D140's rule. A dependent is alive,
+unpartnered and younger than `age_independence`, attached to their mother
+while she is alive, otherwise to their father while he is alive. A
+household is a carrier, the carrier's current partner and the dependents
+of either, recursively. The carrier is the woman in a current union, or an
+unpartnered person who is not a dependent, including an independent
+orphan. Every living template person belongs to exactly one household.
+Future, more complex household rules, such as multigenerational households,
+must keep membership exclusive. Template external relatives are never
+household members. A dependent whose mother is a template external
+relative attaches to their father if he is a living member of the
+template; otherwise they are independent.
+
+**Selection.** A stream with a household rule samples carriers, with
+replacement. The stream's weight model applies to carriers'
+characteristics, so a household's selection probability is its carrier's
+normalized weight. A `custom` assignment function receives carriers, one
+row per party. Household-level characteristics, such as size or
+children's ages, are not available to weights or assignment functions in
+phase 3.
+
+**Intensity.** `intensity` stays in persons per year. Let E[size] be the
+expected party size under the stream's selection probabilities: the sum of
+each household's size times its probability. The stream's clock runs at
+`intensity / E[size]` parties per year, so expected arrivals are
+`intensity` persons per year. A calendar-varying intensity is converted
+band by band with the same constant. Persons arrive in clumps, so the
+count over T years is compound Poisson, with mean `intensity * T` and a
+variance larger than the mean: `(intensity / E[size]) * T * E[size^2]`.
+For a cloning stream, E[size] is 1.
+
+**Arrival.** Every member of a party arrives at the same time with the
+same stream and the same date offset. Each assigned dimension gets one
+draw per party, so members share their assigned categories. Shared
+dimensions and ancestry are copied for each member as in phases 1 and 2.
+
+**Imported histories.** Each member imports their histories as in phase
+2, with these changes:
+
+- A union between two members becomes a destination union between them.
+  This includes the current union, which arrives live.
+- A child who is a member has their member parents' new IDs. A child's
+  parent who is not a member is an external relative when they are a
+  previous partner of a member, and unknown (`NA`) otherwise.
+- Anyone a member's history references who is not a member becomes an
+  external relative. Each is created once per party, even when several
+  members reference them, such as a dead mother of a dependent who was
+  also the partner's previous wife.
+- A carrier's and partner's own parents are not imported, as in phase 2.
+- `censor_time` of a living external relative is the party's arrival time.
+
+**Ongoing unions.** A current union arrives live, with duration from its
+original start, shifted by the offset. It is pre-migration
+(`pre_migration = TRUE`), so its start is not a destination union
+formation. From the arrival time it is simulated like any destination
+union: it enters dissolution cells, and conversion cells when cohabiting,
+in the duration band its original start implies; the woman's fertility
+uses its union type; and neither partner searches. Previous-union state
+comes from each partner's ended unions, as in phase 2.
+
+**Observation of unions.** Union calculations left-truncate unions at the
+arrival time instead of dropping pre-migration unions. A union contributes
+union-years, dissolutions and conversions only after both partners have
+arrived. Formation counts exclude unions that started before arrival. A
+pre-migration union that ended before arrival therefore still contributes
+nothing, as in phase 2.
+
+**Party records.** Members of a party share `arrival_time` and `stream`;
+no party identifier is stored.
+
+**Validation of populations.** The nine phase 2 rules apply. Rule 6 still
+holds: a live union always has two members.
+
+**Worked example.** A template ends at year 100 with four living
+households: three unpartnered adults and one couple. The woman, born 70,
+married a man born 66 at 90. Their children were born at 92 (died 93), 95
+and 99. The man has a son born 85 from a previous marriage that ended with
+his first wife's death at 89. With `age_independence = 18`, the son (15)
+attaches to his father, since his mother is dead, and the children born at
+95 and 99 attach to their mother. Their household has five members. With
+equal weights, E[size] is (1 + 1 + 1 + 5) / 4 = 2, so an intensity of 100
+persons per year runs the clock at 50 parties per year.
+
+When this household arrives at 2035.4 (offset 1935.4), all five arrive at
+2035.4 with fresh IDs. The couple's union starts at 2025.4, is live and
+pre-migration, and enters dissolution cells at duration 10. The first wife
+and the daughter who died are external relatives with censor times at
+their deaths, 2024.4 and 2028.4. The first marriage is a pre-migration
+union between the man and his first wife, ended at 2024.4. The son's
+parents are the man and the first wife. The woman has parity three. The
+couple's union contributes union-years from 2035.4 at duration 10; it adds
+no destination union formation.
+
+## Cloning streams
+
+User decisions, November 16, 2026 (D188). Household parties are the default
+and the recommended way to import migrants. A stream with `household = NULL`
+clones template people instead, for uses such as labor migration from a
+restricted template of young adults.
+
+**Eligibility.** Every person alive at the template's `end_time` can be
+drawn, whether partnered or not.
+
+**What a clone keeps.** Age, sex, shared group categories and ancestry, as in
+phase 1. Nothing else: a clone's history begins at arrival. They arrive
+never partnered (`previous_union = "none"`), at parity zero with no last
+birth, with unknown parents, and with no imported unions, transitions or
+external relatives. Group duration starts at arrival in every dimension,
+recorded as an entry row (`origin = NA`) per dimension.
+
+**Selection and intensity.** Weights and `custom` assignment see every
+eligible person, with the same `members` columns as household streams. Each
+arrival is one person, so the clock runs at `intensity`.
+
+**Warning.** Constructing a cloning stream from a template with any unions
+or transitions warns (kind `no_effect`) that these histories will not come
+with migrants, and that a `household()` rule imports them.
 
 ## Migration facts, family history and classifications
 
@@ -569,7 +703,7 @@ The following choices are open; listing an option does not select it.
 | Imported state | Settled for phase 2 (D186) |
 | Compatibility | Categories of future scheduled templates; calendar-scheduled assignments |
 | Calendar inputs | Template and weight-model schedules: interval columns, coverage, gaps and exact boundaries |
-| Households | Party membership, selection probabilities, rate units and reconstruction of internal person/union links |
+| Households | Settled for phase 3 (D187); household-level characteristics in weights and assignment; multigenerational rules |
 | Migration history | Stored facts, source provenance, history depth, starting-population unknowns and restart persistence |
 | Classifications | Rule interface, output types, update timing, custom-model inputs and imported-history inputs |
 | Rate strata | Declared group versus built-in migration variable, process support and coverage rules |
@@ -577,8 +711,7 @@ The following choices are open; listing an option does not select it.
 | Timing and interface | Remaining `immigration_stream()` and `migrant_assignment()` arguments; the non-immigrant label |
 
 No implementation milestone or scientific acceptance threshold is established
-here. Household implementation can remain deferred while the individual-arrival
-contract is developed; its unresolved rate units must not be silently chosen.
+here.
 
 ## Worked examples for review
 
@@ -601,7 +734,9 @@ not depend on the destination's current population size.
 **Imported history and external relatives.** A template ends at year 100.
 A woman in it was born at 70 and married a man born at 66 at 88. Their
 children were born at 90 (died 92) and 95 (alive), and her husband died at
-98. She arrives individually at 2035.4, an offset of 1935.4. In the
+98. She arrives at 2035.4, an offset of 1935.4, in a household stream
+with `household(age_independence = 0)`, under which her living child is
+independent, so she arrives alone. In the
 destination she is born at 2005.4 (age 30). Her union runs from 2023.4 to
 2033.4, ended by death, and is pre-migration. She arrives widowed, 2 years
 after that union ended, at parity two, with last birth at 2030.4. Her
@@ -657,6 +792,13 @@ with a valid, nonempty source, the initial analytical and accounting cases are:
 | Phase 2 derived state | Imported parity selects parity-specific fertility; imported last births keep spacing; imported widowhood selects remarriage schedules; group duration continues from the template or starts at arrival |
 | Phase 2 observation | External relatives add no counts; pre-migration unions add no union-years; entry rows are not counted as transitions |
 | Phase 2 restarts | IDs stay unique; parity from external children persists |
+| Phase 3 households | Every living template person is in exactly one household; a party is its carrier, partner and dependents, recursively |
+| Phase 3 selection | Across replications, household frequencies match normalized carrier weights |
+| Phase 3 intensity | Expected persons equal `intensity * T`; parties equal `intensity * T / E[size]`; person-count variance matches the compound Poisson value |
+| Phase 3 arrival | Members share arrival time, stream and assigned categories; internal unions and parent links connect destination members; each external relative is created once per party |
+| Phase 3 ongoing unions | A live union enters dissolution and conversion cells at its imported duration; partners do not search; union calculations count it from arrival and exclude its formation |
+| Phase 3 restarts | Live imported unions and party links persist |
+| Cloning streams | Anyone alive can be drawn; clones arrive never partnered at parity zero with no imported records, an entry row per dimension, and unknown parents; templates with unions or transitions warn |
 
 Additional tests should cover multiple streams, age preservation, template
 schedule boundaries, future group categories, mixed-stream pedigrees,
@@ -664,6 +806,5 @@ classification inputs in custom models, unknown histories, and classification
 and external-relative preservation through restart. Source and destination
 should be reusable across independent seeded runs under the existing RNG
 contract.
-Household checks depend on its deferred sampling and intensity decisions.
 Statistical test methods must be justified when implementation begins; no
 acceptance thresholds or successful validation results are claimed here.

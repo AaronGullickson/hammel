@@ -28,16 +28,22 @@
 #' declaration. Calling `set_immigration(model)` without streams removes
 #' immigration from the model.
 #'
-#' Migrants arrive individually. A migrant keeps the age, sex and history of
-#' the template person they were drawn from, with every date shifted so that
-#' ages and durations at the template's `end_time` are unchanged at arrival.
+#' Migrants arrive as households, or as clones of individuals when their
+#' stream has no household rule (see [immigration_stream()]). A household
+#' member keeps the age, sex and history of the template person they were
+#' drawn from, with every date shifted so that ages and durations at the
+#' template's `end_time` are unchanged at arrival.
 #' Their template unions arrive as pre-migration unions, and their previous
 #' partners and children become `external_relatives` of the simulated
 #' population: records that inform histories, such as parity and
 #' previous-union status, but are never simulated or counted. Their own
-#' parents are unknown. Group duration continues from the template, or for
-#' groups assigned by [migrant_assignment()] starts at arrival, recorded as a
-#' `transitions` row with no `origin`.
+#' parents are unknown unless they arrive in the same household. Group
+#' duration continues from the template, or for groups assigned by
+#' [migrant_assignment()] starts at arrival, recorded as a `transitions` row
+#' with no `origin`. A household's current union arrives with it, at its
+#' imported duration; it is a pre-migration union, so rate calculations count
+#' its dissolution and conversion only from arrival and never count its
+#' formation.
 #'
 #' Simulated populations of models with immigration gain `arrival_time` and
 #' `stream` columns in `persons`, which are `NA` for people who did not
@@ -92,11 +98,27 @@ set_immigration <- function(model, ...) {
 #' year. The expected number of arrivals over a period is the integral of the
 #' intensity; the actual number is random.
 #'
-#' At each arrival one eligible person is drawn, with replacement, from the
-#' template. Eligible people are alive at the template's `end_time` and have
-#' no current partner. The migrant keeps their age at the template's
-#' `end_time`, so their birth time is the arrival time minus that age. Drawing
-#' does not change the template.
+#' By default, the template's living people are divided into households as
+#' for household moves in [set_group_transition()]: a woman in a union and
+#' her partner, or an unpartnered adult, together with the dependents of
+#' either. Each arrival draws one household, with replacement, represented
+#' by its carrier: the woman in a union, or the unpartnered adult. Every
+#' member arrives at the same time, keeps their age at the template's
+#' `end_time` (so their birth time is the arrival time minus that age) and
+#' their history, and shares the categories assigned by `assignment`.
+#' `intensity` still counts people, so households arrive at `intensity`
+#' divided by the expected household size, and arrivals come in groups, with
+#' more variation than individual arrivals. Drawing does not change the
+#' template.
+#'
+#' With `household = NULL`, the stream clones individuals instead: anyone
+#' alive at the template's `end_time` can be drawn, and keeps their age, sex
+#' and groups but none of their history. Clones arrive never partnered, with
+#' no children, unknown parents and group durations starting at arrival.
+#' This suits templates built for the purpose, such as young adults sampled
+#' as labor migrants; for templates with histories, household streams are
+#' more realistic, and a cloning stream warns that the histories will not
+#' be imported.
 #'
 #' Group dimensions that both the template and the simulation declare must
 #' have the same categories, and migrants keep their template category.
@@ -116,10 +138,13 @@ set_immigration <- function(model, ...) {
 #'   or a [weight_model()] whose formula or function may use `age` (at the
 #'   template's `end_time`), `sex` and the template's groups shared with the
 #'   simulation. Each eligible person is drawn with probability proportional
-#'   to their weight; weights do not change the stream's intensity.
+#'   to their weight; weights do not change the stream's intensity. For
+#'   household streams, weights use the carrier's characteristics.
 #' @param assignment `NULL` (default) or a list of [migrant_assignment()]
 #'   objects named by the simulation's group dimensions that the template
 #'   lacks.
+#' @param household A [household()] rule (default) to draw whole households
+#'   with their histories, or `NULL` to clone individuals without histories.
 #' @return An `hammel_immigration_stream` object.
 #' @seealso [immigration()], [migrant_assignment()], [weight_model()]
 #' @export
@@ -141,9 +166,10 @@ immigration_stream <- function(
   template,
   intensity,
   weights = NULL,
-  assignment = NULL
+  assignment = NULL,
+  household = hammel::household()
 ) {
-  new_immigration_stream(template, intensity, weights, assignment)
+  new_immigration_stream(template, intensity, weights, assignment, household)
 }
 
 #' Assign migrants to a group category
@@ -167,6 +193,8 @@ immigration_stream <- function(
 #'   `fun(members)`. `members` is a tibble with one row per eligible template
 #'   person, holding `person_id` (the template ID), `age` (at the template's
 #'   `end_time`), `sex` and the template's groups shared with the simulation.
+#'   For household streams, the rows are household carriers, and every
+#'   member of a household receives the carrier's category.
 #'   `fun` returns a data frame or matrix with one row per member and one
 #'   column per category, named by category; each row's probabilities must
 #'   sum to one.
@@ -230,8 +258,10 @@ migrant_assignment <- function(
 #' @return
 #' `summary()` returns an object of class `summary.hammel_immigration`
 #' containing `streams`, a named list with one element per stream holding
-#' `template_size` (persons in the template), `eligible` (template people who
-#' can be drawn), `intensity` (a number, or a tibble of calendar intervals),
+#' `template_size` (persons in the template), `eligible` (households, or for
+#' cloning streams template people, that can be drawn), `household` (the
+#' household rule's `age_independence`, or `NULL` for cloning streams),
+#' `intensity` (a number, or a tibble of calendar intervals),
 #' `weights` (a weight model summary, or `NULL` for uniform draws) and
 #' `assignment` (the method assigning each group dimension, named by
 #' dimension).
@@ -253,9 +283,11 @@ summary.hammel_immigration <- function(object, ...) {
           intensity[c("time_start", "time_end", "intensity")]
         )
       }
+      parties <- migrant_parties(stream$template, stream$household)
       list(
         template_size = nrow(stream$template$persons),
-        eligible = length(eligible_migrants(stream$template)),
+        eligible = length(parties$party_start) - 1L,
+        household = stream$household$age_independence,
         intensity = intensity,
         weights = summarize_model_argument(stream$weights),
         assignment = vapply(stream$assignment, `[[`, "", "method")
@@ -279,9 +311,16 @@ print.summary.hammel_immigration <- function(x, ...) {
     print_stat(
       "Template",
       paste0(
-        stream$template_size, " persons, ", stream$eligible, " eligible"
+        stream$template_size, " persons, ", stream$eligible,
+        if (is.null(stream$household)) " eligible" else " households"
       )
     )
+    if (!is.null(stream$household)) {
+      print_stat(
+        "Households",
+        paste("dependents under", stream$household, "years")
+      )
+    }
     intensity <- stream$intensity
     print_stat(
       "Intensity",
@@ -405,6 +444,7 @@ new_immigration_stream <- function(
   intensity,
   weights,
   assignment,
+  household,
   call = rlang::caller_env()
 ) {
   if (missing(intensity)) {
@@ -423,11 +463,30 @@ new_immigration_stream <- function(
       template = template,
       intensity = intensity,
       weights = weights,
-      assignment = assignment
+      assignment = assignment,
+      household = household
     ),
     class = "hammel_immigration_stream"
   )
   validate_immigration_stream(stream, call = call)
+  histories <- c(
+    unions = NROW(template$unions), transitions = NROW(template$transitions)
+  )
+  if (is.null(household) && any(histories > 0)) {
+    held <- names(histories)[histories > 0]
+    warn_hammel(
+      c(
+        "Migrants won't bring the template's {.field {held}}.",
+        "i" = paste(
+          "A stream without a household rule clones people without their",
+          "histories; use {.code household = household()} to import them."
+        )
+      ),
+      "no_effect",
+      argument = "household",
+      call = call
+    )
+  }
   stream
 }
 
@@ -459,6 +518,19 @@ validate_immigration_stream <- function(stream, call = rlang::caller_env()) {
     )
   }
   validate_process_weights(weights, "migrant", call = call)
+  household <- stream$household
+  if (!is.null(household) && !inherits(household, "hammel_household")) {
+    abort_hammel(
+      c(
+        "{.arg household} must be {.code NULL} or a household rule.",
+        "x" = "It is {describe_value(household)}.",
+        "i" = "Create one with {.fn household}."
+      ),
+      "specification",
+      argument = "household",
+      call = call
+    )
+  }
   assignment <- stream$assignment
   if (is.null(assignment)) {
     return(invisible(stream))
@@ -669,14 +741,89 @@ validate_migrant_assignment <- function(model, call = rlang::caller_env()) {
   invisible(model)
 }
 
-# Rows of the template's persons that can be drawn: alive at its end_time and
-# without a current (unended) union.
-eligible_migrants <- function(template) {
+# A stream's parties (D187). Without a household rule, each living person
+# is a one-person party to clone (D188). With one, the template's living
+# persons form households under D140's rule at its end_time: a carrier (the
+# woman in a current union, or an unpartnered person who is not a
+# dependent), their partner and the dependents of either, recursively. Returns the members'
+# template rows, party by party (carrier, partner, then dependents by birth),
+# the zero-based start of each party and its end, and links within parties
+# as member offsets (-1 none): parents, and each woman's current partner with
+# the union's template row.
+migrant_parties <- function(template, household) {
   persons <- template$persons
+  n <- nrow(persons)
+  if (is.null(household)) {
+    rows <- which(is.na(persons$death_time))
+    none <- rep(-1L, length(rows))
+    return(
+      list(
+        rows = rows,
+        party_start = c(0L, seq_along(rows)),
+        mother = none,
+        father = none,
+        partner = none,
+        union_row = rep(NA_integer_, length(rows))
+      )
+    )
+  }
+  alive <- is.na(persons$death_time)
   unions <- template$unions
-  current <- unions[is.na(unions$end_time), , drop = FALSE]
-  partnered <- c(current$wife_id, current$husband_id)
-  which(is.na(persons$death_time) & !persons$person_id %in% partnered)
+  current <- which(is.na(unions$end_time))
+  wife <- match(unions$wife_id[current], persons$person_id)
+  husband <- match(unions$husband_id[current], persons$person_id)
+  partner <- rep(NA_integer_, n)
+  partner[wife] <- husband
+  partner[husband] <- wife
+  union_row <- rep(NA_integer_, n)
+  union_row[wife] <- current
+  # A dependent attaches to their living mother, otherwise their living
+  # father; parents who are external relatives are absent.
+  mother <- match(persons$mother_id, persons$person_id)
+  father <- match(persons$father_id, persons$person_id)
+  living_mother <- !is.na(mother) & alive[mother]
+  living_father <- !is.na(father) & alive[father]
+  attached <- ifelse(
+    living_mother, mother, ifelse(living_father, father, NA_integer_)
+  )
+  dependent <- alive & is.na(partner) & !is.na(attached) &
+    persons$birth_time + household$age_independence > template$end_time
+  head <- seq_len(n)
+  repeat {
+    up <- dependent[head]
+    if (!any(up)) {
+      break
+    }
+    head[up] <- attached[head[up]]
+  }
+  male_head <- !is.na(partner[head]) & persons$sex[head] == "m"
+  carrier <- ifelse(male_head, partner[head], head)
+  members <- which(alive)
+  # Carrier first, then the partner, then dependents by birth, so parents
+  # precede their children.
+  rank <- ifelse(
+    members == carrier[members], 0L, ifelse(dependent[members], 2L, 1L)
+  )
+  members <- members[order(
+    carrier[members], rank, persons$birth_time[members], members
+  )]
+  party <- match(carrier[members], unique(carrier[members]))
+  first <- match(seq_len(max(c(0L, party))), party)
+  offset <- function(target) {
+    at <- match(target, members)
+    same <- !is.na(at) & party[at] == party[seq_along(at)]
+    ifelse(same, at - first[party], -1L)
+  }
+  list(
+    rows = members,
+    party_start = as.integer(c(first, length(members) + 1L) - 1L),
+    mother = as.integer(offset(mother[members])),
+    father = as.integer(offset(father[members])),
+    partner = as.integer(
+      ifelse(persons$sex[members] == "f", offset(partner[members]), -1L)
+    ),
+    union_row = as.integer(union_row[members])
+  )
 }
 
 # A stream's intensity as calendar intervals; a constant applies throughout.
@@ -787,15 +934,14 @@ prepare_stream <- function(
       call = call
     )
   }
-  rows <- eligible_migrants(template)
+  parties <- migrant_parties(template, stream$household)
+  rows <- parties$rows
   if (!length(rows)) {
     abort_hammel(
       c(
         "The stream's template has nobody who can migrate.",
-        "i" = paste(
-          "Migrants are drawn from people alive at the template's",
-          "{.field end_time} without a current partner."
-        )
+        "i" = "Migrants are drawn from people alive at the template's end."
+
       ),
       "population",
       argument = "template",
@@ -883,26 +1029,36 @@ prepare_stream <- function(
       call = call
     )
   }
-  members <- tibble::tibble(
+  # Every party member, and the carriers who represent parties in weights
+  # and assignment (D187).
+  people <- tibble::tibble(
     person_id = persons$person_id,
     age = template$end_time - persons$birth_time,
     sex = as.character(persons$sex)
   )
   for (d in shared) {
-    members[[d]] <- persons[[d]]
+    people[[d]] <- persons[[d]]
   }
+  starts <- parties$party_start
+  members <- people[utils::head(starts, -1) + 1L, , drop = FALSE]
   probabilities <- migrant_probabilities(
     stream$weights, members, registries[shared], name,
     call = call
   )
-  n <- nrow(members)
+  # Intensity is in persons per year; the clock counts parties (D187).
+  expected_size <- if (is.null(stream$household)) {
+    1
+  } else {
+    sum(probabilities * diff(starts))
+  }
+  n <- nrow(people)
   categories <- matrix(-1L, nrow = n, ncol = length(dimensions))
   assignment <- vector("list", length(dimensions))
   for (k in seq_along(dimensions)) {
     d <- dimensions[k]
     if (d %in% shared) {
       categories[, k] <- match(
-        as.character(members[[d]]), as.character(registries[[d]])
+        as.character(people[[d]]), as.character(registries[[d]])
       ) - 1L
     } else {
       assignment[[k]] <- assignment_probabilities(
@@ -912,26 +1068,55 @@ prepare_stream <- function(
       )
     }
   }
+  live <- template$unions[parties$union_row, , drop = FALSE]
   list(
     time_start = intensity$time_start,
     time_end = intensity$time_end,
-    intensity = intensity$intensity,
-    age = as.numeric(members$age),
-    female = members$sex == "f",
+    intensity = intensity$intensity / expected_size,
+    age = as.numeric(people$age),
+    female = people$sex == "f",
     categories = categories,
     ancestry = migrant_ancestry(
-      template, rows, members, dimensions, shared, registries, components
+      template, rows, people, dimensions, shared, registries, components
     ),
     cumulative = c(utils::head(cumsum(probabilities), -1), 1),
     assignment = assignment,
-    rows = rows
+    rows = rows,
+    party_start = as.integer(starts),
+    mother = parties$mother,
+    father = parties$father,
+    partner = parties$partner,
+    union_since = template$end_time - as.numeric(live$start_time),
+    union_cohab = if ("union_type" %in% names(live)) {
+      !is.na(live$union_type) & live$union_type == "cohab"
+    } else {
+      rep(FALSE, n)
+    },
+    union_row = parties$union_row
   ) |>
     c(
-      migrant_history_state(
-        template, rows, dimensions, shared, counts_cohab, cohab_enabled,
-        call = call
-      )
+      if (is.null(stream$household)) {
+        clone_state(n, length(dimensions))
+      } else {
+        migrant_history_state(
+          template, rows, dimensions, shared, counts_cohab, cohab_enabled,
+          call = call
+        )
+      }
     )
+}
+
+# Clones' state at arrival (D188): never partnered, parity zero, and every
+# group entered at arrival.
+clone_state <- function(n, dimensions) {
+  list(
+    parity = integer(n),
+    since_birth = rep(NA_real_, n),
+    previous_union = integer(n),
+    legal_previous = integer(n),
+    since_union_end = rep(NA_real_, n),
+    since_entry = matrix(NA_real_, nrow = n, ncol = dimensions)
+  )
 }
 
 # Template people: persons and any external relatives, in one table with the
@@ -1513,6 +1698,7 @@ import_histories <- function(
   external <- list()
   unions <- list()
   moves <- list()
+  live_unions <- list()
   for (s in seq_along(process$streams)) {
     a <- which(arrivals$stream == s - 1L)
     if (!length(a)) {
@@ -1526,13 +1712,22 @@ import_histories <- function(
       t_moves <- empty_transitions()
     }
     template_dims <- intersect(dimensions, names(template$groups))
+    # Clones import no records, and enter every group at arrival (D188).
+    if (is.null(process$streams[[s]]$household)) {
+      t_unions <- t_unions[0, , drop = FALSE]
+      t_moves <- t_moves[0, , drop = FALSE]
+      people <- people[0, , drop = FALSE]
+      template_dims <- character()
+    }
     assigned <- setdiff(dimensions, template_dims)
     pid <- arrivals$person_id[a]
     time <- arrivals$time[a]
     offset <- time - template$end_time
+    party <- arrivals$party[a]
     rows <- input$streams[[s]]$rows[arrivals$row[a] + 1L]
     tp <- template$persons$person_id[rows]
     key <- as.character(tp)
+    member_key <- paste(party, tp)
     # Records of each arrival's template person, as (arrival, record) pairs.
     pairs <- function(index) {
       found <- index[key]
@@ -1550,37 +1745,50 @@ import_histories <- function(
     children_of <- split(
       rep(seq_len(nrow(people)), 2L)[known], as.character(parents[known])
     )
+    # Each party's ended unions, once each; current unions arrive live from
+    # the engine (D187).
     u <- pairs(unions_of)
+    u_party <- party[u$arrival]
+    keep <- !duplicated(paste(u_party, u$record)) &
+      !is.na(t_unions$end_time[u$record])
+    u_party <- u_party[keep]
+    u_record <- u$record[keep]
+    u_first <- u$arrival[keep]
     k <- pairs(children_of)
-    # Relatives: partners in those unions and children; fresh IDs.
-    partner <- ifelse(
-      t_unions$wife_id[u$record] == tp[u$arrival],
-      t_unions$husband_id[u$record], t_unions$wife_id[u$record]
+    # Relatives: partners and children outside the party, once per party.
+    rel_party <- c(
+      u_party, u_party, party[k$arrival]
     )
-    rel_arrival <- c(u$arrival, k$arrival)
-    rel_id <- c(partner, people$person_id[k$record])
-    child <- rep(c(FALSE, TRUE), c(length(partner), length(k$record)))
-    keep <- !duplicated(paste(rel_arrival, rel_id))
-    rel_arrival <- rel_arrival[keep]
+    rel_id <- c(
+      t_unions$wife_id[u_record], t_unions$husband_id[u_record],
+      people$person_id[k$record]
+    )
+    child <- rep(
+      c(FALSE, TRUE), c(2L * length(u_record), length(k$record))
+    )
+    keep <- !paste(rel_party, rel_id) %in% member_key &
+      !duplicated(paste(rel_party, rel_id))
+    rel_party <- rel_party[keep]
     rel_id <- rel_id[keep]
     child <- child[keep]
     new_id <- next_person + seq_along(rel_id)
     next_person <- next_person + length(rel_id)
-    lookup_key <- c(paste(rel_arrival, rel_id), paste(seq_along(a), tp))
+    lookup_key <- c(paste(rel_party, rel_id), member_key)
     lookup_id <- c(new_id, pid)
-    map <- function(arrival, id) {
-      lookup_id[match(paste(arrival, id), lookup_key)]
+    map <- function(group, id) {
+      lookup_id[match(paste(group, id), lookup_key)]
     }
+    party_offset <- offset[match(rel_party, party)]
+    party_time <- time[match(rel_party, party)]
     if (length(rel_id)) {
       r <- match(rel_id, people$person_id)
-      shift <- offset[rel_arrival]
       table <- data.frame(
         person_id = new_id,
         sex = people$sex[r],
-        birth_time = people$birth_time[r] + shift,
-        death_time = people$death_time[r] + shift,
-        mother_id = ifelse(child, map(rel_arrival, people$mother_id[r]), NA),
-        father_id = ifelse(child, map(rel_arrival, people$father_id[r]), NA),
+        birth_time = people$birth_time[r] + party_offset,
+        death_time = people$death_time[r] + party_offset,
+        mother_id = ifelse(child, map(rel_party, people$mother_id[r]), NA),
+        father_id = ifelse(child, map(rel_party, people$father_id[r]), NA),
         stringsAsFactors = FALSE
       )
       for (d in dimensions) {
@@ -1603,20 +1811,32 @@ import_histories <- function(
       }
       table$censor_time <- ifelse(
         is.na(table$death_time),
-        ifelse(is.na(censor[r]), time[rel_arrival], censor[r] + shift),
+        ifelse(is.na(censor[r]), party_time, censor[r] + party_offset),
         table$death_time
       )
       external[[length(external) + 1L]] <- table
     }
-    if (length(u$record)) {
-      ids <- next_union + seq_along(u$record)
-      next_union <- next_union + length(u$record)
-      shift <- offset[u$arrival]
-      x <- t_unions[u$record, , drop = FALSE]
+    # Members' parents outside the party are external relatives when they
+    # were a member's previous partner (D187).
+    at <- match(pid, result$persons$person_id)
+    for (field in c("mother_id", "father_id")) {
+      outside <- map(party, template$persons[[field]][rows])
+      fill <- is.na(result$persons[[field]][at]) & !is.na(outside)
+      result$persons[[field]][at[fill]] <- outside[fill]
+    }
+    imported_key <- character()
+    imported_id <- numeric()
+    if (length(u_record)) {
+      ids <- next_union + seq_along(u_record)
+      next_union <- next_union + length(u_record)
+      shift <- offset[u_first]
+      x <- t_unions[u_record, , drop = FALSE]
+      imported_key <- paste(u_party, x$union_id)
+      imported_id <- ids
       table <- data.frame(
         union_id = ids,
-        wife_id = map(u$arrival, x$wife_id),
-        husband_id = map(u$arrival, x$husband_id),
+        wife_id = map(u_party, x$wife_id),
+        husband_id = map(u_party, x$husband_id),
         start_time = x$start_time + shift,
         end_time = x$end_time + shift,
         end_reason = as.character(x$end_reason),
@@ -1631,16 +1851,30 @@ import_histories <- function(
       }
       if ("previous_cohab_id" %in% names(result$unions)) {
         table$previous_cohab_id <- if ("previous_cohab_id" %in% names(x)) {
-          ids[match(
-            paste(u$arrival, x$previous_cohab_id),
-            paste(u$arrival, x$union_id)
-          )]
+          ids[match(paste(u_party, x$previous_cohab_id), imported_key)]
         } else {
           rep(NA_real_, nrow(x))
         }
       }
       table$pre_migration <- rep(TRUE, nrow(table))
       unions[[length(unions) + 1L]] <- table
+    }
+    # Unions that arrived live are pre-migration; a converted cohabitation
+    # links to its imported record.
+    live <- which(arrivals$union_party %in% party)
+    if (length(live)) {
+      x <- t_unions[arrivals$union_row[live], , drop = FALSE]
+      previous <- if ("previous_cohab_id" %in% names(x)) {
+        imported_id[match(
+          paste(arrivals$union_party[live], x$previous_cohab_id), imported_key
+        )]
+      } else {
+        rep(NA_real_, length(live))
+      }
+      live_unions[[length(live_unions) + 1L]] <- data.frame(
+        union_id = arrivals$union_id[live],
+        previous_cohab_id = previous
+      )
     }
     if (length(dimensions)) {
       imported <- list(arrival = integer(), record = integer())
@@ -1691,6 +1925,17 @@ import_histories <- function(
   }
   if (length(unions)) {
     result$unions <- bind_columns(result$unions, do.call(rbind, unions))
+  }
+  if (length(live_unions)) {
+    live <- do.call(rbind, live_unions)
+    at <- match(live$union_id, result$unions$union_id)
+    if (!"pre_migration" %in% names(result$unions)) {
+      result$unions$pre_migration <- rep(NA, nrow(result$unions))
+    }
+    result$unions$pre_migration[at] <- TRUE
+    if ("previous_cohab_id" %in% names(result$unions)) {
+      result$unions$previous_cohab_id[at] <- live$previous_cohab_id
+    }
   }
   if (length(moves)) {
     result$transitions <- bind_columns(
@@ -1759,13 +2004,30 @@ kin_people <- function(population, include_external) {
   rbind(people, extra)
 }
 
-# Unions observed in the population: those that did not start before an
-# immigrant partner's arrival (D186).
-observed_unions <- function(unions) {
+# Unions as observed in the population, with `.origin` holding each union's
+# start for duration axes. Pre-migration unions are left-truncated at their
+# partners' arrival (D187): those that ended by then are dropped, and the
+# rest are observed from it, so a union that arrived live contributes from
+# arrival at its imported duration.
+observed_unions <- function(population) {
+  unions <- population$unions
+  unions$.origin <- unions$start_time
   if (!"pre_migration" %in% names(unions)) {
     return(unions)
   }
-  unions[!unions$pre_migration, , drop = FALSE]
+  persons <- population$persons
+  arrival <- function(id) {
+    persons$arrival_time[match(id, persons$person_id)]
+  }
+  from <- pmax(
+    arrival(unions$wife_id), arrival(unions$husband_id),
+    na.rm = TRUE
+  )
+  pre <- unions$pre_migration & !is.na(from)
+  keep <- !unions$pre_migration |
+    (pre & (is.na(unions$end_time) | unions$end_time > from))
+  unions$start_time[pre] <- from[pre]
+  unions[keep, , drop = FALSE]
 }
 
 # With arrival records, unions and transitions record `pre_migration`;

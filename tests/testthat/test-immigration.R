@@ -221,7 +221,7 @@ test_that("migrants keep age and sex and arrive without relatives", {
   )
 })
 
-test_that("dead and partnered template people are not eligible", {
+test_that("cloning streams draw anyone alive without their histories", {
   unions <- data.frame(union_id = 1, wife_id = 1, husband_id = 2,
                        start_time = -5, end_time = NA_real_,
                        end_reason = NA_character_)
@@ -229,12 +229,46 @@ test_that("dead and partnered template people are not eligible", {
     c(30, 32, 40, 50, 70), c("f", "m", "f", "m", "f"), unions = unions,
     death_time = c(NA, NA, NA, NA, -1)
   )
-  expect_identical(eligible_migrants(template), 3:4)
-  model <- set_immigration(quiet_model(), a = immigration_stream(template, 50))
-  arrived <- arrivals_of(run_simulation(model, 2, seed = 2))
+  template$persons$mother_id[3] <- 1
+  expect_identical(migrant_parties(template, NULL)$rows, 1:4)
+  # A template with histories warns that clones leave them behind.
+  region <- list(region = migrant_assignment("fixed", fixed_value = "n"))
+  expect_warning(
+    stream <- immigration_stream(
+      template, 50,
+      assignment = region, household = NULL
+    ),
+    class = "hammel_warning_no_effect"
+  )
+  model <- make_model(10)
+  model$population$persons$region <- "n"
+  model <- model |>
+    set_groups(region = group(categories = "n")) |>
+    set_immigration(a = stream)
+  result <- run_simulation(model, 2, seed = 2)
+  arrived <- arrivals_of(result)
   age <- round(arrived$arrival_time - arrived$birth_time)
-  expect_setequal(unique(age), c(40, 50))
-  # Nobody eligible is an error before the run.
+  # Partnered people are cloned too; the dead are not.
+  expect_setequal(unique(age), c(30, 32, 40, 50))
+  # Clones arrive never partnered, at parity zero, with unknown parents and
+  # no imported records; each group is entered at arrival.
+  expect_false(any(c(result$unions$wife_id, result$unions$husband_id) %in%
+                     arrived$person_id))
+  expect_true(all(is.na(arrived$mother_id)))
+  expect_identical(NROW(result$external_relatives), 0L)
+  entry <- result$transitions[
+    result$transitions$person_id %in% arrived$person_id,
+  ]
+  expect_identical(nrow(entry), nrow(arrived))
+  expect_true(all(is.na(entry$origin)))
+  expect_equal(
+    entry$time, arrived$arrival_time[match(entry$person_id, arrived$person_id)]
+  )
+  # Templates without histories do not warn.
+  expect_no_warning(
+    immigration_stream(immigration_template(30), 1, household = NULL)
+  )
+  # Nobody alive is an error before the run.
   nobody <- immigration_template(30, death_time = -1)
   expect_hammel_error(
     run_simulation(

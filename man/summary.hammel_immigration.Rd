@@ -20,8 +20,10 @@
 \value{
 \code{summary()} returns an object of class \code{summary.hammel_immigration}
 containing \code{streams}, a named list with one element per stream holding
-\code{template_size} (persons in the template), \code{eligible} (template people who
-can be drawn), \code{intensity} (a number, or a tibble of calendar intervals),
+\code{template_size} (persons in the template), \code{eligible} (households, or for
+cloning streams template people, that can be drawn), \code{household} (the
+household rule's \code{age_independence}, or \code{NULL} for cloning streams),
+\code{intensity} (a number, or a tibble of calendar intervals),
 \code{weights} (a weight model summary, or \code{NULL} for uniform draws) and
 \code{assignment} (the method assigning each group dimension, named by
 dimension).
