@@ -5,8 +5,8 @@ and household arrivals with imported histories (phases 1 to 3), cloning
 streams, the automatic `birthplace` group, count and crude-rate intensities,
 template cuts, weight schedules and `calculate_immigration_rates()`. This is
 the current specification, following D177–D182 as amended and D184–D198;
-the [validation report](../validation/external_migration.qmd) awaits the
-user's assessment. Behavior depending on the [open decisions](#open-decisions)
+the user's [validation report](../validation/external_migration.qmd) checks
+the implemented behavior. Behavior depending on the [open decisions](#open-decisions)
 requires further user decisions before implementation. See the
 [roadmap](roadmap.md#post-release-immigration-from-outside-the-system) for
 scope. No emigration mechanism is selected here.

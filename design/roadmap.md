@@ -9,8 +9,9 @@ user reordered later milestones (D131). On November 6, D136 superseded that
 sequence: finish milestone 9, then prepare the first version bump and public
 release. The first public release was v0.1.0 on November 11, 2026, followed
 by v0.2.0 on November 16. External immigration and two-sex marriage models
-are post-release projects; external immigration is now implemented (D184–D198)
-and awaits the user's assessment of its validation report. Summary and print methods were added in PR #34, and D183 selects
+are post-release projects; external immigration is now implemented
+(D184–D198). Post-release features have no formal milestone acceptance; their
+validation reports are the user's working checks. Summary and print methods were added in PR #34, and D183 selects
 cli/rlang error and warning messages with condition classes (issue #25),
 replacing the output-presentation deferral in D151. Other diagnostic checks and
 helpers remain proposed; their release scope has not yet been selected.
@@ -25,9 +26,9 @@ or an unselected public API.
 | 7 | Time-varying rates, matching, and inheritance within a simulation run | Complete November 2, 2026 (D127); current engine and documented limitations retained |
 | 8 | Cell scheduling for all rate processes; formula and custom weight models | Complete November 5, 2026 (D130); documented limitations retained |
 | 9 | More than one group column, potentially including regions and internal migration | Complete November 6, 2026 (D141); documented limitations retained |
-| Post-release | Immigration from outside the system, tracking generation (formerly 10) | Implemented (D184–D198); [validation report](../validation/external_migration.qmd) awaiting user assessment |
+| Post-release | Immigration from outside the system, tracking generation (formerly 10) | Implemented (D184–D198); checked in the user's [validation report](../validation/external_migration.qmd) |
 | Release | First version bump and public release after milestone 9 | Released as v0.1.0, November 11, 2026 (D136); v0.2.0 November 16 |
-| Implemented, pending review | Diagnostic bullets and condition classes for errors and warnings | D183 (issue #25), superseding D151's deferral; summaries added in PR #34 |
+| Released | Diagnostic bullets and condition classes for errors and warnings | Released in v0.2.0 (D183, issue #25, PR #35), superseding D151's deferral; summaries added in PR #34 |
 | Unassigned | Model diagnostic checks and post-simulation helpers (formerly 11) | Proposed; scope and timing to select during release planning |
 | Post-release | Two-sex marriage model (formerly 12) | Deferred until after first public release (D136); model and API unselected |
 
@@ -336,9 +337,9 @@ v0.1.0. Implemented under D177–D182 as amended and D184–D198: named
 `immigration_stream()`s with count or crude-rate intensities, household
 arrivals with imported histories or cloned individuals, template cuts and
 weight schedules, the automatic `birthplace` group, user-defined generation
-groups and `calculate_immigration_rates()`. The
-[validation report](../validation/external_migration.qmd) awaits the user's
-assessment; implementation does not establish acceptance. See
+groups and `calculate_immigration_rates()`. The user's
+[validation report](../validation/external_migration.qmd) is a working check
+of the feature rather than a milestone acceptance. See
 [external immigration](immigration.md) for the current specification and its
 open decisions, including calendar schedules of migrant assignment,
 multigenerational households, migration-history depth and provenance,

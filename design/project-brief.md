@@ -116,7 +116,7 @@ The [roadmap](roadmap.md) records multiple group columns as milestone 9
 first public release, v0.1.0 (November 11, 2026), followed by v0.2.0
 (November 16). External immigration and two-sex marriage models are
 post-release projects: [external immigration](immigration.md) is implemented
-(D184–D198) and awaits the user's assessment, and the two-sex model and API
+(D184–D198), and the two-sex model and API
 remain unselected (D117). The scope of proposed summaries/helpers remains
 unselected. No future feature or
 publication is authorized by milestone completion. Fixed newborn assignment was

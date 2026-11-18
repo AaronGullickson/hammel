@@ -193,9 +193,10 @@ the user's agreement.
   complete on November 6, 2026 (D141), based on `validation/milestone9.qmd`.
   Under D136 the first public release followed (v0.1.0, November 11, 2026;
   v0.2.0, November 16). External immigration, a post-release project, is
-  implemented (D184–D198; see `design/immigration.md`) and its report
-  `validation/external_migration.qmd` awaits the user's assessment; the
-  two-sex model remains a post-release project.
+  implemented (D184–D198; see `design/immigration.md`).
+  `validation/external_migration.qmd` is the user's working check of the
+  feature, not a milestone acceptance report; post-release features have no
+  formal acceptance step. The two-sex model remains a post-release project.
   Distinguish current
   specifications from deferred mechanisms and future proposals.
 - `validation/milestone1.qmd` is the accepted historical assessment; reproduce it
