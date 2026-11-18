@@ -545,9 +545,11 @@ template endpoint, created with the same age and sex, unknown parents, no
 unions, parity zero and every group entered at arrival. Shared group dimensions copy the
 template category; others are drawn from `migrant_assignment()`
 probabilities. Ancestry is copied where the template tracks it and is
-otherwise all in the migrant's category. `persons` gains `arrival_time` and
-`stream` when the model has streams or the input has them. Observation
-kernels and living-kin counts start at the later of birth and arrival. See
+otherwise all in the migrant's category. `persons` gains `arrival_time`
+when the model has streams or the input has it. Observation kernels and
+living-kin counts start at the later of birth and arrival, and an
+immigrant's events at or before arrival, including imported events at the
+template's endpoint, are never counted. See
 the [phase 1 specification](immigration.md#phase-1-specification) (D185).
 
 Phase 2 (D186) imports each migrant's template unions, with their partners
@@ -584,7 +586,9 @@ declaration before the run: `"native"` plus the stream names, fixed native
 inheritance, ancestry only with `birthplace_ancestry = TRUE`. Each stream
 assigns its own name internally, ignoring the template's `birthplace`; it
 replaces the former `stream` column. The dimension is flagged `automatic`
-and excluded from only-dimension defaults. See the
+and excluded from only-dimension defaults, including when a transition
+without `group` is resolved at run time; naming it in a transition process
+is an error (D198). See the
 [birthplace group](immigration.md#birthplace-group).
 
 A `"custom"` migrant assignment (D193) is an R closure the engine calls at

@@ -1,15 +1,15 @@
 # External immigration design
 
-Planning discussion, November 12 and 16, 2026. Phases 1 to 3 of external
-immigration, including household parties, are implemented. This document
-consolidates
-the approach selected in D177–D182 and D184–D187 for design review on the
-`external-migration` branch. Behavior
-depending on the unresolved modeling choices below requires further user
-decisions before implementation. Illustrative field names do not establish
-a public API.
-See the [roadmap](roadmap.md#post-release-immigration-from-outside-the-system)
-for scope. No emigration mechanism is selected here.
+Updated November 18, 2026. External immigration is implemented: individual
+and household arrivals with imported histories (phases 1 to 3), cloning
+streams, the automatic `birthplace` group, count and crude-rate intensities,
+template cuts, weight schedules and `calculate_immigration_rates()`. This is
+the current specification, following D177–D182 as amended and D184–D198;
+the [validation report](../validation/external_migration.qmd) awaits the
+user's assessment. Behavior depending on the [open decisions](#open-decisions)
+requires further user decisions before implementation. See the
+[roadmap](roadmap.md#post-release-immigration-from-outside-the-system) for
+scope. No emigration mechanism is selected here.
 
 ## Purpose and intended workflow
 
@@ -53,7 +53,9 @@ remain separate responsibilities. The public interface is described in
 | Selective migration | A weight model, or a calendar schedule of them, selects among a stream's eligible template people; intensity is unchanged | D180, D184, D197 |
 | Migration histories | Separate personal/family facts from reusable, named classifications | D181 |
 | Rate schedules | Stratify by personal immigration status and stream; generation rules stay outside the required rate-table schema | D182 |
-| Birthplace | Automatic `birthplace` group (`"native"` or stream), replacing `stream`; optional heritage ancestry; never the only dimension | D190 |
+| Birthplace | Automatic `birthplace` group (`"native"` or stream), replacing `stream`; optional heritage ancestry; never the only dimension; no transitions | D190, D198 |
+| Generation | User-defined groups with custom inheritance and migrant assignment | D192, D193 |
+| Immigration rates | `calculate_immigration_rates()`: crude rates by period, `by` strata and stream; intervals adjusted for household dispersion | D194 |
 | Phase 3 contract | Household parties under D140's rule; carriers sampled; intensity in persons converted by expected party size; ongoing unions arrive live and are left-truncated | D187 |
 | Households | Arrivals are parties; household parties are phase 3 | D179–D180, D184, D187 |
 | Cloning | Household streams are the default; `household = NULL` clones age, sex and groups without history | D188 |
@@ -891,27 +893,25 @@ within the kinship-screening depth, and summaries preserving migration
 classifications. See the
 [burn-in helper discussion](roadmap.md#living-population-extraction-after-burn-in).
 
-Immigration separately needs arrival-aware exposure and event accounting so
-imported pre-arrival births and histories are not mistaken for destination
-events or exposure.
+Observation is arrival-aware without truncation (D185, D186): imported
+events at or before arrival are never destination events or exposure.
 
 ## Open decisions
 
 The following choices are open; listing an option does not select it.
+Source sampling (D189, D195), imported state and observation (D186),
+households (D187), template and weight schedules (D196, D197), intensity
+(D194), rate strata (D190) and the interface are settled.
 
 | Area | Decisions still needed |
 | --- | --- |
-| Source sampling | Weight-model variables beyond age, sex and groups in later phases |
-| Imported state | Settled for phase 2 (D186) |
-| Compatibility | Categories of future scheduled templates; calendar-scheduled assignments |
-| Calendar inputs | Template and weight-model schedules: interval columns, coverage, gaps and exact boundaries |
-| Households | Settled for phase 3 (D187) and selection variables (D189); multigenerational rules |
-| Migration history | Stored facts, source provenance, history depth, starting-population unknowns and restart persistence |
-| Duration of residence | Custom weight functions see `birth_time`, `arrival_time` and `bin$time` (D195); not formulas or matching |
-| Classifications | Generation is user-defined (D192): a declared group with custom inheritance and migrant assignment; per-member assignment for arriving households; recency shares by generation depth await quantitative characteristics |
-| Rate strata | Personal status and stream via the `birthplace` group (D190); generation strata |
-| Observation | Settled for phase 2 (D186) |
-| Timing and interface | Settled: argument order (intensity first, D194), the `"native"` label (D190) |
+| Calendar inputs | Calendar schedules of `migrant_assignment()` |
+| Households | Multigenerational household rules beyond D140's |
+| Migration history | Source provenance, history depth and restart persistence |
+| Duration of residence | Use in formulas and matching models; custom weight functions already see `arrival_time` (D195) |
+| Classifications | Recency shares by generation depth, awaiting quantitative characteristics; generation itself is user-defined (D192, D193) |
+| Template preparation | A truncation helper, deferred by D184 |
+| Emigration | No mechanism selected |
 
 No implementation milestone or scientific acceptance threshold is established
 here.

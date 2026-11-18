@@ -111,12 +111,14 @@ belongs to the user; completion does not establish universal accuracy or remove
 sparse-cell, calibration, or fertility-transition limitations. Weighted matching
 does not model marriage squeezes; fuller two-sex models remain future work.
 
-The [roadmap](roadmap.md) records multiple group columns as the current
-milestone 9 (D131/D134). Under D136, once it is completed and accepted, work
-turns to the first version bump and public release. External immigration and
-two-sex marriage models are post-release projects. The release version,
-criteria and scope of proposed summaries/helpers remain unselected; the
-two-sex model and API also remain unselected (D117). No future feature or
+The [roadmap](roadmap.md) records multiple group columns as milestone 9
+(D131/D134), accepted November 6, 2026. Under D136, work then turned to the
+first public release, v0.1.0 (November 11, 2026), followed by v0.2.0
+(November 16). External immigration and two-sex marriage models are
+post-release projects: [external immigration](immigration.md) is implemented
+(D184–D198) and awaits the user's assessment, and the two-sex model and API
+remain unselected (D117). The scope of proposed summaries/helpers remains
+unselected. No future feature or
 publication is authorized by milestone completion. Fixed newborn assignment was
 selected November 7, 2026 (D142), using an explicit category per dimension; see
 [group inheritance](group-inheritance.md).

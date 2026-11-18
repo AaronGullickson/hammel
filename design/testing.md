@@ -1765,3 +1765,21 @@ immigration files (without D195's two weight tests) made 1,830 native calls
 on `master` and this branch, and the five earlier immigration files 396 on
 commit 51c34e2 and this branch, all identical.
 `devtools::test()` passed 9,149 expectations with one skip.
+
+## Immigration review fixes (November 18, 2026)
+
+Fixes from a code review, each reproduced before the change and covered by
+a regression test. `test-immigration-households.R` checks that a converted
+cohabitation's end equals the live marriage's start when the template ends
+at 2000 and the destination at 0 (the run previously failed validation),
+and that a newborn and a union dated at the template's end report no
+destination births or union formations (four of each before the fix).
+`test-immigration-cuts.R` checks that cuts every 0.1 years over a 0.2-year
+run from 2000 are 2000 and 2000.1, not also 2000.2. Under D190 and D198,
+`test-immigration-birthplace.R` checks that a transition without `group`
+attached before `set_groups()` resolves past `birthplace` at run time, and
+that transitions in `birthplace` (to `"native"` or another stream) and an
+implicit fallback to it are `groups` errors. `test-immigration-intensity.R`
+now checks that `dispersion` is reported only with `conf_level`.
+`devtools::test()` passed 9,183 expectations with one skip, and
+`devtools::check()` reported no errors or warnings.

@@ -79,13 +79,14 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | One `by` argument for rate calculators; shared observation engine | D133 |
 | Multiple group dimensions: declaration, names, staging | D134 |
 | Matching prohibitions written as NA in `group_exogamy` | D135 |
-| First public release after milestone 9; immigration and two-sex models post-release | D136 |
+| First public release after milestone 9 (v0.1.0, November 11, 2026); immigration and two-sex models post-release | D136 |
 | GitHub milestones and Projects; multiple issues and PRs per milestone | D137 |
 | Matching calibration within separate markets | D138 |
 | `group_exogamy` table form for cross-dimension pair effects (`_x`/`_y` columns) | D139 |
 | Household moves for group transitions | D140 |
 | Milestone 9 accepted complete | D141 |
 | Error and warning messages: cli/rlang style, classes, function names | D183 (supersedes D151's deferral) |
+| External immigration: streams, templates, imported histories, households, birthplace, intensity, cuts and weights | D177–D182 as amended; D184–D190, D192–D198; D191 planned |
 
 ## Recorded decisions
 
@@ -2986,7 +2987,9 @@ available.
 
 ## D136 — First public release after the current milestone (November 6, 2026)
 
-**Status:** User decision, November 6, 2026.
+**Status:** User decision, November 6, 2026. The first public release was
+v0.1.0 on November 11, 2026, followed by v0.2.0 on November 16; external
+immigration followed as post-release work (D184–D198).
 
 **Decision:** Finish the current milestone (9, multiple group dimensions),
 then work toward the first version bump, coinciding with the first public
@@ -3533,8 +3536,9 @@ at its recorded commit.
 
 ## D177 — Absolute stochastic immigration intensity (November 12, 2026)
 
-**Status:** User modeling decision, November 12, 2026. Planning only;
-external immigration is not implemented by this decision.
+**Status:** User modeling decision, November 12, 2026, implemented through
+D185 (November 16, 2026). D194 adds crude-rate intensities alongside
+absolute counts.
 
 **Decision:** Specify external immigration through an absolute arrival
 intensity in migrants per year, with stochastic arrival times. The input is
@@ -3562,7 +3566,8 @@ schedule interface remain unresolved. See [the roadmap](roadmap.md#post-release-
 
 ## D178 — Multiple external migrant streams (November 12, 2026)
 
-**Status:** User modeling requirement, November 12, 2026. Planning only.
+**Status:** User modeling requirement, November 12, 2026, implemented
+through D185 (November 16, 2026) as named `immigration_stream()`s.
 
 **Decision:** Allow multiple external migrant streams in one simulation.
 Streams may represent countries or world regions of origin, with separate
@@ -3579,7 +3584,9 @@ select separate clocks versus an aggregated arrival clock.
 
 ## D179 — Sample migrant templates from a population (November 12, 2026)
 
-**Status:** User modeling decision, November 12, 2026. Planning only.
+**Status:** User modeling decision, November 12, 2026, implemented
+through D185–D188 (November 16, 2026): household parties by default, or
+clones with `household = NULL`.
 
 **Decision:** Use an existing `hammel_population` as the source template for
 a migrant stream, drawing with replacement. Preserve sampled migrants' age,
@@ -3604,8 +3611,10 @@ parity, birth spacing or previous/current unions initialize.
 ## D180 — Migrant-template preparation and schedules (November 12, 2026)
 
 **Status:** User requirements and design discussion, November 12, 2026.
-Planning only; no helper API or migration implementation is authorized here.
-The truncation requirement is deferred by D184.
+Template schedules are implemented as cuts of one template (D196) and
+selective migration as weight models and their schedules (D184, D197).
+The truncation requirement is deferred by D184; no preparation helper is
+implemented.
 
 **Requested capabilities:**
 
@@ -3635,8 +3644,11 @@ models remain unresolved.
 
 ## D181 — Migration histories and reusable classifications (November 12, 2026)
 
-**Status:** User-approved design direction, November 12, 2026. Documentation
-only; schemas, classification rules and APIs remain to be specified.
+**Status:** User-approved design direction, November 12, 2026. Personal
+migration facts are implemented as `arrival_time`, `pre_migration` and
+`external_relatives` (D185–D186) and the `birthplace` group (D190);
+classifications such as generation are user-defined groups (D192).
+History depth, provenance and restart persistence remain open.
 
 **Decision:** Keep personal migration facts and family migration history
 separate from derived generation/origin classifications. Support mixed-stream
@@ -3665,8 +3677,8 @@ signature, selection-weight interpretation or household rule is selected.
 
 ## D182 — Rate stratification by personal immigration status and stream (November 12, 2026)
 
-**Status:** User-approved design direction, November 12, 2026. Planning only;
-no rate-table schema or implementation is selected. Amended by D190: the
+**Status:** User-approved design direction, November 12, 2026, implemented
+through the `birthplace` group (D190). Amended by D190: the
 `birthplace` group carries personal status and stream, and starting populations
 default to `"native"`.
 
@@ -3741,8 +3753,8 @@ policy.
 
 ## D184 — Migrant parties, imported histories and external relatives (November 16, 2026)
 
-**Status:** User modeling decisions, November 16, 2026. Planning only; no
-implementation is authorized by this record.
+**Status:** User modeling decisions, November 16, 2026. Implemented in
+phases under D185–D187, authorized the same day.
 
 **Decision:**
 
