@@ -20,6 +20,14 @@ Empty results retain the enriched schema. The population is not modified.
 Return births where the mother was outside both cohabitation and marriage,
 with parent ages and optional groups supplied by \code{\link[=augment_persons]{augment_persons()}}.
 }
+\details{
+Births are extracted from the full histories in \code{persons}, not only from
+the simulated period. They include births before the simulation started
+and, with immigration, births before arrival of children who arrived with
+their parents. To keep only births during the simulation, filter the
+result on \code{birth_time}; children who arrived have a non-missing
+\code{arrival_time}.
+}
 \examples{
 population <- generate_uniform_population(1000)
 model <- hammel_model() |>

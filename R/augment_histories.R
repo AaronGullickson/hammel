@@ -144,6 +144,15 @@ augment_persons <- function(population) {
 #' Return births where the mother was outside both cohabitation and marriage,
 #' with parent ages and optional groups supplied by [augment_persons()].
 #'
+#' @details
+#'
+#' Births are extracted from the full histories in `persons`, not only from
+#' the simulated period. They include births before the simulation started
+#' and, with immigration, births before arrival of children who arrived with
+#' their parents. To keep only births during the simulation, filter the
+#' result on `birth_time`; children who arrived have a non-missing
+#' `arrival_time`.
+#'
 #' @param population A `hammel_population` with person and union
 #'   histories, such as the result of [run_simulation()].
 #' @return A separate tibble containing selected person rows and `age_mother`,

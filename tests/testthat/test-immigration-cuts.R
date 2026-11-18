@@ -108,6 +108,20 @@ test_that("arrivals come from the template as it stood at each cut", {
   expect_no_error(validate_population(result))
 })
 
+test_that("fractional steps don't add a cut at the run's end", {
+  # (2000.2 - 2000) / 0.1 exceeds 2 by rounding; the cuts are 2000 and
+  # 2000.1, which a template ending at 2000.1 covers.
+  stream <- list(
+    step = 0.1,
+    template = list(unrealized_since = 1990, end_time = 2000.1)
+  )
+  cuts <- template_cuts(stream, 2000, 2000.2)
+  expect_length(cuts, 2)
+  expect_true(all(cuts < 2000.2))
+  # A run shorter than one step still has its start.
+  expect_identical(template_cuts(stream, 2000, 2000.05), 2000)
+})
+
 test_that("cuts must lie within the template's simulated history", {
   # Cuts at 10, 15, 20 and 25; the template ends at 20.
   model <- cut_destination() |>

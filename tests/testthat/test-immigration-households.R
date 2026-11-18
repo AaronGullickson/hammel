@@ -6,8 +6,8 @@
 # Man 8 (50) lives alone; woman 9 (25) has child 10 by an unknown father;
 # man 11 (10) is an orphan whose mother 12 died at -2. Households: {1, 2, 4,
 # 6, 7}, {8}, {9, 10} and {11}. `cohab` makes the marriage a conversion of a
-# cohabitation that began at -12.
-household_template <- function(cohab = FALSE) {
+# cohabitation that began at -12. `at` moves every date to end at `at`.
+household_template <- function(cohab = FALSE, at = 0) {
   persons <- data.frame(
     person_id = 1:12,
     sex = c("f", "m", "f", "m", "f", "f", "m", "m", "f", "f", "m", "f"),
@@ -32,7 +32,11 @@ household_template <- function(cohab = FALSE) {
     unions$union_type <- c("marriage", "marriage", "cohab")
     unions$previous_cohab_id <- c(NA, 3, NA)
   }
-  hammel_population(persons, unions = unions, end_time = 0)
+  persons$birth_time <- persons$birth_time + at
+  persons$death_time <- persons$death_time + at
+  unions$start_time <- unions$start_time + at
+  unions$end_time <- unions$end_time + at
+  hammel_population(persons, unions = unions, end_time = at)
 }
 
 # Draw only the household carried by template person `id`.
@@ -350,6 +354,45 @@ test_that("cohabiting histories link to live unions and convert", {
   expect_identical(cohab$wife_id, live$wife_id)
   expect_equal(live$start_time - cohab$start_time, rep(2, nrow(live)))
   expect_true(all(cohab$pre_migration))
+
+  # On another calendar, translated dates must still meet exactly at the
+  # conversion.
+  model <- set_immigration(
+    model,
+    a = household_stream(
+      household_template(cohab = TRUE, at = 2000),
+      intensity = 15
+    )
+  )
+  result <- run_simulation(model, 2, seed = 9)
+  unions <- result$unions
+  live <- unions[is.na(unions$end_time), ]
+  expect_gt(nrow(live), 0)
+  cohab <- unions[match(live$previous_cohab_id, unions$union_id), ]
+  expect_identical(cohab$end_time, live$start_time)
+})
+
+test_that("events at the template's end are not destination events", {
+  # A newborn and a union dated at the template's end arrive at the
+  # arrival time itself; they are pre-migration.
+  persons <- data.frame(
+    person_id = 1:3, sex = c("f", "m", "f"), birth_time = c(-30, -32, 0),
+    death_time = NA_real_, mother_id = c(NA, NA, 1), father_id = c(NA, NA, 2)
+  )
+  unions <- data.frame(
+    union_id = 1, wife_id = 1, husband_id = 2, start_time = 0,
+    end_time = NA_real_, end_reason = NA_character_
+  )
+  template <- hammel_population(persons, unions = unions, end_time = 0)
+  model <- make_rate_model(0, search_rate = 0) |>
+    set_immigration(a = immigration_stream(per_year(3), template))
+  result <- run_simulation(model, 3, seed = 1)
+  expect_gt(sum(!is.na(result$persons$arrival_time)), 0)
+  expect_true(all(result$unions$pre_migration))
+  births <- calculate_fertility_rates(result, c(0, 3), c(0, 100))
+  expect_identical(sum(births$births), 0)
+  unions <- calculate_union_rates(result, c(0, 3), c(0, 100))
+  expect_identical(sum(unions$unions), 0)
 })
 
 test_that("a live cohabitation converts after arrival", {

@@ -28,7 +28,8 @@
 #' `birthplace` group whose categories match the stream names, plus a
 #' "native" category. This group can be used in the same way as any
 #' other group (e.g. to stratify rate schedules, apply weights in weight
-#' models). To track ancestry from this group, use the
+#' models), except that it can't have group transitions, since birthplace
+#' is fixed at birth or arrival. To track ancestry from this group, use the
 #' `birthplace_ancestry = TRUE` argument of this function.
 #'
 #' Simulated populations of models with immigration also gain an `arrival_time`
@@ -1238,6 +1239,8 @@ template_cuts <- function(stream, start, end, call = rlang::caller_env()) {
     return(start)
   }
   cuts <- start + step * (seq_len(max(1, ceiling((end - start) / step))) - 1)
+  # Rounding in the division can add a cut at the exclusive run end.
+  cuts <- cuts[cuts == start | cuts < end]
   template <- stream$template
   first <- template$unrealized_since
   if (is.null(first)) {
@@ -2455,6 +2458,13 @@ import_histories <- function(
     result$unions$pre_migration[at] <- TRUE
     if ("previous_cohab_id" %in% names(result$unions)) {
       result$unions$previous_cohab_id[at] <- live$previous_cohab_id
+      # The engine dates a live union from its imported duration, and the
+      # converted cohabitation was dated by the offset; the two can differ
+      # by rounding, so the cohabitation ends when the marriage starts.
+      cohab <- match(live$previous_cohab_id, result$unions$union_id)
+      linked <- !is.na(cohab)
+      result$unions$end_time[cohab[linked]] <-
+        result$unions$start_time[at[linked]]
     }
   }
   if (length(moves)) {

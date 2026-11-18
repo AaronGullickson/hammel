@@ -422,26 +422,55 @@ resolve_transition_processes <- function(
     )
   }
   dims <- names(declaration)
+  # The automatic birthplace dimension never counts as the only dimension
+  # (D190).
+  counted <- counted_dimensions(declaration)
   resolved <- list()
   for (key in names(processes)) {
     x <- processes[[key]]
     group <- x$group
     if (is.null(group)) {
-      if (length(dims) != 1L) {
+      if (length(counted) != 1L) {
+        problem <- if (length(counted)) {
+          c(
+            "x" = "The model declares {.val {counted}}.",
+            "i" = "Name the dimension with {.arg group}."
+          )
+        } else {
+          c(
+            "x" = "The model declares only the automatic {.field birthplace}.",
+            "i" = "Declare a dimension with {.fn set_groups}."
+          )
+        }
         abort_hammel(
           c(
             paste(
               "A group transition without {.arg group} needs exactly one",
               "declared group dimension."
             ),
-            "x" = "The model declares {.val {dims}}.",
-            "i" = "Name the dimension with {.arg group}."
+            problem
           ),
           "groups",
           call = call
         )
       }
-      group <- dims
+      group <- counted
+    }
+    # Birthplace is fixed at birth or arrival, so nobody moves in it (D198).
+    if (group %in% dims && isTRUE(declaration[[group]]$automatic)) {
+      abort_hammel(
+        c(
+          "Group transitions can't change {.field {group}}.",
+          "x" = paste(
+            "{.field {group}} records where people were born, fixed at",
+            "birth or arrival."
+          ),
+          "i" = "Remove the transition process for {.field {group}}."
+        ),
+        "groups",
+        group = group,
+        call = call
+      )
     }
     if (!group %in% dims) {
       abort_hammel(

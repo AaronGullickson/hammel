@@ -3991,7 +3991,8 @@ These variables let users target household composition directly.
 **Status:** User modeling decisions, November 16, 2026, amended November
 17 (ancestry off by default; named `birthplace`, because `origin` and
 `destination` are transition columns), when the user authorized
-implementation. Implemented November 17, 2026.
+implementation. Implemented November 17, 2026. Amended by D198: the
+dimension can't have transitions.
 
 **Decision:** Models with immigration always have a `birthplace` group
 dimension (see the [specification](immigration.md#birthplace-group)):
@@ -4184,3 +4185,28 @@ a policy change) without separate streams, and the D123 format matches the
 other processes' weight schedules.
 
 **Supersedes:** the rejection of immigration weight schedules (D185).
+
+## D198 — No group transitions in birthplace (November 18, 2026)
+
+**Status:** User decision, November 18, 2026, authorizing implementation.
+Implemented November 18, 2026.
+
+**Decision:** The automatic `birthplace` dimension (D190) can't have a
+transition process. Naming it in `set_group_transition(group = )` is an
+error at `run_simulation()`, when the model's dimensions are resolved; a
+transition without `group` never falls back to it. A model without
+immigration may still declare and move people in its own group named
+`birthplace`.
+
+**Rationale:** Birthplace is fixed at birth or arrival, so moves in it have
+no meaning. Allowing them broke the rule that an immigrant's birthplace is
+their stream: a move to `"native"` failed result validation after the run,
+and a move to another stream made `calculate_immigration_rates()` attribute
+arrivals to the destination stream, since it reads current birthplace.
+
+**Alternatives:** Allowing moves and recovering each arrival's stream from
+their entry row, which would make the dimension a current immigration
+status rather than a birthplace.
+
+**Amends:** D190's statement that the dimension is used like any group when
+named, and the specification's note on duration-based transitions in it.

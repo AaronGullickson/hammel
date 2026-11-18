@@ -195,6 +195,65 @@ test_that("birthplace never becomes the only dimension", {
   expect_true(all(rates$origin %in% c("A", "B")))
 })
 
+test_that("a transition attached before its groups skips birthplace", {
+  # Without `group`, the transition resolves at run time to the only
+  # declared dimension; the automatic birthplace doesn't count (D190).
+  model <- birthplace_model() |>
+    set_group_transition(
+      data.frame(
+        origin = "B", destination = "A", age_start = 0, age_end = Inf,
+        rate = 0.5
+      )
+    )
+  model$population$persons$race <- rep(c("A", "B"), each = 10)
+  model <- model |>
+    set_groups(race = group(categories = c("A", "B"))) |>
+    set_immigration(
+      asia = immigration_stream(
+        per_year(10), birthplace_template(),
+        assignment = list(race = migrant_assignment("fixed", fixed_value = "A"))
+      )
+    )
+  result <- run_simulation(model, 2, seed = 10)
+  expect_true(all(result$transitions$group[!is.na(
+    result$transitions$origin
+  )] == "race"))
+})
+
+test_that("birthplace can't have transitions", {
+  model <- birthplace_model() |>
+    set_immigration(
+      asia = immigration_stream(per_year(10), birthplace_template()),
+      europe = immigration_stream(per_year(10), birthplace_template())
+    )
+  for (destination in c("native", "europe")) {
+    moving <- set_group_transition(
+      model,
+      data.frame(
+        origin = "asia", destination = destination, age_start = 0,
+        age_end = Inf, rate = 1
+      ),
+      group = "birthplace"
+    )
+    error <- expect_hammel_error(
+      run_simulation(moving, 1, seed = 1),
+      "groups",
+      "run_simulation"
+    )
+    expect_identical(error$group, "birthplace")
+  }
+  # Without groups of its own, a transition without `group` can't fall back
+  # to birthplace.
+  implicit <- set_group_transition(
+    model,
+    data.frame(
+      origin = "asia", destination = "native", age_start = 0, age_end = Inf,
+      rate = 1
+    )
+  )
+  expect_hammel_error(run_simulation(implicit, 1), "groups", "run_simulation")
+})
+
 test_that("birthplace names and settings are validated", {
   template <- birthplace_template()
   expect_hammel_error(

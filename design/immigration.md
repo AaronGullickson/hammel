@@ -249,8 +249,10 @@ cloned.
 
 **Imported histories.** Each party member brings their recorded births,
 unions (including ended unions) and group transitions, including events
-before arrival. An imported event is pre-migration when it occurred before
-the person's arrival time; a union is classified by its start time. Unions
+before arrival. An imported event is pre-migration when it occurred at or
+before the person's arrival time: an event at the template's endpoint
+arrives dated at the arrival time itself. A union is classified by its
+start time. Unions
 and transitions record this in a stored `pre_migration` column (D186).
 Pre-migration events are not destination events and contribute no
 destination exposure; calculation and observation functions must exclude
@@ -599,7 +601,8 @@ comes from each partner's ended unions, as in phase 2.
 **Observation of unions.** Union calculations left-truncate unions at the
 arrival time instead of dropping pre-migration unions. A union contributes
 union-years, dissolutions and conversions only after both partners have
-arrived. Formation counts exclude unions that started before arrival. A
+arrived. Formation counts exclude unions that started at or before arrival.
+A
 pre-migration union that ended before arrival therefore still contributes
 nothing, as in phase 2.
 
@@ -680,15 +683,20 @@ name; the template's own `birthplace`, if any, is ignored, and
 `assignment` can't set it. The category therefore records personal
 immigration status and stream, which D182 rate strata, weight models,
 matching and `by = "birthplace"` observation use like any group. Each
-arrival gets an entry row in `birthplace`, so group duration starts at
-arrival and duration-based transitions in the dimension measure time since
-arrival.
+arrival gets an entry row in `birthplace`, so group duration in it starts
+at arrival.
+
+**No transitions.** Birthplace is fixed at birth or arrival, so the
+dimension can't have a transition process (D198). Naming it in
+`set_group_transition(group = )` is an error at `run_simulation()`, and a
+transition without `group` never falls back to it. A model without
+immigration may declare its own `birthplace` group and move people in it.
 
 **Only-dimension defaults.** The automatic dimension never counts as a
 model's only dimension: transitions without `group`, bare matching settings,
 default matching pools, transition rates without `group`, `transitions`
 input without a `group` column and observation by a single dimension all
-ignore it. It is used only when named.
+ignore it. It is used only when named, and never by transitions.
 
 **Ancestry: heritage.** `immigration(..., birthplace_ancestry = TRUE)` (and
 `set_immigration()`) tracks ancestry in `birthplace`; the default is

@@ -75,6 +75,12 @@ struct Histories {
     int from, to;
   };
   std::vector<std::vector<Move>> moves;
+  // Whether an event of person `i` at `t` precedes their observation.
+  // Imported events at the template's endpoint arrive dated at the arrival
+  // time itself, so an immigrant's events at their entry are pre-migration.
+  bool before_entry(int i, double t) const {
+    return t < entry[i] || (arrived[i] && t <= entry[i]);
+  }
 };
 
 // `target` maps each group index to a category of the dimension whose entry
@@ -480,7 +486,8 @@ List person_lexis_cpp(
     const auto& kids = h.children[i];
     for (size_t j = 0; j < kids.size(); ++j) {
       const double when = h.born[kids[j]];
-      if (when < h.entry[i]) {
+      // A child who arrived was born before migration, even at its time.
+      if (h.before_entry(i, when) || h.arrived[kids[j]]) {
         continue;
       }
       State x = state_at(line, when, kBirthEvent);
@@ -494,7 +501,7 @@ List person_lexis_cpp(
     }
     // Union formations, under the state before them.
     for (const auto& f : h.formations[i]) {
-      if (f.time < h.entry[i]) {
+      if (h.before_entry(i, f.time)) {
         continue;
       }
       const State& x = state_at(line, f.time, kFormationEvent);
@@ -518,7 +525,7 @@ List person_lexis_cpp(
     // another dimension may precede it, so the origin is the move's own.
     for (const auto& m : h.moves[i]) {
       if ((!target.empty() && target[m.from] == target[m.to]) ||
-          m.time < h.entry[i]) {
+          h.before_entry(i, m.time)) {
         continue;
       }
       State x = state_at(line, m.time, kTransitionEvent);

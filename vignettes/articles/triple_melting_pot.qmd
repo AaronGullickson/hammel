@@ -1,0 +1,40 @@
+---
+title: "Simulating the Triple Melting Pot"
+knitr:
+  opts_chunk:
+    collapse: true
+    comment: '#>'
+execute:
+  warning: false
+---
+
+```{r}
+#| label: setup
+
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+```{r}
+#| label: set-theme
+#| include: false
+
+set_theme(theme_bw())
+```
+
+During the first period of mass migration to the US between 1850-1960, immigrants diversified an ethnically homogenous white population before eventually being assimilated into a white mainstream. This was mostly keenly experienced in the period between 1880 and 1930 when immigration to the US shifted to Southern and Eastern European groups. The quota acts in the 1920s helped to largely reduce immigration and likely contributed to assimilation of these groups due to generational aging. 
+
+Another factor in the assimilation process were the so-called "triple melting pots" driven by intermarriage. Intermarriage across ethnic groups, but within large religious groups (specifically, Catholics, Protestants, and Jews) helped to reduce ethnically based boundaries, but strengthened religious boundaries.
+
+In this simulation, we will stylistically recreate this process by simulating the US population from 1870-1960, while allowing for multiple immigration streams.
+
+Ideally, we might like to have detailed immigration streams that capture specific ethnic/national groups, but for this article, we will use fairly large immigrant streams that capture important groupings. We will use the following immigration streams:
+
+- NW European: Including English, Scottish, Scandanavian, Dutch, and German immigrants. This was a more common immigrant flow in the early 19th century but receded in importance by the late 19th century.
+- Irish: The only specific ethnic group used here. Irish immigrants dominated immigration flows in the mid-19th century but that flow had declined by the late 19th century relative to the Southern and Eastern European migrants.
+- Southern European: Most commonly Italian immigrants.
+- Eastern European: A mix of Slavic and non-Slavic groups, as well as many Jews.
+
+

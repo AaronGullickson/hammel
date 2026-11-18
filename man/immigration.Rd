@@ -45,7 +45,8 @@ Simulations with an immigration process will automatically create a
 \code{birthplace} group whose categories match the stream names, plus a
 "native" category. This group can be used in the same way as any
 other group (e.g. to stratify rate schedules, apply weights in weight
-models). To track ancestry from this group, use the
+models), except that it can't have group transitions, since birthplace
+is fixed at birth or arrival. To track ancestry from this group, use the
 \code{birthplace_ancestry = TRUE} argument of this function.
 
 Simulated populations of models with immigration also gain an \code{arrival_time}
