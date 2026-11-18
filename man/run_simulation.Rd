@@ -4,7 +4,12 @@
 \alias{run_simulation}
 \title{Run a demographic simulation}
 \usage{
-run_simulation(model, years, seed = NULL, progress = FALSE)
+run_simulation(
+  model,
+  years,
+  seed = NULL,
+  progress = getOption("hammel.progress", interactive())
+)
 }
 \arguments{
 \item{model}{A \code{hammel_model} containing a population, mortality, fertility,
@@ -18,7 +23,9 @@ supported.}
 specified, simulation will use current RNG.}
 
 \item{progress}{Show a console progress bar based on elapsed simulation
-years. Defaults to \code{FALSE}.}
+years. Defaults to \verb{TRUE`` in interactive environments and }FALSE`` in
+non-interactive environments. Users can set the \code{hammel.progress} option
+to control its use.}
 }
 \value{
 A \code{hammel_population} with updated histories and endpoint, plus a

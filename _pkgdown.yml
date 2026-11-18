@@ -23,6 +23,7 @@ reference:
   - title: Model setup and simulation
     desc: Construct a model, attach its population and processes, and run a simulation.
     contents:
+      - hammel-package
       - hammel_model
       - summary.hammel_model
       - set_population
