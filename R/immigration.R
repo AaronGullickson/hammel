@@ -3,11 +3,9 @@
 
 # PUBLIC FUNCTIONS ---------------------------------------------------------
 
-#' Specify external immigration
+#' Specify external immigration process
 #'
 #' @description
-#'
-#' DRAFT: agent-written documentation that needs user review and editing.
 #'
 #' `immigration()` constructs an immigration process from one or more named
 #' streams of migrants arriving from outside the simulated population. Each
@@ -18,56 +16,41 @@
 #'
 #' @details
 #'
-#' Each named argument is one stream, and its name identifies the stream in
-#' the `birthplace` group of simulated persons. Every stream must be named,
-#' names must be unique, and no stream can be named `"native"` or
-#' `"birthplace_ancestry"`.
-#'
 #' A model has at most one immigration process. Each call to
 #' `set_immigration()` defines the complete set of streams, replacing any
-#' streams set earlier, as [set_groups()] replaces the whole group
-#' declaration. Calling `set_immigration(model)` without streams removes
-#' immigration from the model.
+#' streams set earlier. Calling `set_immigration(model)` without streams
+#' removes immigration from the model.
 #'
-#' Migrants arrive as households, or as clones of individuals when their
-#' stream has no household rule (see [immigration_stream()]). A household
-#' member keeps the age, sex and history of the template person they were
-#' drawn from, with every date shifted so that ages and durations at the
-#' template's `end_time` are unchanged at arrival.
-#' Their template unions arrive as pre-migration unions, and their previous
-#' partners and children become `external_relatives` of the simulated
-#' population: records that inform histories, such as parity and
-#' previous-union status, but are never simulated or counted. Their own
-#' parents are unknown unless they arrive in the same household. Group
-#' duration continues from the template, or for groups assigned by
-#' [migrant_assignment()] starts at arrival, recorded as a `transitions` row
-#' with no `origin`. A household's current union arrives with it, at its
-#' imported duration; it is a pre-migration union, so rate calculations count
-#' its dissolution and conversion only from arrival and never count its
-#' formation.
+#' Each named argument provides one [immigration_stream()]. Every stream must
+#' be named and streams cannot be named `"native"` or `"birthplace_ancestry"`.
 #'
-#' Models with immigration have an automatic group dimension, `birthplace`.
-#' Its categories are `"native"`, for everyone born in the population
-#' (including the starting population, unless it supplies a `birthplace`
-#' column), and the stream names, for immigrants. Like any group, it can
-#' stratify rates and appear in weight models, matching models and `by`
-#' arguments, but it never counts as a model's only dimension, and models
-#' with immigration can't declare their own `birthplace` group. With
-#' `birthplace_ancestry = TRUE`, ancestry is tracked in `birthplace`, so
-#' descendants of immigrants carry their heritage shares, such as
-#' `ancestry_birthplace_asia` in weight models.
+#' Simulations with an immigration process will automatically create a
+#' `birthplace` group whose categories match the stream names, plus a
+#' "native" category. This group can be used in the same way as any
+#' other group (e.g. to stratify rate schedules, apply weights in weight
+#' models). To track ancestry from this group, use the
+#' `birthplace_ancestry = TRUE` argument of this function.
 #'
-#' Simulated populations of models with immigration gain an `arrival_time`
+#' Simulated populations of models with immigration also gain an `arrival_time`
 #' column in `persons`, which is `NA` for people who did not immigrate, and a
-#' `pre_migration` column in `unions` and `transitions`.
-#' External relatives have a `censor_time`, after which nothing is known about
-#' them. Observation functions such as [calculate_life_table()] count a
-#' migrant's exposure and events only from their arrival.
+#' `pre_migration` column in `unions` and `transitions` that flags unions and
+#' transitions that occurred to migrants before entry. Additionally, simulations
+#' with immigration will contain an `external_relatives` tibble that includes
+#' relevant relatives of the migrating person for complete history. These
+#' relatives are partners from former unions and children that did not
+#' migrate with the person. These external relatives are not updated within
+#' the simulation and a `censor_time` is provided for their last date of
+#' observation.
+#'
+#' This additional returned information is provided
+#' in order to be able to reconstruct full histories for migrants. Events
+#' occurring prior to migration never show up in calculated rates, nor do
+#' person years of exposure for migrants prior to arrival.
 #'
 #' @param ... Named [immigration_stream()] objects, one per stream. The
 #'   argument names are the stream names.
 #' @param birthplace_ancestry Whether to track ancestry in the automatic
-#'   `birthplace` group. Defaults to `FALSE`, as for [group()].
+#'   `birthplace` group. Defaults to `FALSE`.
 #' @param model A `hammel_model` object, used by `set_immigration()`.
 #' @return `immigration()` returns an inspectable process inheriting from
 #'   `hammel_immigration` and `hammel_process`, with `name`, a named list
@@ -83,7 +66,7 @@
 #'   set_fertility(usa_2000_fertility) |>
 #'   set_union_formation("on_demand") |>
 #'   set_immigration(
-#'     origin = immigration_stream(data.frame(count = 20), template)
+#'     other_place = immigration_stream(data.frame(count = 20), template)
 #'   )
 #' result <- run_simulation(model, years = 10, seed = 1)
 #' table(result$persons$birthplace)
@@ -103,59 +86,62 @@ set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
 #'
 #' @description
 #'
-#' DRAFT: agent-written documentation that needs user review and editing.
-#'
 #' Describe a stream of migrants for [immigration()]: the template population
 #' migrants are drawn from, how many arrive, who is selected and how groups
 #' the template lacks are assigned.
 #'
 #' @details
 #'
-#' Arrivals follow a Poisson process. With a `count` intensity, the expected
-#' number of arrivals per year is the count, whatever the population's size.
-#' With a `rate` intensity, it is the rate times the number of people living
-#' in the simulated population at each moment, including earlier immigrants,
-#' so immigration grows and shrinks with the population. Either way, the
-#' expected number over a period is the integral of the intensity, and the
-#' actual number is random.
+#' Migrant arrivals follow a Poisson process. Users can enter the `intensity`
+#' rate for this Poisson process in one of two ways. With a `count` intensity,
+#' the expected number of arrivals per year is the count and this does not
+#' depend on the simulated population's size. With a `rate` intensity, it
+#' is the rate times the number of people living in the simulated population
+#' at each moment, including earlier immigrants, so immigration grows and
+#' shrinks with the population.
+#'
+#' To use either approach, users provide a data.frame with either a `count`
+#' or `rate` column. This data.frame can be banded by `time_start` and
+#' `time_end` to allow for changing immigration intensity over time. It
+#' cannot be stratified in any other way. For constant intensity, users
+#' provide a tibble with one row and one column (either `count` or `rate`).
+#'
+#' Migrants are sampled from the provided `template` population with
+#' replacement. Users can apply a [weight_model()] with the `weights`
+#' argument to target individuals more likely to be migrants (e.g. working
+#' age adults).
+#'
+#' By default, only the living members of the template's population at its end
+#' time are sampled. If the provided template population has a range of time
+#' that covers the current simulation, users can instead sample from living
+#' persons at different cut points that correspond to the time in the
+#' simulated population. To do so, users set `step` which determines how
+#' frequently the template population is updated to match the simulation
+#' time. For example, with `step = 5`, every five years of the simulation
+#' the living population of the template available for sampling will be updated
+#' to the simulation time. More frequent steps will slow the simulation.
 #'
 #' By default, the template's living people are divided into households as
 #' for household moves in [set_group_transition()]: a woman in a union and
 #' her partner, or an unpartnered adult, together with the dependents of
 #' either. Each arrival draws one household, with replacement, represented
-#' by its carrier: the woman in a union, or the unpartnered adult. Every
-#' member arrives at the same time, keeps their age at the template's
-#' `end_time` (so their birth time is the arrival time minus that age) and
-#' their history, and shares the categories assigned by `assignment`.
-#' `intensity` still counts people, so households arrive at `intensity`
-#' divided by the expected household size, and arrivals come in groups, with
-#' more variation than individual arrivals. Drawing does not change the
-#' template.
-#'
-#' With `step`, the template is cut over time instead: an arrival in
-#' `[start + k * step, start + (k + 1) * step)` is drawn from the template as
-#' it stood at `start + k * step`, with the people then alive, their unions,
-#' groups and children up to that time, and nothing after it. One long
-#' simulation of an origin population then supplies migrants whose ages,
-#' families and histories change with the origin over time. Migrants arrive
-#' as they were at the cut, with dates shifted to their arrival.
+#' by its carrier: the woman in a union, or the unpartnered adult. `intensity`
+#' rates are adjusted by household size to still produce correct rates for
+#' individual people.
 #'
 #' With `household = NULL`, the stream clones individuals instead: anyone
-#' alive at the template's `end_time` can be drawn, and keeps their age, sex
-#' and groups but none of their history. Clones arrive never partnered, with
-#' no children, unknown parents and group durations starting at arrival.
-#' This suits templates built for the purpose, such as young adults sampled
-#' as labor migrants; for templates with histories, household streams are
-#' more realistic, and a cloning stream warns that the histories will not
-#' be imported.
+#' drawn keeps their age, sex and groups but none of their history. Clones
+#' arrive never partnered, with no children, unknown parents and group
+#' durations starting at arrival. This suits templates built for the purpose,
+#' such as young adults sampled as labor migrants; for templates with histories,
+#' household streams are more realistic.
 #'
-#' Group dimensions that both the template and the simulation declare must
-#' have the same categories, and migrants keep their template category.
-#' Template dimensions that the simulation does not declare are ignored. Each
-#' simulation dimension that the template lacks needs a [migrant_assignment()]
-#' in `assignment`. When the simulation tracks ancestry for a dimension,
-#' migrants take their template ancestry shares if the template tracks them,
-#' and otherwise have all their ancestry in their category.
+#' If the template shares a group dimension with the simulated population, 
+#' this group dimension will be carried along with migrants along with any
+#' group transition history. Categories must be identically defined in shared
+#' group dimensions. Template group dimensions that the simulation does
+#' not declare are ignored. Each simulation group dimension that the template
+#' lacks needs a [migrant_assignment()] in `assignment`.
 #'
 #' @param intensity A data frame with exactly one nonnegative intensity
 #'   column: `count`, the expected arrivals per year, or `rate`, the expected
@@ -163,22 +149,19 @@ set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
 #'   calendar columns it has one row, applying throughout. Optional
 #'   `time_start` and `time_end` columns give piecewise-constant intensities
 #'   over half-open calendar intervals, which must not overlap and must cover
-#'   the simulation run; use a zero to pause a stream. The intensity can't
-#'   have other columns: who arrives is set by `template` and `weights`.
-#' @param template A `hammel_population` from which migrants are drawn.
-#' @param weights `NULL` (default) to draw eligible template people uniformly,
-#'   or a [weight_model()] whose formula or function may use `age` (at the
-#'   template's `end_time`, or the cut with `step`), `sex` and the template's
-#'   groups shared with the simulation. It may also be a calendar schedule, a
-#'   data frame with `time_start`, `time_end` and a list column `model` of
-#'   weight models covering the run, as for other processes; a custom function's `bin` then holds the interval's
-#'   `time_start` and `time_end`. Each eligible person is drawn with
-#'   probability proportional to their weight; weights do not change the
-#'   stream's intensity. For
-#'   household streams, weights describe each household by its carrier, and
-#'   may also use `partnered` (0/1), `household_size`, `n_dependents` and
+#'   the simulation run; use a zero to pause a stream.
+#' @param weights `NULL` (default) for unweighted selection of migrants, or
+#'   a [weight_model()] specification. The model may use `age` (at the
+#'   template's `end_time`, or at the cut with `step`), `sex` and the
+#'   template's groups shared with the simulation. For household streams,
+#'   weights apply to each household through its carrier, and the model may
+#'   also use `partnered` (0/1), `household_size`, `n_dependents` and
 #'   `partner_age` (`NA` for unpartnered carriers; in a formula the term then
-#'   contributes nothing).
+#'   contributes nothing). Weights change who is selected, not how many
+#'   arrive. To vary weights over time, provide a data frame with
+#'   `time_start`, `time_end` and a list column `model` of weight models
+#'   covering the run, as for other processes.
+#' @param template A `hammel_population` object from which migrants are drawn.
 #' @param assignment `NULL` (default) or a list of [migrant_assignment()]
 #'   objects named by the simulation's group dimensions that the template
 #'   lacks.
@@ -190,7 +173,7 @@ set_immigration <- function(model, ..., birthplace_ancestry = FALSE) {
 #'   start are drawn from the template as it stood at the interval's start.
 #'   The template must have been simulated on the same calendar over every
 #'   cut.
-#' @return An `hammel_immigration_stream` object.
+#' @return A `hammel_immigration_stream` object.
 #' @seealso [immigration()], [migrant_assignment()], [weight_model()]
 #' @export
 #' @examples
@@ -227,8 +210,6 @@ immigration_stream <- function(
 #'
 #' @description
 #'
-#' DRAFT: agent-written documentation that needs user review and editing.
-#'
 #' Describe how migrants in an [immigration_stream()] are assigned a category
 #' of a simulation group dimension that their template population lacks.
 #'
@@ -242,11 +223,10 @@ immigration_stream <- function(
 #'   probability zero, and the probabilities must sum to one.
 #' - `"custom"` calls `fun(members)` at each arrival. `members` is a tibble
 #'   with one row per arriving person, holding `person_id` (the template
-#'   ID), `age` (at arrival, which equals age at the template's `end_time`),
-#'   `sex`, the template's groups shared with the simulation and
-#'   `arrival_time`. For household streams it also holds `role`
-#'   (`"carrier"`, `"partner"` or `"dependent"`), `household` (a number
-#'   shared by the household's members) and the household's `partnered`
+#'   ID), `age` (at arrival), `sex`, the template's groups shared with the
+#'   simulation and `arrival_time`. For household streams it also holds
+#'   `role` (`"carrier"`, `"partner"` or `"dependent"`), `household` (a
+#'   number shared by the household's members) and `partnered`
 #'   (0/1), `household_size`, `n_dependents` and `partner_age` (`NA` for
 #'   unpartnered carriers). Rows come in household order, carrier first.
 #'   `fun` returns one category per row, so members
@@ -254,14 +234,15 @@ immigration_stream <- function(
 #'   made inside `fun`, for example with [sample()]; to keep a household
 #'   together, draw once and repeat the result.
 #'
-#' `"fixed"` and `"probability"` assign every member of a household the same
-#' category, drawn once per household. A `"custom"` function is called for
-#' every arriving household, so it is slower than the other methods, and is
+#' The `"fixed"` and `"probability"` methods assign every member of a household
+#' the same category, drawn once per household. A `"custom"` function is called
+#' for every arriving household, so it is slower than the other methods, and is
 #' not needed for groups the template already declares, which members keep.
 #'
 #' @param method One of `"fixed"`, `"probability"` or `"custom"`.
 #' @param fixed_value For `"fixed"`, one category label.
-#' @param probs For `"probability"`, probabilities named by category.
+#' @param probs For `"probability"`, probabilities named by category. Must sum 
+#'   to one.
 #' @param fun For `"custom"`, a function of `members` returning one category
 #'   per member, as described in details.
 #' @return A `hammel_migrant_assignment` object.
@@ -313,8 +294,6 @@ migrant_assignment <- function(
 #' Summarize an immigration process
 #'
 #' @description
-#'
-#' DRAFT: agent-written documentation that needs user review and editing.
 #'
 #' Summary method for class `"hammel_immigration"`
 #'

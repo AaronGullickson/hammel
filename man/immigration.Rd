@@ -3,7 +3,7 @@
 \name{immigration}
 \alias{immigration}
 \alias{set_immigration}
-\title{Specify external immigration}
+\title{Specify external immigration process}
 \usage{
 immigration(..., birthplace_ancestry = FALSE)
 
@@ -14,7 +14,7 @@ set_immigration(model, ..., birthplace_ancestry = FALSE)
 argument names are the stream names.}
 
 \item{birthplace_ancestry}{Whether to track ancestry in the automatic
-\code{birthplace} group. Defaults to \code{FALSE}, as for \code{\link[=group]{group()}}.}
+\code{birthplace} group. Defaults to \code{FALSE}.}
 
 \item{model}{A \code{hammel_model} object, used by \code{set_immigration()}.}
 }
@@ -25,8 +25,6 @@ of \code{streams} and \code{birthplace_ancestry}. \code{set_immigration()} retur
 updated \code{hammel_model}.
 }
 \description{
-DRAFT: agent-written documentation that needs user review and editing.
-
 \code{immigration()} constructs an immigration process from one or more named
 streams of migrants arriving from outside the simulated population. Each
 stream is described by \code{\link[=immigration_stream]{immigration_stream()}}. The convenience function
@@ -35,51 +33,36 @@ stream is described by \code{\link[=immigration_stream]{immigration_stream()}}. 
 model.
 }
 \details{
-Each named argument is one stream, and its name identifies the stream in
-the \code{birthplace} group of simulated persons. Every stream must be named,
-names must be unique, and no stream can be named \code{"native"} or
-\code{"birthplace_ancestry"}.
-
 A model has at most one immigration process. Each call to
 \code{set_immigration()} defines the complete set of streams, replacing any
-streams set earlier, as \code{\link[=set_groups]{set_groups()}} replaces the whole group
-declaration. Calling \code{set_immigration(model)} without streams removes
-immigration from the model.
+streams set earlier. Calling \code{set_immigration(model)} without streams
+removes immigration from the model.
 
-Migrants arrive as households, or as clones of individuals when their
-stream has no household rule (see \code{\link[=immigration_stream]{immigration_stream()}}). A household
-member keeps the age, sex and history of the template person they were
-drawn from, with every date shifted so that ages and durations at the
-template's \code{end_time} are unchanged at arrival.
-Their template unions arrive as pre-migration unions, and their previous
-partners and children become \code{external_relatives} of the simulated
-population: records that inform histories, such as parity and
-previous-union status, but are never simulated or counted. Their own
-parents are unknown unless they arrive in the same household. Group
-duration continues from the template, or for groups assigned by
-\code{\link[=migrant_assignment]{migrant_assignment()}} starts at arrival, recorded as a \code{transitions} row
-with no \code{origin}. A household's current union arrives with it, at its
-imported duration; it is a pre-migration union, so rate calculations count
-its dissolution and conversion only from arrival and never count its
-formation.
+Each named argument provides one \code{\link[=immigration_stream]{immigration_stream()}}. Every stream must
+be named and streams cannot be named \code{"native"} of \code{"birthplace_ancestry"}.
 
-Models with immigration have an automatic group dimension, \code{birthplace}.
-Its categories are \code{"native"}, for everyone born in the population
-(including the starting population, unless it supplies a \code{birthplace}
-column), and the stream names, for immigrants. Like any group, it can
-stratify rates and appear in weight models, matching models and \code{by}
-arguments, but it never counts as a model's only dimension, and models
-with immigration can't declare their own \code{birthplace} group. With
-\code{birthplace_ancestry = TRUE}, ancestry is tracked in \code{birthplace}, so
-descendants of immigrants carry their heritage shares, such as
-\code{ancestry_birthplace_asia} in weight models.
+Simulations with an immigration process will automatically create a
+\code{birthplace} group whose categories match the stream names, plus a
+"native" category. This group can be used in the same way as any
+other group (e.g. to stratify rate schedules, apply weights in weight
+models). To track ancestry from this group, use the
+\code{birthplace_ancestry = TRUE} argument of this function.
 
-Simulated populations of models with immigration gain an \code{arrival_time}
+Simulated populations of models with immigration also gain an \code{arrival_time}
 column in \code{persons}, which is \code{NA} for people who did not immigrate, and a
-\code{pre_migration} column in \code{unions} and \code{transitions}.
-External relatives have a \code{censor_time}, after which nothing is known about
-them. Observation functions such as \code{\link[=calculate_life_table]{calculate_life_table()}} count a
-migrant's exposure and events only from their arrival.
+\code{pre_migration} column in \code{unions} and \code{transitions} that flags unions and
+transitions that occurred to migrants before entry. Additionally, simulations
+with immigration will contain an \code{external_relatives} tibble that includes
+relevant relatives of the migrating person for complete history. These
+relatives are partners from former unions and children that did not
+migrate with the person. These external relatives are not updated within
+the simulation and a \code{censor_time} is provided for their last date of
+observation.
+
+This additional returned information is provided
+in order to be able to reconstruct full histories for migrants. Events
+occurring prior to migration never show up in calculated rates, nor do
+person years of exposure for migrants prior to arrival.
 }
 \examples{
 template <- generate_uniform_population(500)
@@ -89,7 +72,7 @@ model <- hammel_model() |>
   set_fertility(usa_2000_fertility) |>
   set_union_formation("on_demand") |>
   set_immigration(
-    origin = immigration_stream(data.frame(count = 20), template)
+    other_place = immigration_stream(data.frame(count = 20), template)
   )
 result <- run_simulation(model, years = 10, seed = 1)
 table(result$persons$birthplace)

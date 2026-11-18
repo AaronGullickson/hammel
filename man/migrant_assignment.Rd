@@ -11,7 +11,8 @@ migrant_assignment(method, fixed_value = NULL, probs = NULL, fun = NULL)
 
 \item{fixed_value}{For \code{"fixed"}, one category label.}
 
-\item{probs}{For \code{"probability"}, probabilities named by category.}
+\item{probs}{For \code{"probability"}, probabilities named by category. Must sum
+to one.}
 
 \item{fun}{For \code{"custom"}, a function of \code{members} returning one category
 per member, as described in details.}
@@ -20,8 +21,6 @@ per member, as described in details.}
 A \code{hammel_migrant_assignment} object.
 }
 \description{
-DRAFT: agent-written documentation that needs user review and editing.
-
 Describe how migrants in an \code{\link[=immigration_stream]{immigration_stream()}} are assigned a category
 of a simulation group dimension that their template population lacks.
 }
@@ -34,11 +33,10 @@ vector of probabilities named by category. Unlisted categories have
 probability zero, and the probabilities must sum to one.
 \item \code{"custom"} calls \code{fun(members)} at each arrival. \code{members} is a tibble
 with one row per arriving person, holding \code{person_id} (the template
-ID), \code{age} (at arrival, which equals age at the template's \code{end_time}),
-\code{sex}, the template's groups shared with the simulation and
-\code{arrival_time}. For household streams it also holds \code{role}
-(\code{"carrier"}, \code{"partner"} or \code{"dependent"}), \code{household} (a number
-shared by the household's members) and the household's \code{partnered}
+ID), \code{age} (at arrival), \code{sex}, the template's groups shared with the
+simulation and \code{arrival_time}. For household streams it also holds
+\code{role} (\code{"carrier"}, \code{"partner"} or \code{"dependent"}), \code{household} (a
+number shared by the household's members) and \code{partnered}
 (0/1), \code{household_size}, \code{n_dependents} and \code{partner_age} (\code{NA} for
 unpartnered carriers). Rows come in household order, carrier first.
 \code{fun} returns one category per row, so members
@@ -47,10 +45,10 @@ made inside \code{fun}, for example with \code{\link[=sample]{sample()}}; to kee
 together, draw once and repeat the result.
 }
 
-\code{"fixed"} and \code{"probability"} assign every member of a household the same
-category, drawn once per household. A \code{"custom"} function is called for
-every arriving household, so it is slower than the other methods, and is
-not needed for groups the template already declares, which members keep.
+The \code{"fixed"} and \code{"probability"} methods assign every member of a household the
+same category, drawn once per household. A \code{"custom"} function is called for
+every arriving household, so it is slower than the other methods, and is not
+needed for groups the template already declares, which members keep.
 }
 \examples{
 migrant_assignment("fixed", fixed_value = "north")

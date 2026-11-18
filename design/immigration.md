@@ -120,12 +120,13 @@ arrival. `by` accepts `"sex"` and declared dimensions except `birthplace`,
 which is an error pointing to `streams`. `streams = TRUE` splits each
 stratum's arrivals by stream over the stratum's person-years, so stream
 rates sum to the stratum's rate, matching the crude-rate definition of
-`rate` intensities. Household arrivals are compound Poisson, so each row
-reports `dispersion`, the sum of squared household sizes over its arrivals
-(households identified by shared arrival time and stream), and confidence
-intervals are exact Poisson intervals for arrivals and person-years both
-divided by it; individual arrivals have dispersion 1 and unchanged
-intervals.
+`rate` intensities. Household arrivals are compound Poisson, so with
+`conf_level` each row also reports `dispersion`, the sum of squared
+household sizes over its arrivals (households identified by shared arrival
+time and stream), and confidence intervals are exact Poisson intervals for
+arrivals and person-years both divided by it; individual arrivals have
+dispersion 1 and unchanged intervals. Without `conf_level`, `dispersion` is
+not reported.
 
 ## Interface
 

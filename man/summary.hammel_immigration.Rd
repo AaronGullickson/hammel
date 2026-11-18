@@ -32,8 +32,6 @@ household rule's \code{age_independence}, or \code{NULL} for cloning streams),
 dimension).
 }
 \description{
-DRAFT: agent-written documentation that needs user review and editing.
-
 Summary method for class \code{"hammel_immigration"}
 }
 \examples{

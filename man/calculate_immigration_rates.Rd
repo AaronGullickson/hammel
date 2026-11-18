@@ -26,21 +26,27 @@ group dimensions other than \code{birthplace} to stratify by.}
 
 \item{conf_level}{\code{NULL} (default) for no confidence interval, or a
 confidence level between 0 and 1 for intervals in \code{conf_low} and
-\code{conf_high}, adjusted for household clumping as described in details.}
+\code{conf_high}, adjusted for household clustering as described in details.}
 }
 \value{
 A tibble with \code{time_start}, \code{time_end}, the \code{by} columns,
 \code{birthplace} (with \code{streams = TRUE}), \code{arrivals}, \code{person_years},
-\code{rate_immigration} and \code{dispersion}, plus \code{conf_low} and \code{conf_high}
+and \code{rate_immigration}, plus \code{dispersion}, \code{conf_low} and \code{conf_high}
 when \code{conf_level} is given.
 }
 \description{
-DRAFT: agent-written documentation that needs user review and editing.
-
 Calculate crude immigration rates, arrivals per person-year lived in the
 population, by time interval and optionally by sex, group and stream.
 }
 \details{
+Crude immigration rates use an exposure count of the destination population
+even though events are drawn from the origin population and thus it may
+be misleading to think of them as true hazard rates. Nonetheless, they
+do provide a measure of migration flow relative to destination population
+size and net migration rates are a key component of the crude growth
+rate formula: (birth rate) - (death rate) + (net migration rate). Currently,
+emigration is not possible within the simulation engine.
+
 Person-years are lived by everyone in \code{persons}: immigrants from their
 arrival, everyone else from birth, and no one after death or the
 population's \code{end_time}. External relatives are never counted. Arrivals
@@ -55,17 +61,17 @@ classified by their category at arrival. \code{birthplace} can't be used in
 
 With \code{streams = TRUE}, each stratum's arrivals are split by stream (the
 immigrants' \code{birthplace}) over the stratum's person-years, so the streams'
-rates sum to the stratum's rate. This is the rate a \code{rate} intensity in
-\code{\link[=immigration_stream]{immigration_stream()}} specifies.
+rates sum to the stratum's rate.
 
-Household streams bring people in groups, so arrivals vary more than a
-Poisson count. \code{dispersion} measures this in each row: the sum of squared
-household sizes over the number of arrivals, 1 when everyone arrives
-alone. Confidence intervals are exact Poisson intervals for arrivals and
-person-years both divided by \code{dispersion}, which widens them for
-household streams; members of a household are recognized by their shared
-arrival time and stream. With few households in a row, the dispersion is
-itself uncertain.
+When \code{conf_level} is set, \code{conf_low} and \code{conf_high} columns are included in
+the returned object, corresponding to the desired confidence interval of the
+rate. These confidence intervals are determined by the exact Poisson
+process, not normal approximation. When migrants arrive by households rather
+than as individuals, arrivals will vary more than a Poisson count. The
+confidence intervals account for this overdisperson which is measured by the
+sum of squared household sizes over the number of arrivals. The
+\code{dispersion} is reported along with \code{conf_low} and \code{conf_high} when
+\code{conf_level} is not NULL.
 }
 \examples{
 template <- generate_uniform_population(200)

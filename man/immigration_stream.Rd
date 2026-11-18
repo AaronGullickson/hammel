@@ -20,24 +20,21 @@ arrivals per person-year lived in the simulated population. Without
 calendar columns it has one row, applying throughout. Optional
 \code{time_start} and \code{time_end} columns give piecewise-constant intensities
 over half-open calendar intervals, which must not overlap and must cover
-the simulation run; use a zero to pause a stream. The intensity can't
-have other columns: who arrives is set by \code{template} and \code{weights}.}
+the simulation run; use a zero to pause a stream.}
 
-\item{template}{A \code{hammel_population} from which migrants are drawn.}
+\item{template}{A \code{hammel_population} object from which migrants are drawn.}
 
-\item{weights}{\code{NULL} (default) to draw eligible template people uniformly,
-or a \code{\link[=weight_model]{weight_model()}} whose formula or function may use \code{age} (at the
-template's \code{end_time}, or the cut with \code{step}), \code{sex} and the template's
-groups shared with the simulation. It may also be a calendar schedule, a
-data frame with \code{time_start}, \code{time_end} and a list column \code{model} of
-weight models covering the run, as for other processes; a custom function's \code{bin} then holds the interval's
-\code{time_start} and \code{time_end}. Each eligible person is drawn with
-probability proportional to their weight; weights do not change the
-stream's intensity. For
-household streams, weights describe each household by its carrier, and
-may also use \code{partnered} (0/1), \code{household_size}, \code{n_dependents} and
+\item{weights}{\code{NULL} (default) for unweighted selection of migrants, or
+a \code{\link[=weight_model]{weight_model()}} specification. The model may use \code{age} (at the
+template's \code{end_time}, or at the cut with \code{step}), \code{sex} and the
+template's groups shared with the simulation. For household streams,
+weights apply to each household through its carrier, and the model may
+also use \code{partnered} (0/1), \code{household_size}, \code{n_dependents} and
 \code{partner_age} (\code{NA} for unpartnered carriers; in a formula the term then
-contributes nothing).}
+contributes nothing). Weights change who is selected, not how many
+arrive. To vary weights over time, provide a data frame with
+\code{time_start}, \code{time_end} and a list column \code{model} of weight models
+covering the run, as for other processes.}
 
 \item{assignment}{\code{NULL} (default) or a list of \code{\link[=migrant_assignment]{migrant_assignment()}}
 objects named by the simulation's group dimensions that the template
@@ -54,61 +51,64 @@ The template must have been simulated on the same calendar over every
 cut.}
 }
 \value{
-An \code{hammel_immigration_stream} object.
+A \code{hammel_immigration_stream} object.
 }
 \description{
-DRAFT: agent-written documentation that needs user review and editing.
-
 Describe a stream of migrants for \code{\link[=immigration]{immigration()}}: the template population
 migrants are drawn from, how many arrive, who is selected and how groups
 the template lacks are assigned.
 }
 \details{
-Arrivals follow a Poisson process. With a \code{count} intensity, the expected
-number of arrivals per year is the count, whatever the population's size.
-With a \code{rate} intensity, it is the rate times the number of people living
-in the simulated population at each moment, including earlier immigrants,
-so immigration grows and shrinks with the population. Either way, the
-expected number over a period is the integral of the intensity, and the
-actual number is random.
+Migrant arrivals follow a Poisson process. Users can enter the \code{intensity}
+rate for this Poisson process in one of two ways. With a \code{count} intensity,
+the expected number of arrivals per year is the count and this does not
+depend on the simulated population's size. With a \code{rate} intensity, it
+is the rate times the number of people living in the simulated population
+at each moment, including earlier immigrants, so immigration grows and
+shrinks with the population.
+
+To use either approach, users provide a data.frame with either a \code{count}
+or \code{rate} column. This data.frame can be banded by \code{time_start} and
+\code{time_end} to allow for changing immigration intensity over time. It
+cannot be stratified in any other way. For constant intensity, users
+provide a tibble with one row and one column (either \code{count} or \code{rate}).
+
+Migrants are sampled from the provided \code{template} population with
+replacement. Users can apply a \code{\link[=weight_model]{weight_model()}} with the \code{weights}
+argument to target individuals more likely to be migrants (e.g. working
+age adults).
+
+By default, only the living members of the template's population at its end
+time are sampled. If the provided template population has a range of time
+that covers the current simulation, users can instead sample from living
+persons at different cut points that correspond to the time in the
+simulated population. To do so, users set \code{step} which determines how
+frequently the template population is updated to match the simulation
+time. For example, with \code{step = 5}, every five years of the simulation
+the living population of the template available for sampling will be updated
+to the simulation time. More frequent steps will slow the simulation.
 
 By default, the template's living people are divided into households as
 for household moves in \code{\link[=set_group_transition]{set_group_transition()}}: a woman in a union and
 her partner, or an unpartnered adult, together with the dependents of
 either. Each arrival draws one household, with replacement, represented
-by its carrier: the woman in a union, or the unpartnered adult. Every
-member arrives at the same time, keeps their age at the template's
-\code{end_time} (so their birth time is the arrival time minus that age) and
-their history, and shares the categories assigned by \code{assignment}.
-\code{intensity} still counts people, so households arrive at \code{intensity}
-divided by the expected household size, and arrivals come in groups, with
-more variation than individual arrivals. Drawing does not change the
-template.
-
-With \code{step}, the template is cut over time instead: an arrival in
-\verb{[start + k * step, start + (k + 1) * step)} is drawn from the template as
-it stood at \code{start + k * step}, with the people then alive, their unions,
-groups and children up to that time, and nothing after it. One long
-simulation of an origin population then supplies migrants whose ages,
-families and histories change with the origin over time. Migrants arrive
-as they were at the cut, with dates shifted to their arrival.
+by its carrier: the woman in a union, or the unpartnered adult. \code{intensity}
+rates are adjusted by household size to still produce correct rates for
+individual people.
 
 With \code{household = NULL}, the stream clones individuals instead: anyone
-alive at the template's \code{end_time} can be drawn, and keeps their age, sex
-and groups but none of their history. Clones arrive never partnered, with
-no children, unknown parents and group durations starting at arrival.
-This suits templates built for the purpose, such as young adults sampled
-as labor migrants; for templates with histories, household streams are
-more realistic, and a cloning stream warns that the histories will not
-be imported.
+drawn keeps their age, sex and groups but none of their history. Clones
+arrive never partnered, with no children, unknown parents and group
+durations starting at arrival. This suits templates built for the purpose,
+such as young adults sampled as labor migrants; for templates with histories,
+household streams are more realistic.
 
-Group dimensions that both the template and the simulation declare must
-have the same categories, and migrants keep their template category.
-Template dimensions that the simulation does not declare are ignored. Each
-simulation dimension that the template lacks needs a \code{\link[=migrant_assignment]{migrant_assignment()}}
-in \code{assignment}. When the simulation tracks ancestry for a dimension,
-migrants take their template ancestry shares if the template tracks them,
-and otherwise have all their ancestry in their category.
+If the template shares a group dimension with the simulated population,
+this group dimension will be carried along with migrants along with any
+group transition history. Categories must be identically defined in shared
+group dimensions. Template group dimensions that the simulation does
+not declare are ignored. Each simulation group dimension that the template
+lacks needs a \code{\link[=migrant_assignment]{migrant_assignment()}} in \code{assignment}.
 }
 \examples{
 template <- generate_uniform_population(500)

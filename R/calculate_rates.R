@@ -22,6 +22,11 @@
 #' All breaks defined by the function use half-open intervals that are inclusive
 #' at the lower bound and exclusive at the upper bound.
 #'
+#' When `conf_level` is set, `conf_low` and `conf_high` columns are included in
+#' the returned object, corresponding to the desired confidence interval of the
+#' rate. This confidence interval is determined by the exact Poisson interval,
+#' not normal approximation.
+#'
 #' For more details on each rate, see below.
 #'
 #' @param population A `hammel_population` object returned from
@@ -722,12 +727,18 @@ calculate_union_rates <- function(
 #'
 #' @description
 #'
-#' DRAFT: agent-written documentation that needs user review and editing.
-#'
 #' Calculate crude immigration rates, arrivals per person-year lived in the
 #' population, by time interval and optionally by sex, group and stream.
 #'
 #' @details
+#'
+#' Crude immigration rates use an exposure count of the destination population
+#' even though events are drawn from the origin population and thus it may
+#' be misleading to think of them as true hazard rates. Nonetheless, they
+#' do provide a measure of migration flow relative to destination population
+#' size and net migration rates are a key component of the crude growth
+#' rate formula: (birth rate) - (death rate) + (net migration rate). Currently,
+#' emigration is not possible within the simulation engine.
 #'
 #' Person-years are lived by everyone in `persons`: immigrants from their
 #' arrival, everyone else from birth, and no one after death or the
@@ -743,17 +754,17 @@ calculate_union_rates <- function(
 #'
 #' With `streams = TRUE`, each stratum's arrivals are split by stream (the
 #' immigrants' `birthplace`) over the stratum's person-years, so the streams'
-#' rates sum to the stratum's rate. This is the rate a `rate` intensity in
-#' [immigration_stream()] specifies.
+#' rates sum to the stratum's rate.
 #'
-#' Household streams bring people in groups, so arrivals vary more than a
-#' Poisson count. `dispersion` measures this in each row: the sum of squared
-#' household sizes over the number of arrivals, 1 when everyone arrives
-#' alone. Confidence intervals are exact Poisson intervals for arrivals and
-#' person-years both divided by `dispersion`, which widens them for
-#' household streams; members of a household are recognized by their shared
-#' arrival time and stream. With few households in a row, the dispersion is
-#' itself uncertain.
+#' When `conf_level` is set, `conf_low` and `conf_high` columns are included in
+#' the returned object, corresponding to the desired confidence interval of the
+#' rate. This confidence intervals is determined by the exact Poisson 
+#' interval, not normal approximation. When migrants arrive by households rather
+#' than as individuals, arrivals will vary more than a Poisson count. The
+#' confidence intervals account for this overdispersion which is measured by the
+#' sum of squared household sizes over the number of arrivals. The
+#' `dispersion` is reported along with `conf_low` and `conf_high` when
+#' `conf_level` is not `NULL`.
 #'
 #' @param population A `hammel_population` object returned from
 #'   [run_simulation()].
@@ -764,10 +775,10 @@ calculate_union_rates <- function(
 #' @param streams Whether to split arrivals by stream. Defaults to `FALSE`.
 #' @param conf_level `NULL` (default) for no confidence interval, or a
 #'   confidence level between 0 and 1 for intervals in `conf_low` and
-#'   `conf_high`, adjusted for household clumping as described in details.
+#'   `conf_high`, adjusted for household clustering as described in details.
 #' @return A tibble with `time_start`, `time_end`, the `by` columns,
 #'   `birthplace` (with `streams = TRUE`), `arrivals`, `person_years`,
-#'   `rate_immigration` and `dispersion`, plus `conf_low` and `conf_high`
+#'   and `rate_immigration`, plus `dispersion`, `conf_low` and `conf_high`
 #'   when `conf_level` is given.
 #' @seealso [immigration_stream()], [calculate_rates]
 #' @export
@@ -889,6 +900,10 @@ calculate_immigration_rates <- function(
   result <- result[c(
     keys, "arrivals", "person_years", "rate_immigration", "dispersion"
   )]
+  # Dispersion is reported only with the intervals it adjusts.
+  if (is.null(conf_level)) {
+    result$dispersion <- NULL
+  }
   scaled_rate_confidence(result, conf_level)
 }
 

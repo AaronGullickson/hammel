@@ -235,7 +235,7 @@ test_that("immigration rates stratify arrivals and person-years together", {
     split,
     c(
       "time_start", "time_end", "sex", "region", "birthplace", "arrivals",
-      "person_years", "rate_immigration", "dispersion"
+      "person_years", "rate_immigration"
     )
   )
   expect_identical(sum(split$arrivals), total$arrivals)
@@ -293,8 +293,16 @@ test_that("household arrivals widen intervals by their dispersion", {
   )$conf.int
   expect_gt(rates$conf_high - rates$conf_low, diff(plain))
   # Split by sex, each household has one member in each stratum.
-  by_sex <- calculate_immigration_rates(result, c(0, 5), by = "sex")
+  by_sex <- calculate_immigration_rates(
+    result, c(0, 5),
+    by = "sex",
+    conf_level = 0.95
+  )
   expect_equal(by_sex$dispersion, c(1, 1))
+  # Without intervals, dispersion is not reported.
+  expect_false(
+    "dispersion" %in% names(calculate_immigration_rates(result, c(0, 5)))
+  )
   # Across replications the adjusted 90% intervals cover the input rate.
   covered <- vapply(1:40, function(seed) {
     r <- calculate_immigration_rates(
