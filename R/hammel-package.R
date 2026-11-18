@@ -8,7 +8,7 @@
 #'
 #' * `hammel.progress`: the default for the `progress` argument of
 #'   [run_simulation()]. When unset, a progress bar is shown in
-#'   interactive sessions and hidden otherwise. An explicit `progress` 
+#'   interactive sessions and hidden otherwise. An explicit `progress`
 #'   argument takes precedence.
 "_PACKAGE"
 

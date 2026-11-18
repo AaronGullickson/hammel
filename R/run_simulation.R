@@ -33,7 +33,7 @@
 #' @param seed Optional integer seed for random number generation. If not
 #'   specified, simulation will use current RNG.
 #' @param progress Show a console progress bar based on elapsed simulation
-#'   years. Defaults to `TRUE`` in interactive environments and `FALSE`` in
+#'   years. Defaults to `TRUE` in interactive environments and `FALSE` in
 #'   non-interactive environments. Users can set the `hammel.progress` option
 #'   to control its use.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
