@@ -34,7 +34,9 @@
 #' @param seed Optional integer seed for random number generation. If not
 #'   specified, simulation will use current RNG.
 #' @param progress Show a console progress bar based on elapsed simulation
-#'   years. Defaults to `FALSE`.
+#'   years. Defaults to `TRUE` in interactive environments and `FALSE` in
+#'   non-interactive environments. Users can set the `hammel.progress` option
+#'   to control its use.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
 #'   `simulation` component recording selected settings.
 #' @export
@@ -49,15 +51,30 @@
 #'     matching = age_gap_matching_model(3, 5)
 #'   )
 #' result <- run_simulation(model, years = 50, seed = 42)
-run_simulation <- function(model, years, seed = NULL, progress = FALSE) {
+run_simulation <- function(
+  model,
+  years,
+  seed = NULL,
+  progress = getOption("hammel.progress", interactive())
+) {
   # Errors raised by helpers called from local functions name this function.
   run_call <- rlang::current_env()
   check_model(model)
   if (!is.logical(progress) || length(progress) != 1L || is.na(progress)) {
+    # A missing argument means the value came from the hammel.progress option.
+    option_hint <- if (missing(progress)) {
+      c(
+        "i" = paste(
+          "The value comes from the {.code hammel.progress} option;",
+          "set it to {.code TRUE} or {.code FALSE}."
+        )
+      )
+    }
     abort_hammel(
       c(
         "{.arg progress} must be {.code TRUE} or {.code FALSE}.",
-        "x" = "It is {describe_value(progress)}."
+        "x" = "It is {describe_value(progress)}.",
+        option_hint
       ),
       "argument",
       argument = "progress"
