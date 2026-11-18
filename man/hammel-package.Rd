@@ -4,22 +4,21 @@
 \name{hammel-package}
 \alias{hammel}
 \alias{hammel-package}
-\title{hammel: Hammel}
+\title{hammel: Continuous-Time Demographic Microsimulation}
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-Demographic micro-simulation in the spirit of SOCSIM but with modern tools.
+Demographic microsimulation in the spirit of SOCSIM but with modern tools.
 }
 \section{Options}{
 
 hammel reads the following option, which can be set with \code{\link[=options]{options()}},
-for example in a session or an \code{.Rprofile}:
+or in an \code{.Rprofile}:
 \itemize{
 \item \code{hammel.progress}: the default for the \code{progress} argument of
 \code{\link[=run_simulation]{run_simulation()}}. When unset, a progress bar is shown in
-interactive sessions (\code{\link[=interactive]{interactive()}}) and hidden otherwise, such as
-in scripts, rendered documents and tests. Set it to \code{TRUE} or \code{FALSE}
-to override this. An explicit \code{progress} argument takes precedence.
+interactive sessions and hidden otherwise. An explicit \code{progress}
+argument takes precedence.
 }
 }
 
