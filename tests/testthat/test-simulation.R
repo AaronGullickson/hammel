@@ -25,6 +25,35 @@ test_that("progress preserves complete results and random-number state", {
   }
 })
 
+test_that("hammel.progress option sets the default progress bar", {
+  model <- make_model(200, sex = "f", death_rate = 0.02, birth_rate = 0.3)
+  withr::local_options(hammel.progress = TRUE)
+  output <- capture.output(run_simulation(model, 1, seed = 42))
+  expect_match(paste(output, collapse = ""), "100%", fixed = TRUE)
+  expect_output(run_simulation(model, 1, seed = 42, progress = FALSE), NA)
+
+  withr::local_options(hammel.progress = FALSE)
+  expect_output(run_simulation(model, 1, seed = 42), NA)
+
+  # An invalid option value is rejected, with a hint naming the option.
+  withr::local_options(hammel.progress = "yes")
+  error <- expect_hammel_error(
+    run_simulation(model, 1),
+    "argument",
+    "run_simulation"
+  )
+  expect_identical(error$argument, "progress")
+  expect_true("i" %in% names(error$body))
+
+  # An explicit invalid argument gets no option hint.
+  error <- expect_hammel_error(
+    run_simulation(model, 1, progress = "yes"),
+    "argument",
+    "run_simulation"
+  )
+  expect_false("i" %in% names(error$body))
+})
+
 test_that("progress follows simulation time and closes on success or error", {
   values <- numeric()
   closed <- FALSE
