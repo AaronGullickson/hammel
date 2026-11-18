@@ -7,9 +7,14 @@ recorded in D073 and D074. D074 authorizes the male-target adjustment
 described below; D075 subsequently removes unweighted matching and directed
 pair effects. The user assigned a two-sex marriage model to
 tentative milestone 11 on October 30, 2026 (D117), subsequently moved to
-[tentative milestone 12](roadmap.md#tentative-milestone-12-two-sex-marriage-model)
-on October 31 (D121). This sets a planning priority, not a model or API;
-the fuller two-sex proposals remain deferred. The current union process remains as described in
+tentative milestone 12 on October 31 (D121) and then to
+[post-release](roadmap.md#post-release-two-sex-marriage-model) (D136). This
+sets a planning priority, not a model or API; the fuller two-sex proposals
+remain deferred. A second discussion on November 12, 2026 revised the
+implementation sketch for the cell-scheduled engine (D128) and compared
+denominator choices and spillover mechanisms; see
+[denominators and spillover](#denominators-and-spillover-november-12-2026).
+The current union process remains as described in
 [union-formation models](union-formation-models.md) and
 [weighted-choice matching](weighted-choice-matching.md).
 
@@ -113,14 +118,19 @@ search hazard and would respond through a choice parameter (V0), while men's
 rates respond mechanically and without a cap through being chosen more or
 less often, so the response depends on which sex is scarce. The user decided
 to defer marriage-squeeze modeling to a full two-sex choice model rather than
-approximate it with a one-sided outside option. Schoen's harmonic mean alone
-is probably insufficient: it lowers union rates under scarcity but has no
-spillovers, so squeezed women are not redirected toward other ages or groups,
-and it is a rate function rather than a choice model. Choo–Siow and Dagsvik
-are two-sex choice models with redirection through equilibrium accounting;
-Dagsvik avoids the type-splitting sensitivity noted below. Given the close
-algebraic relationship between Dagsvik's attraction parameter and Schoen's
-force of attraction, the user hopes to find a form between the two.
+approximate it with a one-sided outside option. At the time, Schoen's
+harmonic mean alone seemed insufficient: it lowers union rates under scarcity
+but, at fixed stocks, does not redirect squeezed women toward other ages or
+groups, and it is a rate function rather than a choice model. Choo–Siow and
+Dagsvik are two-sex choice models with redirection through equilibrium
+accounting; Dagsvik avoids the type-splitting sensitivity noted below. Given
+the close algebraic relationship between Dagsvik's attraction parameter and
+Schoen's force of attraction, the user hopes to find a form between the two.
+The November 12 analysis
+([denominators and spillover](#denominators-and-spillover-november-12-2026))
+found that the Choo–Siow and Dagsvik spillovers act only through who remains
+single, which unpartnered stocks reproduce in continuous time; whether that
+passive redirection is sufficient remains open.
 
 ## Schoen's harmonic-mean model
 
@@ -144,33 +154,41 @@ For female type i and male type j with unpartnered counts F_i and M_j:
 
 ### Implementation sketch
 
-**Types and cells.** A type is defined for one sex: group by birth-time bin
-(as in weighted choice), plus any other attribute affecting pairing. A cell is
-a pair of types. Birth-time bins never change membership as people age; age
-enters through alpha evaluated at the bins' current ages. Quarter-year bins
-over a 50-year range with two groups give about 200 x 200 x 4 = 160,000
-cells.
+The sketch was revised on November 12, 2026 for the cell-scheduled engine
+(D128); the October 24 version assumed per-person event queues.
+
+**Types and cells.** A type is defined for one sex: current age band by group
+category (by every declared dimension that affects pairing), plus any other
+attribute affecting pairing, such as previous-union category for remarriage.
+A cell is a pair of types. As in other D128 processes, people move between
+types at age-band edges, and alpha is constant within a band. One-year bands
+over ages 15–80 with four group combinations give about 260 types per sex and
+68,000 cells. Union type (cohabitation or marriage) could be chosen after the
+couple, as `cohab_prob` does now, or added as a cell dimension.
 
 **Market clock.** Women's and men's hazards describe the same event, so
-simulating both sides' clocks would double-count. Unions leave the per-person
-event queue: the market holds one pending next-union event whose rate is the
-sum of all cell rates R_ij = alpha_ij F_i M_j / (F_i + M_j), kept in a sum tree.
+simulating both sides' clocks would double-count. The market is one process
+replacing rate-mode female search, with one exponential clock whose rate is
+the sum of all cell rates R_ij = alpha_ij F_i M_j / (F_i + M_j), kept in a sum
+tree. It would take search's place in the tie order. Cells with F_i = 0 or
+M_j = 0 have zero rate, so there are no failed searches.
 
-**Rate changes.** Unlike the current engine, union times cannot be drawn once
-and kept: every change to F_i or M_j (union, death of an unpartnered person,
-widowhood, dissolution, reaching the minimum age) changes all cell rates in
-that row and column. The update touches one row and one column, then redraws
-the single market time; no individual clocks are redrawn, and mortality,
-fertility within unions and other per-person events keep their precomputed
-times. Cost scales with stock-changing events times a row-plus-column update,
-comparable to weighted choice's incremental pool sums. Not benchmarked.
+**Rate changes.** Unlike other D128 processes, a cell's rate is not its own
+member count times a rate: F_i appears in every cell of row i and M_j in every
+cell of column j. Every change to F_i or M_j (union, death of an unpartnered
+person, widowhood, dissolution, reaching the minimum age, crossing an age
+band, group transition, immigration) recomputes that row or column, then
+redraws the market time. Rates are piecewise constant between such changes,
+so redrawing the memoryless clock is exact, as for other processes; age-band
+and calendar-band edges are handled by the existing refresh and boundary
+queue, so the October 24 thinning options are no longer needed. With 260
+types per sex each change updates about 260 cells. Annual band crossings by
+every unpartnered person will probably dominate the cost. Not benchmarked.
 
-**Rates drifting between events.** alpha changes as people age (and later with
-period inputs) even without events. Options: thinning against an upper bound
-on the total rate (exact, continuous; costly if the bound is loose);
-recomputing rates at bin boundaries (a timing approximation); or fixed-interval
-stock snapshots (reintroduces discrete execution, would require revisiting
-D024; not recommended). Thinning with a bin-boundary fallback was suggested.
+**Weights (D129).** Selection stays exact if a pair's hazard factors as
+alpha_ij w_woman w_man; the cell rate then uses the summed weights on each
+side and each partner is drawn by weight within the type. Non-factoring pair
+weights break exact selection.
 
 **Pair selection.** When the clock fires: choose cell (i, j) with probability
 R_ij / R_total (one sum-tree walk), then one woman uniformly from type i and
@@ -243,6 +261,9 @@ transfer exactly to fine ages.
 
 The user wants a simple way to translate published log odds ratios into
 comparable Schoen parameters, not to force the model to reproduce odds ratios.
+The correction below arises from Schoen's local denominator; with pooled or
+global denominators it vanishes for group contrasts (see
+[odds ratios and alpha](#odds-ratios-and-alpha)).
 For two female and two male types, the F M products cancel in the flow-table
 cross-product:
 
@@ -278,8 +299,11 @@ realized odds ratios move with composition.
 
 ### Known weaknesses
 
-- No spillovers: a shortage of one male type does not shift demand toward
-  other types (the Choo–Siow critique).
+- No spillovers at fixed stocks: a shortage of one male type does not raise
+  women's hazards toward other types (the Choo–Siow critique). In continuous
+  time, squeezed women remain unpartnered and so form more unions with other
+  types through the stocks; the November 12 analysis suggests this is the
+  same mechanism as the Choo–Siow and Dagsvik spillovers.
 - No accounting constraints: implied rates can exceed what is plausible far
   from the estimation data.
 - The built-in homogamy and type-definition sensitivity above.
@@ -307,7 +331,9 @@ algebraically (their Section 5.4): c_ij ~ Y_ij F / (F'_i M'_j) uses end-of-perio
 singles and a global scale F, while alpha_ij uses mid-period stocks and the
 local scale F_i + M_j. They do not run both models on the same data. The
 global denominator is what removes the built-in homogamy and type-splitting
-sensitivity, and the joint system supplies spillovers. Cheng et al. estimate
+sensitivity, and the joint system supplies spillovers through end-of-period
+singles (see [denominators and spillover](#denominators-and-spillover-november-12-2026)).
+Cheng et al. estimate
 from ACS unions in the past 12 months plus singles, using 18 types (2
 education x 3 race x 3 age); their age brackets (women under 24, 24–37, 38+;
 men under 26, 26–41, 42+) cannot identify realistic age gaps. A parametric
@@ -318,13 +344,253 @@ clearing each period, so it needs a continuous-time analogue for Hammel.
 | --- | --- | --- | --- |
 | Endogamy from group size with flat preferences | Yes | No | No |
 | Splitting a type changes total unions | Yes | Yes (modestly) | No |
-| Spillovers between types | No | Yes | Yes |
+| Spillovers between types | Through stocks only | Through singles only | Through singles only |
 | Accounting constraints | No | Yes | Yes |
 | Directional asymmetry | Yes | Yes | Yes |
 
 The table's Schoen and Choo–Siow entries follow from the formulas; the
 type-splitting and spillover interpretations in the econometric literature
-(for example Menzel 2015; Galichon and Salanié) were not checked.
+(for example Menzel 2015; Galichon and Salanié) were not checked. The
+spillover row follows the November 12 analysis below.
+
+## Denominators and spillover (November 12, 2026)
+
+Discussion notes and the agent's own algebra, checked where stated against
+Dagsvik, Flaatten and Brunborg (1998) and Cheng et al. (2026). Nothing here is
+selected.
+
+### Mass-action forms differ only in the denominator
+
+Schoen's model is one member of a family Y_ij = alpha_ij F_i M_j / D, where
+Y_ij is the flow of new unions per year between unpartnered type-i women and
+type-j men, F_i and M_j are their unpartnered counts, and alpha_ij (per year)
+is the force of attraction. A type-i woman's hazard toward type j is
+alpha_ij M_j / D, and each specific pair's hazard is alpha_ij / D. With
+D = F_i + M_j, alpha is roughly the hazard of a member of the scarce side when
+the other side is plentiful, and alpha / 2 each person's hazard when the sexes
+are balanced. The meaning and scale of alpha depend on D, so denominator
+choices should be compared at the same reference rates, not the same alpha.
+
+| D | Group-size endogamy with flat alpha | Splitting a type changes unions | Who dilutes rates | Update per stock change |
+| --- | --- | --- | --- | --- |
+| Local, F_i + M_j (Schoen) | Yes | Yes | No one else | Row i and column j |
+| Pooled over groups within ages, F_a + M_b | No | Not across groups; age bins need density scaling | Others of the same ages | Cells with female age a or male age b |
+| Global, F + M | No | No | Everyone eligible, for example older widows | Numerators only; divide the total by one scalar |
+
+All are homogeneous of degree one: doubling every count doubles the flows, so
+per-capita rates do not depend on simulated population size. The pooled form
+is the agent's proposal, not from the literature. All three use the same market process and engine work;
+only the cell-rate formula and update scope differ. Under global D, cell
+selection uses the numerators alone.
+
+### Odds ratios and alpha
+
+For female types i, i' and male types j, j', every F and M appears once in
+the numerator and once in the denominator of the flow-table cross-product, so
+
+    log OR(flows) = log OR(alpha)
+                    + log[D_ij' D_i'j / (D_ij D_i'j')]
+
+where log OR(alpha) = log[alpha_ij alpha_i'j' / (alpha_ij' alpha_i'j)]. The
+denominator term depends on D:
+
+| D | Denominator term | Result |
+| --- | --- | --- |
+| Local, F_i + M_j | Nonzero, composition-dependent | The correction in [translating odds ratios](#translating-odds-ratios-loosely) |
+| Pooled, F_a + M_b | Zero for group contrasts at the same ages (one shared D) | Group log OR equals log OR(alpha) exactly at every age pair |
+| Global | Always zero | Exact for any contrast |
+
+Under pooled D, contrasts between age pairs involve different D and keep a
+correction; published odds ratios are usually group contrasts. If
+log alpha = a_F(age) + a_M(age) + gap terms + group effects with group
+effects constant across ages, a group interaction in alpha is the log odds
+ratio of new unions in every age cell, whatever the sex ratio or group sizes.
+Published log odds ratios could then be entered directly, much as
+`group_exogamy` works now, and the illustrative conversion helper would be
+unnecessary. A Poisson log-linear model of new-union counts with offset
+log F_i + log M_j estimates alpha's group interactions; a D constant across
+groups is absorbed by the intercept and age terms.
+
+Caveats:
+
+- The odds ratio must describe new unions among the unpartnered. Odds ratios
+  from current marriages also reflect durations, dissolution and mortality.
+- The equality holds within each age pair. A table aggregated over ages has
+  the same odds ratio only if the groups' unpartnered age distributions are
+  proportional; otherwise aggregation changes it, as in any non-collapsible
+  table. Aggregation over calendar time with changing composition is
+  similar.
+- One odds ratio fixes only the association. Group main effects (union
+  levels) and directional asymmetry need other information, such as group
+  union rates or a directional ratio.
+- The equality holds in expectation at each instant; simulated tables vary,
+  especially for small groups.
+
+### Spillovers in Dagsvik and Choo–Siow act through singles
+
+Dagsvik, Flaatten and Brunborg (1998, eq. 2.5–2.10) give the number of
+marriages as X_ij = c_ij X_i0 X_j0, where X_i0 and X_j0 are the women and men
+of each type remaining single at the end of the period; Cheng et al. (eq. 3–4)
+add the scale 1/F. The odds that a type-i woman matches a type-j man rather
+than remaining single are therefore c_ij times the type-j men remaining
+single (over F), with no term for the availability of other male types. A
+shortage of type-j men raises matches with other types only because more
+type-i women remain single (independence of irrelevant alternatives). The
+same holds for Choo–Siow: mu_ik / mu_i0 = exp(Pi_ik / 2) sqrt(mu_0k / mu_i0)
+does not involve type j (from the standard formula; the paper was not
+rechecked). Dagsvik et al. note that McFarland's axiom that X_ij decreases
+with other types' counts can fail in a special case, though not at their
+Norwegian estimates.
+
+In continuous time, a squeezed woman who does not form a union remains in
+the unpartnered stock, so her type's flows toward other types rise without
+any change in hazards. These period models' spillovers therefore appear to
+correspond to stock dynamics, not to an active substitution that mass-action
+forms lack. The relevant distinction is whether a shortage lowers a person's
+total union hazard or redirects it:
+
+| Model | Hazard toward other types when preferred partners are scarce | Total union hazard |
+| --- | --- | --- |
+| Current weighted choice (fixed search rate) | Rises; all of the rate is redirected | Unchanged; no squeeze |
+| Outside option, lambda alpha_k M_k / (V0 + sum alpha M) | Rises partly, depending on V0 | Falls partly |
+| Mass action; Dagsvik and Choo–Siow at fixed singles | Unchanged; redirection through stocks only | Falls |
+
+A two-sided outside-option form is the natural intermediate, with the
+difficulty noted for extension 1.
+
+### Continuous-time limits
+
+Dagsvik's model is not the integral of continuous mass action over a period.
+With one homogeneous type and balanced sexes, continuous flow k F M gives
+period unions kT F_start F_end, while Dagsvik gives c F_end F_end. They agree
+only as the period shortens, where Dagsvik becomes Y_ij = c_ij F_i M_j / F,
+matching Cheng et al.'s eq. 32. So mass action with a global scale is the
+short-period limit of Dagsvik, and its behavioral foundation carries over only
+in that sense.
+
+Dagsvik's scale is F, the number of women (from the normalization kappa /
+sqrt(F) -> 1), not F + M. In continuous time with D = F, a man's hazard
+depends only on women's type shares, not their scarcity, so when women are
+scarce total flow grows with the number of men; Dagsvik's period accounting
+prevents this, but a continuous version would not. D = F + M is the agent's
+symmetric modification. The choice of denominator is therefore not settled by
+the literature.
+
+The short-period limit of Choo–Siow is a geometric mean, Y_ij = gamma
+sqrt(F_i M_j) over unpartnered stocks (the agent's derivation, not checked
+against the literature). It is not mass action: a woman's hazard,
+gamma sqrt(M_j / F_i), falls as more women of her own type compete. It is a
+candidate for comparison alongside the mass-action forms.
+
+### Inputs
+
+Most users have female, and sometimes male, union rates by age rather than
+alpha. One possible bridge is to calibrate alpha so the model reproduces input
+rates at a reference population, such as the initial population, and let
+composition change rates afterward. This would reproduce inputs at the start
+while allowing squeezes later, combining the two model classes distinguished
+above. Not designed.
+
+### Suggested exploration
+
+A deterministic stock-flow model in R, outside the package, with two groups
+and a few age bands, comparing local, pooled and global denominators, the
+geometric mean and perhaps a two-sided outside option on balanced sexes, a
+male shortage in one group, and splitting a type into meaningless labels.
+This would show squeeze size, redirection and odds-ratio behavior before any
+specification. Not started.
+
+## Cohabitation and nonmarital fathers (November 13, 2026)
+
+Discussion notes for a two-sex market model. The cohabitation and father
+directions are the user's tentative preferences, not accepted decisions.
+
+### Cohabitation: partnership attraction and a couple-based share
+
+Two ways to bring union type into the market:
+
+- **A. Type drawn after the couple.** The market forms partnerships with one
+  alpha; after the couple is chosen, cohabitation is drawn with probability
+  p, as `cohab_prob` does now.
+- **B. Type as a cell dimension.** Separate surfaces, with
+  Y^marr_ij = alpha^marr_ij F_i M_j / D and
+  Y^cohab_ij = alpha^cohab_ij F_i M_j / D.
+
+If p can depend on both partners, the two are equivalent:
+alpha^cohab = alpha p and alpha^marr = alpha (1 - p). **Tentative preferred
+choice (user, November 13, 2026):** partnership alpha plus a couple-based
+cohabitation share p, because it offers the most flexibility. A p that depends
+only on the woman's age, group and previous union reproduces the current
+`cohab_prob` semantics, and a couple-based p replaces `cohab_matching`. The
+odds-ratio relationship above holds separately within each type.
+
+Because p is drawn after a specific couple is chosen, it may use any
+individual characteristic of either partner, such as the man's previous-union
+category, parity or a shared child, without breaking the equal-pair hazard
+within a cell; partnership alpha must use only type-defining characteristics.
+A possible interface is a `cohab_prob`-style table (woman's age, group,
+previous union, optional calendar bands under D122) for the woman-only case,
+and a logistic model over both partners' variables, similar to D129 weight
+formulas, for the couple-based case. Tables with both partners' dimensions
+would grow quickly. Not designed.
+
+**Caveat.** The parameterizations can represent the same models but hold
+different quantities fixed when a user changes one input. Under alpha plus p,
+raising the cohabitation share lowers direct marriage one-for-one and leaves
+the total partnership rate unchanged, consistent with calendar-varying
+`cohab_prob` today (D122). Under separate surfaces, raising cohabitation
+attraction adds unions without reducing marriage. A user who wants
+cohabitation to grow on top of marriage under alpha plus p must also raise
+alpha. This resembles the open question of whether alpha or the odds ratio
+is invariant under composition change, and must be documented clearly.
+
+Conversion and dissolution act within existing couples and do not use the
+market; dissolution returns both partners to it.
+
+### Nonmarital fathers
+
+Currently an unpartnered woman's births occur at her input fertility rate, and
+the father is drawn from unpartnered men by conditional logit
+(`father_matching`), without forming a union. Combining that with market
+alpha for unions would give two inconsistent preference structures. Options:
+
+- **F1. One-sex timing, father from the market row.** The birth occurs at the
+  woman's input rate; the father's type is drawn with probability
+  proportional to Y_ij over her row of the market, then a man uniformly within
+  type j. One preference structure, fertility inputs and cell accounting
+  (D101) preserved, and cheap given row access in the market sum tree. A
+  father-specific difference (for example, younger men as fathers than as
+  husbands) would be an optional multiplier on alpha, replacing
+  `father_matching`. A shortage of men changes who the father is, not whether
+  the birth occurs; births still fail only without eligible men. Squeezed
+  women remain unpartnered longer and have births at unpartnered rates, so a
+  squeeze shifts births between union and nonmarital fertility by the rate
+  difference (an interpretation, not a validated result).
+- **F2. Nonmarital conception as a market event,** at rate
+  beta_ij F_i M_j / D, so nonmarital fertility responds to male availability.
+  It would sit outside the fertility cells and need reconciliation with
+  parity, spacing and cell accounting (D101), and would not preserve
+  unpartnered fertility inputs.
+- **F3. Fathers drawn also from partnered men.** A separate extension, not
+  needed for consistency.
+
+**Tentative preferred choice (user, November 13, 2026):** F1. The goal is to
+keep father selection simple and preserve unpartnered fertility input rates.
+This is not an accepted decision while the two-sex model remains unselected.
+The user also wants an equivalent of `father_matching`: an optional
+father-specific multiplier on alpha, so that the partners chosen as fathers
+can differ from those chosen for unions (for example in age gap). Because
+father selection is a draw conditional on a birth rather than a market
+clock, the multiplier could use individual characteristics of either partner
+beyond the type definition, as the cohabitation share can; drawing within a
+type would then be weighted rather than uniform. Form and interface not
+designed. Behavior with no eligible man (currently cancellation by default,
+or an unknown father) is not yet discussed.
+
+Previous-father continuity (D042, deferred) would raise alpha for specific
+co-parent pairs, breaking the equal-pair hazard within a cell. It would need
+its own process on linked co-parent pairs outside the market, like
+conversion. Deferred.
 
 ## Interface considerations
 
@@ -352,6 +618,9 @@ The user identified unresolved connections:
   so father selection, cohabitation and unpartnered partnering must be designed
   together with any two-sex model.
 
+See [cohabitation and nonmarital fathers](#cohabitation-and-nonmarital-fathers-november-13-2026)
+for the November 13 discussion of both connections.
+
 The user deferred API restructuring (D073): the current API is unchanged until
 a single working implementation incorporates all union-formation components.
 
@@ -360,11 +629,17 @@ a single working implementation incorporates all union-formation components.
 - Whether alpha or the odds ratio should be the invariant under composition
   change (they predict differently when group sizes change).
 - Treatment of barred pairs (null event or within-cell redraw).
-- Exact handling of alpha drift between events (thinning bounds, refresh).
-- Spillovers: whether to extend Schoen's form, adopt a Dagsvik-type global
-  denominator, or use Choo–Siow.
-- Reference conditions for estimated or calibrated inputs.
+- The denominator: local (Schoen), pooled over groups within ages, global
+  F + M, or Dagsvik's F; or a non-mass-action form such as the Choo–Siow
+  geometric mean.
+- Whether redirection through unpartnered stocks is sufficient, or a
+  two-sided outside option is needed for partial active substitution.
+- Reference conditions for estimated or calibrated inputs, including
+  calibrating alpha to input rates at a reference population.
 - How unions, cohabitation and nonmarital fathers share one model.
+  Tentatively, cohabitation uses partnership alpha with a couple-based share,
+  and nonmarital fathers are drawn from the woman's market row at input
+  fertility rates (F1).
 
 ## References
 
@@ -379,6 +654,10 @@ a single working implementation incorporates all union-formation components.
   <https://link.springer.com/article/10.1353/dem.2006.0023>
 - Dagsvik, J. K. 2000. Aggregation in matching markets. *International
   Economic Review* 41(1).
+- Dagsvik, J. K., A. S. Flaatten, and H. Brunborg. 2001. A behavioral two-sex
+  marriage model. *Mathematical Population Studies* 9(2):97–121. Discussion
+  Paper 238 version (1998) consulted:
+  <https://ssb.no/forskning/discussion-papers/a-behavioral-two-sex-marriage-model>
 - Cheng, Y., J. K. Dagsvik, X. Han, and Z. Jia. 2026. Force of attraction and
   partner availability in the U.S. marriage market: a two-sided matching
   model. *Sociological Science* 13:178–213. DOI 10.15195/v13.a8.
