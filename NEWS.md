@@ -1,5 +1,7 @@
 # hammel (development version)
 
+- Set progress bar to TRUE in interactive sessions and FALSE in non-interactive sessions. Uses can override with option `hammel.progress`.
+
 # hammel 0.2.0
 
 This release focuses on improvements to user facing output.
