@@ -67,7 +67,7 @@ Each stream requires a "template population" that is a `hammel_population` objec
 
 By default, migrants are sampled as households in a manner analagous to transitions. Users can define these households in the same way. Rates are adjusted for household size to maintain the correct individual migration rates. If migrants are not sampled as households, then any sampled migrant will be treated as never married and as having no children, or group transitions when they migrate.
 
-To maintain correct union and birth histories for migrants, related individuals from those histories who do not migrate (e.g. births to deceased or adult children, partners from previous unions) are kept in a separate `external_relatives` tibble in the output, which has the same structure as persons. Unions and transitions that were completed before the point of migration are added to the `unions` and `transisions` tibles with a flag for `pre_migration` - they are not counted in the calculate_*_rates functions.
+To maintain correct union and birth histories for migrants, related individuals from those histories who do not migrate (e.g. births to deceased or adult children, partners from previous unions) are kept in a separate `external_relatives` tibble in the output, which has the same structure as persons. Unions and transitions that were completed before the point of migration are added to the `unions` and `transitions` tibles with a flag for `pre_migration` - they are not counted in the calculate_*_rates functions.
 
 The template population can have the same groups as the simulated population. For example, race might be a group dimension in both populations. In these cases, the migrant's current group status comes with them. If a group dimension does not exist in the template population but does in the simulated population, a `migrant_assignment` model will need to be used to determine how to assign the category of the group. This can be a fixed value, a probability distribution, or a custom function.
 
@@ -181,7 +181,7 @@ expand_grid(mother = gens, father = gens) |>
 That looks correct. Now I can put this together to create my `generation` group.
 
 ```{r}
-#| lavel: define-generation-group
+#| label: define-generation-group
 
 generation_grp <- group(
   categories =c("1", "1.5", "2", "2.5", "3+"), 
@@ -379,6 +379,7 @@ summary(pop_start)
 Now I can run my simulation. I need to set the immigration streams in the model. I also need to redo union formation to include birthplace exogamy parameters. I leave the `step` parameter NULL here so that all migrants are drawn from the final living members of my template population, but I could set it to 1 or 5, for example, to have the migrants drawn from the same time interval as my simulation.
 
 ```{r}
+#| label: run-simulation
 
 model <- model |>
   # set immigration
@@ -391,7 +392,7 @@ model <- model |>
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.3, "MW" = 0.15, "S" = 0.15, "W" = 0.4)
         ),
-        generation = migrant_assignment("custom", fun = gen_assignment)
+        generation = migrant_assignment("custom", fun = generation_assign)
       ),
       household = household(),
       weights = migrant_selection_fun
@@ -404,7 +405,7 @@ model <- model |>
         region = migrant_assignment(
           "probability", probs = c("NE" = 0.25, "MW" = 0.2, "S" = 0.2, "W" = 0.35)
         ),
-        generation = migrant_assignment("custom", fun = gen_assignment)
+        generation = migrant_assignment("custom", fun = generation_assign)
       ),
       household = household(),
       weights = migrant_selection_fun
