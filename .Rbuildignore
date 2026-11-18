@@ -21,3 +21,4 @@
 ^vignettes/articles/*_files$
 ^data-raw$
 ^\.claude$
+^\.git$
