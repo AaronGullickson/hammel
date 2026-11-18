@@ -5,6 +5,9 @@
 Construct a model, attach its population and processes, and run a
 simulation.
 
+- [`hammel`](https://aarongullickson.github.io/hammel/reference/hammel-package.md)
+  [`hammel-package`](https://aarongullickson.github.io/hammel/reference/hammel-package.md)
+  : hammel: Continuous-Time Demographic Microsimulation
 - [`hammel_model()`](https://aarongullickson.github.io/hammel/reference/hammel_model.md)
   : Create an empty Hammel model specification
 - [`summary(`*`<hammel_model>`*`)`](https://aarongullickson.github.io/hammel/reference/summary.hammel_model.md)

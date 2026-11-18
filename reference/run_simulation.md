@@ -6,7 +6,12 @@ given time length.
 ## Usage
 
 ``` r
-run_simulation(model, years, seed = NULL, progress = FALSE)
+run_simulation(
+  model,
+  years,
+  seed = NULL,
+  progress = getOption("hammel.progress", interactive())
+)
 ```
 
 ## Arguments
@@ -29,7 +34,9 @@ run_simulation(model, years, seed = NULL, progress = FALSE)
 - progress:
 
   Show a console progress bar based on elapsed simulation years.
-  Defaults to `FALSE`.
+  Defaults to ``` TRUE`` in interactive environments and  ```FALSE“ in
+  non-interactive environments. Users can set the `hammel.progress`
+  option to control its use.
 
 ## Value
 

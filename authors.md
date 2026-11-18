@@ -11,11 +11,12 @@
 Source:
 [`DESCRIPTION`](https://github.com/AaronGullickson/hammel/blob/master/DESCRIPTION)
 
-Gullickson A (2026). *hammel: Hammel*. R package version 0.2.0.9000,
+Gullickson A (2026). *hammel: Continuous-Time Demographic
+Microsimulation*. R package version 0.2.0.9000,
 <https://github.com/AaronGullickson/hammel>.
 
     @Manual{,
-      title = {hammel: Hammel},
+      title = {hammel: Continuous-Time Demographic Microsimulation},
       author = {Aaron Gullickson},
       year = {2026},
       note = {R package version 0.2.0.9000},
