@@ -65,13 +65,13 @@ rates sum to the stratum's rate.
 
 When \code{conf_level} is set, \code{conf_low} and \code{conf_high} columns are included in
 the returned object, corresponding to the desired confidence interval of the
-rate. These confidence intervals are determined by the exact Poisson
-process, not normal approximation. When migrants arrive by households rather
+rate. This confidence intervals is determined by the exact Poisson
+interval, not normal approximation. When migrants arrive by households rather
 than as individuals, arrivals will vary more than a Poisson count. The
-confidence intervals account for this overdisperson which is measured by the
+confidence intervals account for this overdispersion which is measured by the
 sum of squared household sizes over the number of arrivals. The
 \code{dispersion} is reported along with \code{conf_low} and \code{conf_high} when
-\code{conf_level} is not NULL.
+\code{conf_level} is not \code{NULL}.
 }
 \examples{
 template <- generate_uniform_population(200)

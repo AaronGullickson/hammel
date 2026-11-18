@@ -45,10 +45,10 @@ made inside \code{fun}, for example with \code{\link[=sample]{sample()}}; to kee
 together, draw once and repeat the result.
 }
 
-The \code{"fixed"} and \code{"probability"} methods assign every member of a household the
-same category, drawn once per household. A \code{"custom"} function is called for
-every arriving household, so it is slower than the other methods, and is not
-needed for groups the template already declares, which members keep.
+The \code{"fixed"} and \code{"probability"} methods assign every member of a household
+the same category, drawn once per household. A \code{"custom"} function is called
+for every arriving household, so it is slower than the other methods, and is
+not needed for groups the template already declares, which members keep.
 }
 \examples{
 migrant_assignment("fixed", fixed_value = "north")

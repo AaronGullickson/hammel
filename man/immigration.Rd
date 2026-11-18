@@ -39,7 +39,7 @@ streams set earlier. Calling \code{set_immigration(model)} without streams
 removes immigration from the model.
 
 Each named argument provides one \code{\link[=immigration_stream]{immigration_stream()}}. Every stream must
-be named and streams cannot be named \code{"native"} of \code{"birthplace_ancestry"}.
+be named and streams cannot be named \code{"native"} or \code{"birthplace_ancestry"}.
 
 Simulations with an immigration process will automatically create a
 \code{birthplace} group whose categories match the stream names, plus a
