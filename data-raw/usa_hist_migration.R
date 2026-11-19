@@ -32,10 +32,12 @@ usa_hist_migration <- immig_counts |>
     south_europe = c100 + c101,
     # eastern Europe: c96 Poland, c97 Other Central, c 98 USSR and Baltic,
     # c99 other Eastern
-    east_europe = c96 + c97 + c98 + c99
+    east_europe = c96 + c97 + c98 + c99,
+    # all others in one group, c89 is total
+    other = c89 - irish - nw_europe - south_europe - east_europe
   ) |>
-  select(year, irish, ends_with("_europe")) |>
-  pivot_longer(cols = c("irish", ends_with("_europe")),
+  select(year, irish, ends_with("_europe"), other) |>
+  pivot_longer(cols = -year,
                names_to = "stream", values_to = "count") |>
   left_join(pop_counts, by = "year") |>
   mutate(

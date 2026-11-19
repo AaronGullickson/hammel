@@ -45,21 +45,41 @@ pal_stream <- c(
   "Irish" = "green",
   "NW Europe" = "dodgerblue",
   "Southern Europe" = "yellow",
-  "Eastern Europe" = "firebrick"
+  "Eastern Europe" = "firebrick",
+  "Other" = "purple"
 )
 
 usa_hist_migration |>
   mutate(
     stream = factor(
       stream,
-      levels = c("irish", "nw_europe", "south_europe", "east_europe"),
-      labels = c("Irish", "NW Europe", "Southern Europe", "Eastern Europe")
+      levels = c("irish", "nw_europe", "south_europe", "east_europe", "other"),
+      labels = c("Irish", "NW Europe", "Southern Europe", "Eastern Europe", "Other")
     )
-) |>
+  ) |>
   ggplot(aes(x = time_start + 0.5, y = rate, fill = stream))+
   geom_area()+
   scale_fill_manual(values = pal_stream)+
   labs(x = "year", y = "crude immigration rate", fill = "origin")
 ```
+
+```{r}
+
+usa_hist_migration |>
+  mutate(
+    stream = factor(
+      stream,
+      levels = c("irish", "nw_europe", "south_europe", "east_europe", "other"),
+      labels = c("Irish", "NW Europe", "Southern Europe", "Eastern Europe", "Other")
+    )
+  ) |>
+  ggplot(aes(x = time_start + 0.5, y = rate, color = stream)) +
+  geom_line() +
+  scale_color_manual(values = pal_stream)
+
+```
+
+
+
 
 
