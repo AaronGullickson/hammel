@@ -1,8 +1,8 @@
 # Bundle the local inputs used by the second demographic-transition article.
 # Run offline from the package root. Original sources, attribution and methods
-# remain in validation/data/england_wales_1992_onward and R/data.R.
+# remain in data-raw/england_wales_1992_onward and R/data.R.
 
-root <- "validation/data/england_wales_1992_onward"
+root <- "data-raw/england_wales_1992_onward"
 checksums <- c(
   fertility_by_union_type_1992.csv = "5a1b0d77f79b5fd6c5a46d6fd5ee78c6",
   female_marriage_rates_1992_2019.csv = "84ea067121a85422e87ac2f5c588960c",

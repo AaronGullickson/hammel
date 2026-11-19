@@ -33,4 +33,7 @@ pairs$all_ages <- flows[cbind(pairs$origin, pairs$destination)] / population[pai
 out <- merge(pairs, data.frame(interstate[c("age_start", "age_end")], multiplier = multiplier), by = NULL)
 out$rate <- signif(out$all_ages * out$multiplier, 4)
 out <- out[order(out$origin, out$destination, out$age_start), c("origin", "destination", "age_start", "age_end", "rate")]
-write.csv(out, "validation/data/usa_2000_2001/usa_2000_regional_migration.csv", row.names = FALSE)
+root <- "data-raw/usa_2000_2001"
+write.csv(
+  out, file.path(root, "usa_2000_regional_migration.csv"), row.names = FALSE
+)

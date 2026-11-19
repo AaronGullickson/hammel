@@ -1,4 +1,4 @@
-# Validation data
+# Data inputs and preparation
 
 Data, original source files, provenance and offline preparation scripts are
 grouped by country and period:
@@ -14,20 +14,4 @@ grouped by country and period:
 Preparation scripts run from the package root and now read/write within their
 respective folders. Individual filenames and numerical data are unchanged.
 
-## Existing validation reports
-
-Report sources and rendered artifacts were deliberately **not edited** during
-this reorganization. Their older flat data paths must be adjusted when those
-reports are next revised; they will not resolve to the new locations as written.
-
-For an old `validation/data/<filename>` reference, insert the folder above:
-
-- `usa_2000_*`, `usa_2001_*`, and their NCHS fertility/Census sources:
-  `validation/data/usa_2000_2001/<filename>`.
-- The other USA schedules and the 1980 NCHS marriage/divorce sources:
-  `validation/data/usa_1980_2019/<filename>`.
-- Earlier England/Wales 2015/2019 examples and their shared ONS sources:
-  `validation/data/england_wales_2015_2019/<filename>`.
-- `niger_2012_*`: `validation/data/niger_2012/<filename>`.
-
-Paths already under `england_wales_1992_onward/` remain unchanged.
+Historical validation reports use the input paths from their original revisions.

@@ -219,7 +219,7 @@ the user's agreement.
   birth, dissolution, conversion, search, then group transition.
   See `design/union-dissolution.md`, `design/remarriage.md`, and `design/cohabitation.md`.
   Supporting benchmarks/recovery evidence lives in `validation/milestone4/`;
-  top-level reports and `validation/data/` remain in place. Preserve active render
+  top-level reports remain in place. Preserve active render
   intermediates until rendering finishes, including milestone 5's active final
   render at closeout and milestone 6's active final render. Parity, fertility
   heterogeneity and individual group transitions are implemented and accepted.
@@ -229,6 +229,12 @@ the user's agreement.
   D131). Calendar-time rates follow `design/time-varying-rates.md`
   (D118); matching and inheritance model schedules are implemented under D123. Most categorical characteristics should
   use groups; multiple group dimensions follow D134.
+- Use `validation/` for long-form Quarto assessments beyond unit tests.
+  Record the final render date and the Git revision and working-tree state used
+  for that render. Preserve the final report and render as historical evidence
+  and use a new report for later package changes. Keep data inputs, preparation
+  scripts, and provenance under `data-raw/`, including inputs used only for
+  validation. See [testing](design/testing.md) for the reporting convention.
 - Use `devtools::test()` for the testthat suite. Live database tests require
   explicit opt-in; ordinary verification must not download rates or expose
   credentials. See `design/testing.md` for commands and evidence.

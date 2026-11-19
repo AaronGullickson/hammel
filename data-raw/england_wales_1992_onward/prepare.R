@@ -1,6 +1,6 @@
 # Run from the package root. Offline extraction of published observations, not
 # a calibrated simulation scenario. Requires readxl and tibble already installed.
-root <- "validation/data/england_wales_1992_onward"
+root <- "data-raw/england_wales_1992_onward"
 read_sheet <- function(file, sheet) {
   as.data.frame(readxl::read_excel(file.path(root, file), sheet = sheet,
     col_names = FALSE, .name_repair = "minimal"), check.names = FALSE)

@@ -78,9 +78,9 @@ Marital divorce/death tables are cumulative competing-risk proportions, not
 annual hazards. No hazard conversion, normalization, extrapolation or
 interpolation is applied to these tables.
 
-Original numerical sources and their provenance remain in
-\verb{validation/data/england_wales_1992_onward/} in the repository. The offline
-preparation script is \code{data-raw/england_wales_1992_onward.R}.
+In the full package repository, original numerical sources, preparation
+scripts and provenance are in \verb{data-raw/england_wales_1992_onward/}.
+\code{data-raw/england_wales_1992_onward.R} builds the bundled dataset.
 }
 \examples{
 england_wales_1992_onward$fertility

@@ -229,7 +229,7 @@ filled by default.
 From the package root run:
 
 ```r
-source("validation/data/england_wales_1992_onward/prepare.R")
+source("data-raw/england_wales_1992_onward/prepare.R")
 ```
 
 This rebuild is offline. It validates year coverage, nonnegative rates,

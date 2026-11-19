@@ -3,7 +3,7 @@
 # from the package root. Requires readxl. See
 # usa_1999_2001_mortality.README.md.
 
-root <- "validation/data/usa_2000_2001"
+root <- "data-raw/usa_2000_2001"
 sources <- c(
   m = "usa_life_table_1999_2001_males.xls",
   f = "usa_life_table_1999_2001_females.xls"

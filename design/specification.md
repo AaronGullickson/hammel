@@ -74,7 +74,7 @@ tuned, probabilities have not been converted to hazards, cohabitation cohorts
 have not been mapped to calendar periods, and mortality is not included.
 Fertility uses the vignette's denominator-age bounds of 16–45; source birth
 numerators are not strictly restricted to these end-band ages. Source files
-and provenance remain under `validation/data/england_wales_1992_onward/`;
+and provenance remain under `data-raw/england_wales_1992_onward/`;
 `data-raw/england_wales_1992_onward.R` builds the bundle offline.
 
 ## Construction is separate from execution

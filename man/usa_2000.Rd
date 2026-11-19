@@ -67,7 +67,7 @@ for Hammel's process constructors. All rates are per person-year, and ages
 are in years, with half-open bands \verb{[age_start, age_end)}. Each source is a
 U.S. federal statistical publication. Source files, preparation scripts and
 further notes are in the package repository under
-\verb{validation/data/usa_2000_2001/}; \code{data-raw/usa_2000.R} builds the datasets.
+\verb{data-raw/usa_2000_2001/}; \code{data-raw/usa_2000.R} builds the datasets.
 }
 \section{Mortality}{
  \code{usa_2000_mortality} gives death rates by sex for ages

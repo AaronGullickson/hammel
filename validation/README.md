@@ -13,11 +13,11 @@ contract; software checks and empirical assessment are different evidence.
 - `milestone4.qmd` / `.html`: accepted October 29, 2026; dissolution,
   age/duration remarriage, cohabitation, conversion, matching roles and rate
   observation.
-- `data/`: local rate inputs, source documents, metadata and preparation scripts
+- `data-raw/`: local rate inputs, source documents, metadata and preparation scripts
   used by the reports and shipped examples. Retain these for reproducibility.
-  See the [data directory guide](data/README.md) for country/period folders and
-  the path mapping for existing reports, which were not edited during relocation.
-- [England and Wales, 1992 onward](data/england_wales_1992_onward/README.md):
+  See the [data directory guide](../data-raw/README.md) for country/period folders.
+  Historical reports use the input paths from their original revisions.
+- [England and Wales, 1992 onward](../data-raw/england_wales_1992_onward/README.md):
   fertility by three union types, annual marriage evidence and population
   denominators, cohabitation composition, and duration-specific divorce
   probabilities for a proposed second-transition demonstration. Observations

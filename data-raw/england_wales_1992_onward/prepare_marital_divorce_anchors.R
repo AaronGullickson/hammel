@@ -1,7 +1,7 @@
 # Offline derivation from transcribed ONS 2005 life table and retained 2010
 # cumulative incidence. Run from the package root. No 1992 hazard is invented.
 local({
-  root <- "validation/data/england_wales_1992_onward"
+  root <- "data-raw/england_wales_1992_onward"
   write_table <- function(x, name) {
     write.csv(tibble::as_tibble(x), file.path(root,name), row.names=FALSE,na="")
   }

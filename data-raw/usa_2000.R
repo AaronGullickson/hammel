@@ -1,9 +1,9 @@
 # Build the bundled United States example rates, around 2000, from the
-# prepared CSVs in validation/data/usa_2000_2001. Run from the package root
+# prepared CSVs in data-raw/usa_2000_2001. Run from the package root
 # after the preparation scripts there. Requires usethis. Sources, methods and
 # caveats are in that folder's README files and in R/data.R.
 
-root <- "validation/data/usa_2000_2001"
+root <- "data-raw/usa_2000_2001"
 read_rates <- function(file) {
   tibble::as_tibble(read.csv(file.path(root, file)))
 }
