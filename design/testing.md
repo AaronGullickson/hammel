@@ -17,11 +17,27 @@ Preserve final report sources and rendered outputs as historical records tied
 to the recorded revision. Use a new report to assess later package changes.
 To reproduce a historical report, use its recorded revision and input paths.
 
+## Data inputs and rebuild scripts
+
 Store data inputs and preparation code under `data-raw/`, including inputs
 used only for validation. Prefer project-specific subdirectories that keep
-inputs, preparation scripts, and provenance together. See
-[issue #41](https://github.com/AaronGullickson/hammel/issues/41) for the
-migration of existing inputs.
+inputs, preparation scripts, and provenance together. For a bundled dataset,
+use one script in its project subdirectory to prepare the source inputs and
+build the `.rda` files in `data/`. Keep the source material needed to rebuild
+the dataset or verify its provenance. Generated intermediate CSVs can be
+discarded once the builder reads the source inputs directly.
+
+Use one `README.md` per data project for the rebuild command, dependencies,
+source citations, transformations, and interpretation notes. Use
+`sources.json` for structured provenance such as source URLs, retrieval
+dates, licences, checksums, and extraction details when available. See
+[issue #41](https://github.com/AaronGullickson/hammel/issues/41).
+
+In `data-raw/` R scripts, load each package dependency with `library()` at
+the top and call its functions by name. Construct paths for reading local
+files with `here()` and read CSVs with `read_csv()` from readr. When changing
+an existing builder, compare the rebuilt objects with the shipped objects
+to check that values and column types are preserved.
 
 ## Optional simulation progress (November 12, 2026)
 
