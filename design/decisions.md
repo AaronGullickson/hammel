@@ -2200,7 +2200,7 @@ ordinary-custom-column treatment for disabled runs.
   fertility, and assesses parity rates, heterogeneity and performance.
 - **Evidence:** the user-authored [report](../validation/milestone5.qmd), its
   [rendered assessment](../validation/milestone5.html), and supporting
-  [diagnostics/provenance](../validation/milestone5/README.md). Acceptance is the
+  [diagnostics/provenance](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/README.md). Acceptance is the
   user's scientific assessment, not a new agent-defined numerical threshold.
 - **Retained limitations:** cells with members but no eligible women lose
   intensity, reported as unrealized expected births. Adding it back is an

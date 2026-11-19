@@ -87,7 +87,7 @@ passed R's dependency scan and 133 focused assertions. These are local checks,
 not a claim that GitHub CI was rerun. See [testing](testing.md).
 
 Validation data now live in country/period subfolders; see the
-[data guide](../validation/data/README.md). Earlier report sources were not
+[data guide](../data-raw/README.md). Earlier report sources were not
 rewritten for that relocation; preserve historical reproducibility at their
 recorded revisions.
 

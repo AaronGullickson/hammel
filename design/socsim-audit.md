@@ -4,7 +4,7 @@ Updated October 29, 2026. Static source audits cover rates, competing events,
 union formation, [dissolution and remarriage](socsim-dissolution-audit.md),
 [cohabitation](socsim-cohabitation-audit.md), and
 [group transitions](socsim-group-transitions-audit.md). A narrow
-[parity/spacing reference experiment](../validation/milestone5/socsim/README.md)
+[parity/spacing reference experiment](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/socsim/README.md)
 now provides executable evidence. No comprehensive audit or validation of all
 variants has been performed. References below are starting points recorded
 in the earlier conversation.
@@ -74,7 +74,7 @@ from the accepted Hammel validation report.
 The [parity/spacing trace](socsim-parity-spacing-audit.md), inspected October 29,
 2026 at the same pinned commit, verifies SOCSIM's previous-parity adjustment,
 unadjusted parity zero, actual history-derived parity and highest-parity copy.
-That trace was initially static. The subsequent [toy reference experiment](../validation/milestone5/socsim/README.md)
+That trace was initially static. The subsequent [toy reference experiment](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/socsim/README.md)
 provides executable evidence for this narrow parity/spacing question; it is not
 a comprehensive SOCSIM validation or acceptance of a replacement correction.
 

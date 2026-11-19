@@ -9,7 +9,7 @@
 #' are in years, with half-open bands `[age_start, age_end)`. Each source is a
 #' U.S. federal statistical publication. Source files, preparation scripts and
 #' further notes are in the package repository under
-#' `validation/data/usa_2000_2001/`; `data-raw/usa_2000.R` builds the datasets.
+#' `data-raw/usa_2000/`; `data-raw/usa_2000/usa_2000.R` builds the datasets.
 #'
 #' @section Mortality: `usa_2000_mortality` gives death rates by sex for ages
 #'   0-1, 1-5, five-year bands to 100, and an open 100+ band, for use with
@@ -126,9 +126,10 @@
 #'   annual hazards. No hazard conversion, normalization, extrapolation or
 #'   interpolation is applied to these tables.
 #'
-#'   Original numerical sources and their provenance remain in
-#'   `validation/data/england_wales_1992_onward/` in the repository. The offline
-#'   preparation script is `data-raw/england_wales_1992_onward.R`.
+#'   In the full package repository, source files and provenance are in
+#'   `data-raw/england_wales_1992_onward/`. The script
+#'   `data-raw/england_wales_1992_onward/england_wales_1992_onward.R`
+#'   builds the dataset from these sources.
 #'
 #' @format A named list containing:
 #' \describe{
@@ -159,7 +160,7 @@
 #'   Marriage and premarital cohabitation: ONS Marriages in England and Wales,
 #'   2019 workbook; female marital population estimates, 1971--2001 and
 #'   2002--2019. Exact source URLs, retrieval dates and checksums are recorded
-#'   in the repository's source-folder `sources.csv`.
+#'   in the repository's source-folder `sources.json`.
 #'
 #'   Cohabitation outcomes: Beaujouan E, Ni Bhrolchain M (2011). Cohabitation
 #'   and marriage in Britain since the 1970s. Population Trends 145, Table 3.
@@ -177,3 +178,21 @@
 #' fertility(england_wales_1992_onward$fertility)
 #' england_wales_1992_onward$cohabitation_outcomes
 "england_wales_1992_onward"
+
+#' Age-specific fertility in Niger, 2012
+#'
+#' Single-year age-specific fertility estimates for Niger in 2012.
+#'
+#' @format A tibble with 35 rows and three columns:
+#' \describe{
+#'   \item{age_start, age_end}{Half-open single-year age bands from
+#'     `[15, 16)` through `[49, 50)`.}
+#'   \item{rate}{Births per woman-year.}
+#' }
+#' @source United Nations, World Population Prospects 2024, fertility rates
+#'   by single age. Source metadata and the rebuild script are under
+#'   `data-raw/niger_2012/` in the full package repository.
+#' @keywords datasets
+#' @examples
+#' fertility(niger_fertility)
+"niger_fertility"
