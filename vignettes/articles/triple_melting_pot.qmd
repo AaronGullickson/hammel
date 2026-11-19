@@ -49,7 +49,7 @@ pal_stream <- c(
   "Other" = "purple"
 )
 
-usa_hist_migration |>
+usa_historical_migration |>
   mutate(
     stream = factor(
       stream,
@@ -65,7 +65,7 @@ usa_hist_migration |>
 
 ```{r}
 
-usa_hist_migration |>
+usa_historical_migration |>
   mutate(
     stream = factor(
       stream,
