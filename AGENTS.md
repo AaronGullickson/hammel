@@ -218,8 +218,9 @@ the user's agreement.
   in dissolution and conversion cells (D128); exact ties prioritize death,
   birth, dissolution, conversion, search, then group transition.
   See `design/union-dissolution.md`, `design/remarriage.md`, and `design/cohabitation.md`.
-  Supporting benchmarks/recovery evidence lives in `validation/milestone4/`;
-  top-level reports remain in place. Preserve active render
+  Supporting benchmarks and recovery evidence are available in Git history.
+  See [testing and validation](design/testing.md#long-form-validation-reports).
+  Preserve active render
   intermediates until rendering finishes, including milestone 5's active final
   render at closeout and milestone 6's active final render. Parity, fertility
   heterogeneity and individual group transitions are implemented and accepted.

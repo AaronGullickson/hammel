@@ -17,6 +17,14 @@ Preserve final report sources and rendered outputs as historical records tied
 to the recorded revision. Use a new report to assess later package changes.
 To reproduce a historical report, use its recorded revision and input paths.
 
+Keep `validation/` focused on Quarto report sources and final renders.
+Supplementary benchmark scripts, exploratory diagnostics, and their outputs
+from earlier milestones are available in Git history. The [pre-migration
+tree](https://github.com/AaronGullickson/hammel/tree/be0c03146c88f51750f3bcdcf2f60d070548814c/validation)
+contains the archived support files. For a reproduction command below, use a
+checkout that contains the archived script and install the package version
+specified by the original experiment.
+
 ## Data inputs and rebuild scripts
 
 Store data inputs and preparation code under `data-raw/`, including inputs
@@ -190,8 +198,8 @@ because the account's Actions minutes were exhausted):
   and [household moves](group-transitions.md#household-moves-d140).
 - Sex symmetry of intermarriage with a second dimension, within combinations
   and within separate markets, and calibration cost, are recorded in
-  [multiple group dimensions](multiple-groups.md) with their scripts in
-  `validation/milestone9/`.
+  [multiple group dimensions](multiple-groups.md) with their
+  [archived scripts](https://github.com/AaronGullickson/hammel/tree/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone9).
 
 Limitations retained at acceptance are listed in D141.
 
@@ -371,7 +379,7 @@ time, including superseded corrections and intermediate proposal status.
 Current execution includes D101–D104 and D112; accepted milestone status includes
 D116. The October 29 milestone 5 closeout checked local Markdown links and
 whitespace; that closeout made no engine or report edits.
-Supporting evidence and reproduction-version notes are in [validation/milestone5/](../validation/milestone5/README.md).
+Supporting evidence and reproduction-version notes are in [validation/milestone5/](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/README.md).
 
 ## Milestone 4 accepted assessment
 
@@ -385,11 +393,11 @@ The previously reviewed rendered report contained 322 test cases: 321 passed,
 one opt-in live database case skipped, no failures/errors/warnings. Treat the
 final report's own results as the record for that render.
 
-Supplementary benchmark and conditional-choice artifacts are retained under
-[validation/milestone4/](../validation/milestone4/README.md), with their original
+Supplementary benchmark and conditional-choice artifacts are archived under
+[validation/milestone4/](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/README.md), with their original
 run provenance. Paths in reproduction commands below reflect that move.
 The final report supersedes the removed exploratory `milestone4_tests.R`.
-[Validation contents](../validation/README.md) lists retained inputs/evidence.
+See the [validation README](../validation/README.md) for the report conventions.
 Earlier dated entries below distinguish implementation checks from scientific
 acceptance at the time; D093 records the subsequent user acceptance. Completion
 retains sparse-cell, initialization, fertility-transition and calibration limits.
@@ -863,10 +871,10 @@ In particular, do not claim the age-dependent pooled estimate is within two
 MCSEs of -6; preservation applies to the conditional utility association, not
 an exact constraint on the final pooled table.
 
-Reproduction: [validation script](../validation/milestone4/validate-calibration-log-odds.R).
-Evidence: [replication estimates](../validation/milestone4/calibration-log-odds-replications.csv),
-[summary](../validation/milestone4/calibration-log-odds-summary.csv), and
-[estimates/session metadata](../validation/milestone4/calibration-log-odds.rds). No package
+Reproduction: [validation script](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/validate-calibration-log-odds.R).
+Evidence: [replication estimates](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/calibration-log-odds-replications.csv),
+[summary](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/calibration-log-odds-summary.csv), and
+[estimates/session metadata](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/calibration-log-odds.rds). No package
 code changed for this recovery check. The run completed without warnings.
 
 ## Duration-specific remarriage (D083, October 28, 2026)
@@ -919,9 +927,9 @@ not establish universal scientific accuracy or milestone 4 acceptance. Pooled
 cross-tab means are retained in the raw results and are not exact target
 constraints under changing pools/age composition.
 
-Evidence: [replication estimates](../validation/milestone4/duration-remarriage-log-odds-replications.csv),
-[summary](../validation/milestone4/duration-remarriage-log-odds-summary.csv), and
-[estimates/session metadata](../validation/milestone4/duration-remarriage-log-odds.rds).
+Evidence: [replication estimates](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/duration-remarriage-log-odds-replications.csv),
+[summary](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/duration-remarriage-log-odds-summary.csv), and
+[estimates/session metadata](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/duration-remarriage-log-odds.rds).
 The public marriage-rate observation helper remains age-based; duration-band
 exposure summaries require a separate interface specification.
 
@@ -973,10 +981,10 @@ conditional log odds averaged -2.0402 (MCSE .04280) for cohabitation against -2,
 and -6.0298 (MCSE .03625) for marriage against -6. These support parameter
 recovery in this synthetic case, not empirical validity or milestone acceptance.
 
-Evidence: [script](../validation/milestone4/validate-cohabitation-matching.R),
-[replications](../validation/milestone4/cohabitation-matching-replications.csv),
-[summary](../validation/milestone4/cohabitation-matching-summary.csv), and
-[estimates/session metadata](../validation/milestone4/cohabitation-matching.rds).
+Evidence: [script](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/validate-cohabitation-matching.R),
+[replications](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/cohabitation-matching-replications.csv),
+[summary](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/cohabitation-matching-summary.csv), and
+[estimates/session metadata](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/cohabitation-matching.rds).
 
 
 ## Union and marriage observation split (D087–D088, October 28, 2026)
@@ -1131,7 +1139,7 @@ seed 42 retained identical complete output without parity columns. No empirical
 rates were downloaded or SOCSIM reference simulations run. SOCSIM's source was
 inspected at the documented pinned commit; no source was copied/adapted.
 
-The independent [spacing diagnostic](../validation/milestone5/check-parity-spacing.R)
+The independent [spacing diagnostic](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/check-parity-spacing.R)
 uses 10 seeds, 3,000 initial women aged 20 at parity zero, no mortality and ten
 years of follow-up. With zero spacing, observed means for parities 0,1,2+ are
 .199760 (MCSE .001479), .299198 (.002280), .403456 (.001528), versus inputs
@@ -1141,8 +1149,8 @@ This initialized-cohort check demonstrates a rate-recovery limitation of the
 selected SOCSIM-style approximation, rather than successful scientific parity-
 rate validation. Do not claim exact eligibility adjustment or milestone 5
 acceptance from the passing software tests. The [parity specification](parity-fertility.md)
-records the limitation and remaining scope. [Replications](../validation/milestone5/parity-spacing-replications.csv)
-and [summary](../validation/milestone5/parity-spacing-summary.csv) retain the evidence.
+records the limitation and remaining scope. [Replications](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/parity-spacing-replications.csv)
+and [summary](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/parity-spacing-summary.csv) retain the evidence.
 The user's validation/milestone5.qmd remains unmodified by this work.
 
 ## Separate mortality/fertility observations and parity ASFRs (D100)
@@ -1174,7 +1182,7 @@ No engine source copied into Hammel, network rates downloaded, or Hammel engine
 changes made. Forty independent fresh-process reference jobs completed: ten
 seeds per birth-interval/experiment combination. Conditional maternal parity and
 monthly exposure were reconstructed independently from raw output. Saved
-[replications, summaries and reproduction scripts](../validation/milestone5/socsim/README.md)
+[replications, summaries and reproduction scripts](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/socsim/README.md)
 include initialized cohorts and 100-year generational runs. All 20 generational
 histories passed explicit unity-fertility-multiplier checks; output categories
 remained single. The cohort exposure/event accounting is checked in the runner.

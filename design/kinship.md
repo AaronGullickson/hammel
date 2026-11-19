@@ -228,8 +228,7 @@ measurable):
 | 100,000 | 244,231 | 4.53 s | 12.7 s |
 
 Group dimensions with recorded transitions add a per-person history lookup at
-each time, which this benchmark does not exercise. Rerun with
-`validation/kinship/benchmark-count-kin.R`.
+each time, which this benchmark does not exercise. The [benchmark script](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/kinship/benchmark-count-kin.R) is available in Git history.
 
 ## Validation
 
