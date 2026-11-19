@@ -10,7 +10,7 @@ library(readr)
 
 # Load raw data ---------------------------------------------------------------
 
-dir_source <- here("validation", "data", "usa_historical_migration")
+dir_source <- here("data-raw", "usa_historical_migration")
 
 immig_counts <- read_csv(here(dir_source, "us_immigration_c89_c119.csv"))
 
@@ -19,7 +19,7 @@ pop_counts <- read_csv(here(dir_source, "us_resident_population_a7.csv"))
 # Calculate rates -------------------------------------------------------------
 
 
-usa_hist_migration <- immig_counts |>
+usa_historical_migration <- immig_counts |>
   # remove missing poland cases with zeroes
   mutate(c96 = if_else(is.na(c96), 0, c96)) |>
   mutate(
@@ -47,8 +47,8 @@ usa_hist_migration <- immig_counts |>
   ) |>
   select(stream, time_start, time_end, rate)
 
-# ggplot2::ggplot(usa_hist_migration, 
+# ggplot2::ggplot(usa_historical_migration, 
 #                 ggplot2::aes(x = time_start + 0.5, y = rate, color = stream))+
 #   ggplot2::geom_line()
 
-usethis::use_data(usa_hist_migration, overwrite = TRUE)
+usethis::use_data(usa_historical_migration, overwrite = TRUE)
