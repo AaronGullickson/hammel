@@ -9,7 +9,7 @@ births per woman.
 [sources.json](sources.json) records the original download, selection,
 conversion, and checksums for the download and retained extract.
 
-Run the builder from the package root with `tibble` installed.
+Run the builder from the package root with `here`, `readr`, and `tibble` installed.
 
 ```sh
 Rscript data-raw/niger_2012/niger_fertility.R

@@ -1,7 +1,8 @@
 # England and Wales demonstration evidence, 1992 onward
 
 Run `Rscript data-raw/england_wales_1992_onward/england_wales_1992_onward.R` from the
-package root with `readxl` and `tibble` installed. The script reads the original sources below
+package root with `here`, `readr`, `readxl`, and `tibble` installed. The script
+reads the original sources below
 and saves the six-table bundle to `data/england_wales_1992_onward.rda`.
 
 | Input | Use |

@@ -1,9 +1,21 @@
 # Build the bundled Niger fertility schedule from the retained UN extract.
-# Run from the package root with tibble installed.
+# Run from the package root.
 
-root <- "data-raw/niger_2012"
-source_file <- file.path(root, "niger_2012_asfr_wpp2024.csv")
-niger_fertility <- tibble::as_tibble(read.csv(source_file))
+library(here)
+library(readr)
+library(tibble)
+
+root <- here("data-raw", "niger_2012")
+source_file <- here(root, "niger_2012_asfr_wpp2024.csv")
+niger_fertility <- read_csv(
+  source_file,
+  col_types = cols(
+    age_start = col_integer(),
+    age_end = col_integer(),
+    rate = col_double()
+  )
+)
+niger_fertility <- as_tibble(niger_fertility)
 stopifnot(
   identical(names(niger_fertility), c("age_start", "age_end", "rate")),
   identical(niger_fertility$age_start, 15:49),

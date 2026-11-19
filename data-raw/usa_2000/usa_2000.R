@@ -1,7 +1,13 @@
 # Rebuild the bundled U.S. mortality, fertility, marriage and migration rates.
-# Run from the package root with readxl, tibble, usethis and Poppler installed.
+# Run from the package root with Poppler installed.
 
-root <- "data-raw/usa_2000"
+library(here)
+library(readr)
+library(readxl)
+library(tibble)
+library(usethis)
+
+root <- here("data-raw", "usa_2000")
 
 # MORTALITY ------
 
@@ -17,8 +23,8 @@ starts <- c(0, 1, seq(5, 100, 5))
 ends <- c(starts[-1], Inf)
 
 abridge <- function(sex) {
-  x <- readxl::read_excel(
-    file.path(root, sources[[sex]]),
+  x <- read_excel(
+    here(root, sources[[sex]]),
     col_names = FALSE,
     col_types = "text",
     .name_repair = "minimal"
@@ -64,7 +70,7 @@ stopifnot(
 
 # FERTILITY ------
 
-pdf <- file.path(root, "usa_fertility_revised_nchs_2003.pdf")
+pdf <- here(root, "usa_fertility_revised_nchs_2003.pdf")
 txt <- tempfile(fileext = ".txt")
 status <- system2("pdftotext", c("-layout", shQuote(pdf), shQuote(txt)))
 stopifnot(status == 0L)
@@ -119,8 +125,8 @@ stopifnot(identical(
 
 # MARRIAGE ------
 
-x <- readxl::read_excel(
-  file.path(root, "usa_marriage_transitions_2001_census.xls"),
+x <- read_excel(
+  here(root, "usa_marriage_transitions_2001_census.xls"),
   col_names = FALSE,
   col_types = "text",
   .name_repair = "minimal"
@@ -205,7 +211,11 @@ migration <- migration[rows, columns]
 # Preserve the precision and column types of the original CSV-based build.
 bundle_table <- function(table) {
   csv <- capture.output(write.csv(table, row.names = FALSE))
-  tibble::as_tibble(read.csv(text = csv))
+  columns <- read_csv(
+    I(paste(csv, collapse = "\n")),
+    col_types = cols(.default = col_character())
+  )
+  as_tibble(lapply(columns, type.convert, as.is = TRUE))
 }
 usa_2000_mortality <- bundle_table(mortality)
 usa_2000_fertility <- bundle_table(overall)
@@ -221,7 +231,7 @@ stopifnot(
   nrow(usa_2000_migration) == 132L
 )
 
-usethis::use_data(
+use_data(
   usa_2000_mortality,
   usa_2000_fertility,
   usa_2000_fertility_union,

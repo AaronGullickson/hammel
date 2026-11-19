@@ -3,7 +3,8 @@
 ## Rebuild the bundled data
 
 Run [usa_2000.R](usa_2000.R) from the package root with
-`readxl`, `tibble`, `usethis`, and Poppler's `pdftotext` installed.
+`here`, `readr`, `readxl`, `tibble`, `usethis`, and Poppler's `pdftotext`
+installed.
 
 ```sh
 Rscript data-raw/usa_2000/usa_2000.R

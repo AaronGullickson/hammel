@@ -1,10 +1,15 @@
 # Rebuild the bundled England and Wales observations from original sources.
-# Run from the package root with readxl and tibble installed.
+# Run from the package root.
 
-root <- "data-raw/england_wales_1992_onward"
+library(here)
+library(readr)
+library(readxl)
+library(tibble)
+
+root <- here("data-raw", "england_wales_1992_onward")
 read_sheet <- function(file, sheet) {
-  data <- readxl::read_excel(
-    file.path(root, file),
+  data <- read_excel(
+    here(root, file),
     sheet = sheet,
     col_names = FALSE,
     .name_repair = "minimal"
@@ -36,7 +41,7 @@ fertility_1992 <- matrix(
   ncol = 3,
   byrow = TRUE
 )
-fertility <- tibble::tibble(
+fertility <- tibble(
   union_type = rep(c("marriage", "cohab", "unpartnered"), each = 6),
   age_start = rep(c(16L, 20L, 25L, 30L, 35L, 40L), 3),
   age_end = rep(c(20L, 25L, 30L, 35L, 40L, 45L), 3),
@@ -147,7 +152,7 @@ for (year in 1992:2019) {
 }
 
 # These remain observed marriage rates, not tuned union-search rates.
-marriage <- tibble::as_tibble(out)
+marriage <- as_tibble(out)
 marriage <- marriage[marriage$marriage_order != "all_marriages", ]
 stopifnot(all(marriage$marriage_order %in% c("first_marriage", "remarriage")))
 marriage$time_start <- marriage$year
@@ -162,14 +167,14 @@ marriage <- marriage[c(
 # ONS Table 11a measures shared addresses at marriage.
 d <- read_sheet("ons_marriages_2019.xlsx", "11a")
 rows <- which(number(d[[1]]) %in% 1994:2019)
-premarital_cohabitation <- tibble::tibble(
+premarital_cohabitation <- tibble(
   year = as.integer(number(d[rows, 1])),
   age_groups = d[rows, 2],
   prop_cohabit = number(d[rows, 6]) / 100
 )
 
 # Table 3 gives competing-risk outcomes for women under 45 at union start.
-cohabitation_outcomes <- tibble::tibble(
+cohabitation_outcomes <- tibble(
   cohort_start = c(1990L, 1995L, 2000L),
   cohort_end = c(1995L, 2000L, 2005L),
   marriage_5 = c(.463, .399, .395),
@@ -181,7 +186,10 @@ cohabitation_outcomes <- tibble::tibble(
 )
 stopifnot(all(abs(rowSums(cohabitation_outcomes[3:5]) - 1) < .002))
 
-life <- read.csv(file.path(root, "marital_life_table_2005.csv"))
+life <- read_csv(
+  here(root, "marital_life_table_2005.csv"),
+  col_types = cols(dur_start = col_integer())
+)
 survivor_diff <- head(life$surviving_marriages, -1) -
   head(life$divorce_events, -1) - head(life$death_events, -1) -
   tail(life$surviving_marriages, -1)
@@ -198,7 +206,7 @@ stopifnot(
 # Integer life-table event counts retain more precision than the 0.1%-rounded
 # published cumulative columns (which hide small nonzero late divorces).
 initial_marriages <- life$surviving_marriages[1]
-cumulative <- tibble::tibble(
+cumulative <- tibble(
   year = 2005L,
   anniversary = life$dur_end,
   cumulative_divorce = cumsum(life$divorce_events) / initial_marriages,
@@ -209,9 +217,9 @@ divorce_diff <- cumulative$cumulative_divorce -
 death_diff <- cumulative$cumulative_death - life$published_cumulative_death_end
 stopifnot(all(abs(divorce_diff) <= .00051), all(abs(death_diff) <= .00051))
 
-divorce_2010 <- file.path(root, "ons_divorce_death_cumulative_2010.csv")
-d <- read.csv(divorce_2010, skip = 6)
-cumulative_2010 <- tibble::tibble(
+divorce_2010 <- here(root, "ons_divorce_death_cumulative_2010.csv")
+d <- read_csv(divorce_2010, skip = 6, show_col_types = FALSE)
+cumulative_2010 <- tibble(
   year = 2010L,
   anniversary = as.integer(number(d[[1]])),
   cumulative_divorce = number(d[[2]]) / 100,
@@ -229,7 +237,11 @@ england_wales_1992_onward <- list(
 # Preserve the precision and column types of the original CSV-based build.
 england_wales_1992_onward <- lapply(england_wales_1992_onward, function(table) {
   csv <- capture.output(write.csv(table, row.names = FALSE, na = ""))
-  tibble::as_tibble(read.csv(text = csv, fileEncoding = "UTF-8"))
+  columns <- read_csv(
+    I(paste(csv, collapse = "\n")),
+    col_types = cols(.default = col_character())
+  )
+  as_tibble(lapply(columns, type.convert, as.is = TRUE))
 })
 stopifnot(
   identical(vapply(england_wales_1992_onward, nrow, integer(1)), c(
