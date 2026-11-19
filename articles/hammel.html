@@ -720,12 +720,52 @@ Table 1: Rate schedules used by Hammel, along with available age/duration bands
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, years <span class="op">=</span> <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 0.767 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 0.791 sec elapsed</span></span></code></pre></div>
 </div>
 <p>Pretty fast! We can get a nice summary of the population at the end.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">pop_end</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">pop_end</span><span class="op">)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Population ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; • First date: -69.997</span></span>
+<span><span class="co">#&gt; • End time: 100</span></span>
+<span><span class="co">#&gt; • Persons alive at end time: 54601</span></span>
+<span><span class="co">#&gt; • Total births: 121579</span></span>
+<span><span class="co">#&gt; • Total unrealized births: 0</span></span>
+<span><span class="co">#&gt; • Total deaths: 66978</span></span>
+<span><span class="co">#&gt; • Total unions: 33742</span></span>
+<span><span class="co">#&gt; • Total dissolutions: 0</span></span>
+<span><span class="co">#&gt; • Latest simulation run</span></span>
+<span><span class="co">#&gt;   • Time period: 0-100</span></span>
+<span><span class="co">#&gt;   • Starting population size: 50000</span></span>
+<span><span class="co">#&gt;   • Ending population size: 54601</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Living population by age and sex</span></span>
+<span><span class="co">#&gt;                      Male     Age     Female                   </span></span>
+<span><span class="co">#&gt;                           | 105-109 |                          </span></span>
+<span><span class="co">#&gt;                           | 100-104 |                          </span></span>
+<span><span class="co">#&gt;                           |  95-99  | #                        </span></span>
+<span><span class="co">#&gt;                        ## |  90-94  | ####                     </span></span>
+<span><span class="co">#&gt;                     ##### |  85-89  | ########                 </span></span>
+<span><span class="co">#&gt;                 ######### |  80-84  | #############            </span></span>
+<span><span class="co">#&gt;              ############ |  75-79  | ###############          </span></span>
+<span><span class="co">#&gt;          ################ |  70-74  | ##################       </span></span>
+<span><span class="co">#&gt;       ################### |  65-69  | ####################     </span></span>
+<span><span class="co">#&gt;      #################### |  60-64  | #####################    </span></span>
+<span><span class="co">#&gt;     ##################### |  55-59  | ######################   </span></span>
+<span><span class="co">#&gt;   ####################### |  50-54  | #######################  </span></span>
+<span><span class="co">#&gt;   ####################### |  45-49  | ######################   </span></span>
+<span><span class="co">#&gt;   ####################### |  40-44  | #######################  </span></span>
+<span><span class="co">#&gt;  ######################## |  35-39  | #######################  </span></span>
+<span><span class="co">#&gt;  ######################## |  30-34  | ######################## </span></span>
+<span><span class="co">#&gt;   ####################### |  25-29  | #######################  </span></span>
+<span><span class="co">#&gt;  ######################## |  20-24  | ######################## </span></span>
+<span><span class="co">#&gt;  ######################## |  15-19  | ######################## </span></span>
+<span><span class="co">#&gt; ######################### |  10-14  | #########################</span></span>
+<span><span class="co">#&gt; ######################### |   5-9   | #######################  </span></span>
+<span><span class="co">#&gt; ######################### |   0-4   | #######################</span></span></code></pre></div>
 </div>
 <p>The age pyramid looks like what we would expect of a low fertility, lower mortality population. We can see that our population grew by 4601 members over the time period of the simulation.</p>
 <p>Lets take a closer look at its structure.</p>
@@ -956,7 +996,7 @@ Figure 4: Age-specific mortality rates estimated from simulation. 95% confidenc
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 0.954 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 1.038 sec elapsed</span></span></code></pre></div>
 </div>
 <p>Lets look at population size again.</p>
 <div class="cell">
@@ -1344,7 +1384,7 @@ Figure 11: Distribution of age difference between partners from simulated data.
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">tic</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">pop_end</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/run_simulation.html">run_simulation</a></span><span class="op">(</span><span class="va">model</span>, <span class="fl">100</span>, <span class="fl">42</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/tictoc/man/tic.html" class="external-link">toc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="co">#&gt; 33.961 sec elapsed</span></span></code></pre></div>
+<span><span class="co">#&gt; 34.951 sec elapsed</span></span></code></pre></div>
 </div>
 <p>This simulation took quite a bit longer to run. The reason for this is the use of a custom R function, because R processing will generally be slower than the underlying C++ used for most of the simulation.</p>
 <p>Lets look at how race and region changed over time. The <code>by</code> argument will allow us to stratify results in all of the <code>calculate</code> helper functions.</p>

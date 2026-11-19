@@ -538,8 +538,8 @@ time_changing <- system.time(
 )
 ```
 
-The simulation with constant rates takes 1.894 seconds to process. The
-simulation with varying rates takes 1.67 second to process.
+The simulation with constant rates takes 1.693 seconds to process. The
+simulation with varying rates takes 1.547 second to process.
 
 ## Analyze the Simulation Results
 
@@ -697,9 +697,9 @@ calculate_fertility_rates(
 #> # A tibble: 3 × 6
 #>   time_start time_end union_type  age_start age_end   tfr
 #>        <dbl>    <dbl> <chr>           <dbl>   <dbl> <dbl>
-#> 1       1992     2019 unpartnered        16      45 0.618
-#> 2       1992     2019 cohab              16      45 2.82 
-#> 3       1992     2019 marriage           16      45 3.74
+#> 1       1992     2019 unpartnered        16      45 0.614
+#> 2       1992     2019 cohab              16      45 2.87 
+#> 3       1992     2019 marriage           16      45 3.79
 ```
 
 As expected, the empirically estimated fertility rates within union type

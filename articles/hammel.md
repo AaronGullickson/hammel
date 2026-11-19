@@ -186,7 +186,7 @@ function. I will also time it with the
 tic()
 pop_end <- run_simulation(model, years = 100, seed = 42)
 toc()
-#> 0.767 sec elapsed
+#> 0.791 sec elapsed
 ```
 
 Pretty fast! We can get a nice summary of the population at the end.
@@ -194,6 +194,46 @@ Pretty fast! We can get a nice summary of the population at the end.
 ``` r
 
 summary(pop_end)
+#> 
+#> ── Population ──
+#> 
+#> • First date: -69.997
+#> • End time: 100
+#> • Persons alive at end time: 54601
+#> • Total births: 121579
+#> • Total unrealized births: 0
+#> • Total deaths: 66978
+#> • Total unions: 33742
+#> • Total dissolutions: 0
+#> • Latest simulation run
+#>   • Time period: 0-100
+#>   • Starting population size: 50000
+#>   • Ending population size: 54601
+#> 
+#> ── Living population by age and sex
+#>                      Male     Age     Female                   
+#>                           | 105-109 |                          
+#>                           | 100-104 |                          
+#>                           |  95-99  | #                        
+#>                        ## |  90-94  | ####                     
+#>                     ##### |  85-89  | ########                 
+#>                 ######### |  80-84  | #############            
+#>              ############ |  75-79  | ###############          
+#>          ################ |  70-74  | ##################       
+#>       ################### |  65-69  | ####################     
+#>      #################### |  60-64  | #####################    
+#>     ##################### |  55-59  | ######################   
+#>   ####################### |  50-54  | #######################  
+#>   ####################### |  45-49  | ######################   
+#>   ####################### |  40-44  | #######################  
+#>  ######################## |  35-39  | #######################  
+#>  ######################## |  30-34  | ######################## 
+#>   ####################### |  25-29  | #######################  
+#>  ######################## |  20-24  | ######################## 
+#>  ######################## |  15-19  | ######################## 
+#> ######################### |  10-14  | #########################
+#> ######################### |   5-9   | #######################  
+#> ######################### |   0-4   | #######################
 ```
 
 The age pyramid looks like what we would expect of a low fertility,
@@ -478,7 +518,7 @@ The model is set, so lets run it.
 tic()
 pop_end <- run_simulation(model, 100, seed = 42)
 toc()
-#> 0.954 sec elapsed
+#> 1.038 sec elapsed
 ```
 
 Lets look at population size again.
@@ -1012,7 +1052,7 @@ the mother, if alive, and otherwise the father.
 tic()
 pop_end <- run_simulation(model, 100, 42)
 toc()
-#> 33.961 sec elapsed
+#> 34.951 sec elapsed
 ```
 
 This simulation took quite a bit longer to run. The reason for this is
