@@ -4,7 +4,14 @@
 \alias{count_kin}
 \title{Calculate the average number of living kin over time}
 \usage{
-count_kin(population, times, generations = 2, by = NULL, relationships = NULL)
+count_kin(
+  population,
+  times,
+  generations = 2,
+  by = NULL,
+  relationships = NULL,
+  include_external = FALSE
+)
 }
 \arguments{
 \item{population}{A \code{hammel_population} with a known \code{end_time} no earlier
@@ -24,6 +31,10 @@ group dimensions, such as \code{"race"}.}
 \item{relationships}{\code{NULL} (default) for all relationships, or a nonempty
 character vector of unique relationship names within \code{generations}, such
 as \code{"first_cousin"}. Retains the usual row order and ego denominators.}
+
+\item{include_external}{If \code{TRUE}, count immigrants' external relatives
+(see \code{\link[=immigration]{immigration()}}) as kin while they are known to be alive, up to their
+\code{censor_time}. They are never egos. Defaults to \code{FALSE}.}
 }
 \value{
 A tibble with \code{time}, the \code{by} columns, \code{relationship}, \code{persons}

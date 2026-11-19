@@ -1,14 +1,17 @@
 # Development roadmap
 
-Updated November 9, 2026. Milestones 1–9 are complete by user acceptance
+Updated November 18, 2026. Milestones 1–9 are complete by user acceptance
 (D029, D050, D077, D093, D105, D116, D127, D130, D141). **Milestone 9,
 multiple group dimensions, was accepted complete on November 6, 2026.** **Milestone 8 was accepted
 complete on November 5, 2026:** cell scheduling for every rate process (D128)
 and weight models (D129), retaining documented limitations. On November 5 the
 user reordered later milestones (D131). On November 6, D136 superseded that
 sequence: finish milestone 9, then prepare the first version bump and public
-release. External immigration and two-sex marriage models are post-release
-projects. Summary and print methods were added in PR #34, and D183 selects
+release. The first public release was v0.1.0 on November 11, 2026, followed
+by v0.2.0 on November 16. External immigration and two-sex marriage models
+are post-release projects; external immigration is now implemented
+(D184–D198). Post-release features have no formal milestone acceptance; their
+validation reports are the user's working checks. Summary and print methods were added in PR #34, and D183 selects
 cli/rlang error and warning messages with condition classes (issue #25),
 replacing the output-presentation deferral in D151. Other diagnostic checks and
 helpers remain proposed; their release scope has not yet been selected.
@@ -23,9 +26,9 @@ or an unselected public API.
 | 7 | Time-varying rates, matching, and inheritance within a simulation run | Complete November 2, 2026 (D127); current engine and documented limitations retained |
 | 8 | Cell scheduling for all rate processes; formula and custom weight models | Complete November 5, 2026 (D130); documented limitations retained |
 | 9 | More than one group column, potentially including regions and internal migration | Complete November 6, 2026 (D141); documented limitations retained |
-| Post-release | Immigration from outside the system, tracking generation (formerly 10) | Deferred until after first public release (D136) |
-| Release preparation | First version bump and public release after milestone 9 | User-selected next focus (D136); version number and release criteria unselected |
-| Implemented, pending review | Diagnostic bullets and condition classes for errors and warnings | D183 (issue #25), superseding D151's deferral; summaries added in PR #34 |
+| Post-release | Immigration from outside the system, tracking generation (formerly 10) | Implemented (D184–D198); checked in the user's [validation report](../validation/external_migration.qmd) |
+| Release | First version bump and public release after milestone 9 | Released as v0.1.0, November 11, 2026 (D136); v0.2.0 November 16 |
+| Released | Diagnostic bullets and condition classes for errors and warnings | Released in v0.2.0 (D183, issue #25, PR #35), superseding D151's deferral; summaries added in PR #34 |
 | Unassigned | Model diagnostic checks and post-simulation helpers (formerly 11) | Proposed; scope and timing to select during release planning |
 | Post-release | Two-sex marriage model (formerly 12) | Deferred until after first public release (D136); model and API unselected |
 
@@ -329,45 +332,21 @@ following questions still require a concrete scientific specification.
 
 ## Post-release: immigration from outside the system
 
-Formerly milestone 10 under D131; deferred until after the first public release
-by D136. Add immigrants within a running
-simulation, rather than requiring a restart.
-Under D177, the user selected absolute arrival intensity in migrants per year,
-with stochastic arrivals and no controlled/exact-count option. A constant
-intensity gives exponential interarrival times and Poisson period counts;
-resident population changes do not themselves change that intensity.
-Under D178, support multiple streams, potentially representing countries or
-world regions of origin, with separate arrival intensities. Stream-specific
-migrant characteristics and how origin is retained or mapped to groups still
-need specification; no clock organization is selected yet.
-Under D179, draw migrant templates with replacement from an existing
-`hammel_population`, preserving age, sex and group identifiers and assigning
-new person IDs. The source is not depleted. Optional household sampling is
-under discussion; selection, intensity units and relationship/history
-handling are not yet selected.
-D180 requests calendar schedules of population templates using time bounds
-and a list column. Selective migration through a predictive selection model
-is under discussion as an alternative to tuning the source population's
-distributions; no weighting or prediction contract is selected yet.
-Calendar-varying intensity inputs and their boundary handling still need a
-contract. The user also envisages an age/sex distribution and tracking
-individual immigrant generational status. Migrant composition,
-attribute/kin/union initialization, ancestry and generation definitions,
-interactions with group assignment, entry observations and the public API
-remain open. This is a modeling decision, not implementation authorization.
-Under D181, retain personal/family migration history separately from reusable,
-named generation/origin classifications. Custom matching, inheritance and
-weight models should be able to consume concise derived variables without
-traversing pedigrees. Definitions, schemas, update timing and history retention
-through truncation remain to be specified. Stream origin, group membership
-and ancestry are distinct. See [external immigration](immigration.md) for the
-consolidated accepted direction, examples and unresolved contracts.
-Under D182, support rate stratification by personal immigration status and
-arrival stream. Generational classifications remain available to custom
-models; normalized weights do not replace generation-specific aggregate rate
-targets. Group-based versus built-in stratifier representation and rate-table
-contracts remain open.
-No emigration process is implied by the immigration request.
+Formerly milestone 10 under D131; post-release work under D136, begun after
+v0.1.0. Implemented under D177–D182 as amended and D184–D198: named
+`immigration_stream()`s with count or crude-rate intensities, household
+arrivals with imported histories or cloned individuals, template cuts and
+weight schedules, the automatic `birthplace` group, user-defined generation
+groups and `calculate_immigration_rates()`. The user's
+[validation report](../validation/external_migration.qmd) is a working check
+of the feature rather than a milestone acceptance. See
+[external immigration](immigration.md) for the current specification and its
+open decisions, including calendar schedules of migrant assignment,
+multigenerational households, migration-history depth and provenance,
+duration of residence in formulas and matching, and a template truncation
+helper (deferred by D184). D191, deprecating only-dimension defaults, is
+planned for a separate change. No emigration process is implied by the
+immigration request.
 
 ## Proposed summaries, diagnostics, and helpers
 

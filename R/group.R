@@ -168,7 +168,8 @@ reserved_group_names <- c(
   "mother_id", "father_id",
   "union_type", "previous_union", "parity", "partnered",
   "age_difference",
-  "origin", "destination", "hetfert", "unknown", "time", "rate"
+  "origin", "destination", "hetfert", "unknown", "time", "rate",
+  "arrival_time", "stream"
 )
 
 # HELPER FUNCTIONS ---------------------------------------------------------
@@ -342,6 +343,13 @@ apply_group_declaration <- function(
   call = rlang::caller_env()
 ) {
   declaration <- normalize_group_declaration(declaration, call = call)
+  # Automatic dimensions, such as birthplace (D190), stay with a population
+  # whose new declaration does not mention them.
+  for (d in setdiff(names(population$groups), names(declaration))) {
+    if (isTRUE(population$groups[[d]]$automatic)) {
+      declaration[[d]] <- population$groups[[d]]
+    }
+  }
   # A dimension declared without categories keeps the categories the
   # population already declares (so turning on ancestry, say, keeps their
   # order).
@@ -367,6 +375,15 @@ apply_group_declaration <- function(
 # The declaration in force for a model: set_groups() wins over the population's.
 model_groups <- function(model) {
   if (!is.null(model$groups)) model$groups else model$population$groups
+}
+
+# Declared dimensions that count as "the only dimension" for defaults: all but
+# the automatic birthplace dimension (D190).
+counted_dimensions <- function(declaration) {
+  automatic <- vapply(
+    declaration, function(x) isTRUE(x$automatic), logical(1)
+  )
+  names(declaration)[!automatic]
 }
 
 # Is a group dimension (any, or the named one) declared for this population?
@@ -440,9 +457,11 @@ validate_group_declaration <- function(
       if (!is.null(tx) && "group" %in% names(tx)) {
         tx <- tx[tx$group == name, , drop = FALSE]
       }
+      # Entry rows have no origin (D186).
       values <- unique(
         as.character(c(persons[[name]], tx$origin, tx$destination))
       )
+      values <- values[!is.na(values)]
       missing <- setdiff(values, as.character(categories))
       if (length(missing)) {
         abort_hammel(

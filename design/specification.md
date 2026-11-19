@@ -25,6 +25,7 @@ The [scientific contract](scientific-contract.md) defines demographic semantics.
 | Proportional input-rate stratification | `R/stratify_rates.R` |
 | Calendar model schedules and engine preparation | `R/model_schedules.R`; switches in `src/simulate.cpp` |
 | Group transition and household specifications | `R/group_transition.R`; events in `src/simulate.cpp` |
+| External immigration (phases 1 to 3) | `R/immigration.R`; arrival clocks and events in `src/simulate.cpp`; arrival-aware observation in `src/observation.cpp` |
 | Persistent fertility heterogeneity (internal, D176) | `R/het_fert.R`; cell weight trees in `src/fertility_cells.h` |
 | Weight models | `R/weight_model.R`; stored weights and selection in `src/simulate.cpp`, `src/rate_cells.h` and `src/fertility_cells.h` |
 | Union formation, dissolution and cohabitation settings | `R/union_formation.R`, `R/union_dissolution.R`, `R/cohabitation.R` |
@@ -530,3 +531,90 @@ Grouped populations always include a `transitions` tibble, including empty
 histories. Restart retains the history and reconstructs duration. Observation
 kernels use private indexed history adapters to split group exposure at moves
 and attribute events at their occurrence. See [the contract](group-transitions.md).
+
+## External immigration (phases 1 to 3)
+
+`immigration(...)`/`set_immigration(model, ...)` attach one process of named
+`immigration_stream()`s; each call replaces every stream and a call without
+streams removes immigration (D184). Each stream has its own exponential
+arrival clock at a constant or piecewise-constant calendar intensity, redrawn
+at intensity edges; arrivals follow every other event at exact ties. An
+arrival draws a party by normalized weight-model probabilities computed in R
+before the run. Streams import households by default (phase 3); a stream
+with `household = NULL` clones individuals (D188): anyone alive at the
+template endpoint, created with the same age and sex, unknown parents, no
+unions, parity zero and every group entered at arrival. Shared group dimensions copy the
+template category; others are drawn from `migrant_assignment()`
+probabilities. Ancestry is copied where the template tracks it and is
+otherwise all in the migrant's category. `persons` gains `arrival_time`
+when the model has streams or the input has it. Observation kernels and
+living-kin counts start at the later of birth and arrival, and an
+immigrant's events at or before arrival, including imported events at the
+template's endpoint, are never counted. See
+the [phase 1 specification](immigration.md#phase-1-specification) (D185).
+
+Phase 2 (D186) imports each migrant's template unions, with their partners
+and children as `external_relatives` (with `censor_time`), and transitions
+in shared groups, all shifted by the age offset with fresh IDs; R builds
+these records after the run from the engine's arrival records. Derived
+state (parity, last birth, previous-union state, group entry) is computed
+in R before the run and set at arrival; an assigned group's entry is a
+`transitions` row with `NA` origin. `unions` and `transitions` store
+`pre_migration` with arrival records. External relatives stay outside the
+engine: their unions are removed from its input and restored, births to
+external children are supplied as counts and latest times, and ID floors
+keep new IDs fresh. Observation appends them flagged so histories resolve,
+never counting them; union-level rates exclude pre-migration unions; kin
+functions include them with `include_external = TRUE`. See the
+[phase 2 specification](immigration.md#phase-2-specification).
+
+Phase 3 (D187) adds `immigration_stream(household = household())`. R divides
+the template's living persons into D140 households before the run and gives
+the engine each party's members with links as offsets within the party;
+selection and assignment use carriers, and the clock runs at `intensity`
+divided by the expected party size. At arrival the engine creates every
+member, links parents within the party, and opens the carrier's current
+union live at its imported duration. After the run, R imports histories per
+party, so relatives are shared and members' parents outside the party are
+filled in. Union rate calculations left-truncate pre-migration unions at
+arrival, with durations from their original start. See the
+[phase 3 specification](immigration.md#phase-3-specification). Cloning
+streams skip the history import and warn at construction when the template
+has unions or transitions; see [cloning streams](immigration.md#cloning-streams).
+
+Models with immigration add an automatic `birthplace` dimension (D190) to the
+declaration before the run: `"native"` plus the stream names, fixed native
+inheritance, ancestry only with `birthplace_ancestry = TRUE`. Each stream
+assigns its own name internally, ignoring the template's `birthplace`; it
+replaces the former `stream` column. The dimension is flagged `automatic`
+and excluded from only-dimension defaults, including when a transition
+without `group` is resolved at run time; naming it in a transition process
+is an error (D198). See the
+[birthplace group](immigration.md#birthplace-group).
+
+A `"custom"` migrant assignment (D193) is an R closure the engine calls at
+each arrival with the arriving members' rows, the arrival time and a
+household number, saving and restoring R's RNG state around the call as for
+custom inheritance; it returns one category code per member.
+
+Intensity tables (D194) carry a `count` or a `rate` column. Count streams
+keep an exponential clock; rate streams hold a cumulative-hazard threshold,
+and every change in the living population (births, deaths, arrivals) adds
+rate × N × elapsed time to each rate stream's used hazard and reschedules
+it. `calculate_immigration_rates()` divides arrivals by the person-years of
+the whole population.
+
+Each engine person stores an arrival time (`NA` for the born), read from a
+restarted population's `arrival_time`. Custom weight functions receive
+birth and arrival times in `members` and the evaluation time as `bin$time`,
+set from the event time (D195).
+
+Each stream is prepared as one slice per template cut (D196), from the
+template truncated to the cut by the internal `population_at()`; without
+`step` there is one slice from the template's end. Slices hold parties,
+probabilities, imported state and their expected party size; cut times are
+calendar boundaries where the engine switches slice and redraws the clock,
+dividing intensity by the slice's expected size. Arrival records carry
+their slice, so histories are imported from that cut's template. Weight
+schedules (D197) add slices at their boundaries, each with the active model
+and the latest cut's template.

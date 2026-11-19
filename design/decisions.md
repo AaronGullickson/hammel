@@ -79,13 +79,14 @@ alternatives, and evidence. Proposals and deferred concerns are not authorizatio
 | One `by` argument for rate calculators; shared observation engine | D133 |
 | Multiple group dimensions: declaration, names, staging | D134 |
 | Matching prohibitions written as NA in `group_exogamy` | D135 |
-| First public release after milestone 9; immigration and two-sex models post-release | D136 |
+| First public release after milestone 9 (v0.1.0, November 11, 2026); immigration and two-sex models post-release | D136 |
 | GitHub milestones and Projects; multiple issues and PRs per milestone | D137 |
 | Matching calibration within separate markets | D138 |
 | `group_exogamy` table form for cross-dimension pair effects (`_x`/`_y` columns) | D139 |
 | Household moves for group transitions | D140 |
 | Milestone 9 accepted complete | D141 |
 | Error and warning messages: cli/rlang style, classes, function names | D183 (supersedes D151's deferral) |
+| External immigration: streams, templates, imported histories, households, birthplace, intensity, cuts and weights | D177–D182 as amended; D184–D190, D192–D198; D191 planned |
 
 ## Recorded decisions
 
@@ -2986,7 +2987,9 @@ available.
 
 ## D136 — First public release after the current milestone (November 6, 2026)
 
-**Status:** User decision, November 6, 2026.
+**Status:** User decision, November 6, 2026. The first public release was
+v0.1.0 on November 11, 2026, followed by v0.2.0 on November 16; external
+immigration followed as post-release work (D184–D198).
 
 **Decision:** Finish the current milestone (9, multiple group dimensions),
 then work toward the first version bump, coinciding with the first public
@@ -3533,8 +3536,9 @@ at its recorded commit.
 
 ## D177 — Absolute stochastic immigration intensity (November 12, 2026)
 
-**Status:** User modeling decision, November 12, 2026. Planning only;
-external immigration is not implemented by this decision.
+**Status:** User modeling decision, November 12, 2026, implemented through
+D185 (November 16, 2026). D194 adds crude-rate intensities alongside
+absolute counts.
 
 **Decision:** Specify external immigration through an absolute arrival
 intensity in migrants per year, with stochastic arrival times. The input is
@@ -3562,7 +3566,8 @@ schedule interface remain unresolved. See [the roadmap](roadmap.md#post-release-
 
 ## D178 — Multiple external migrant streams (November 12, 2026)
 
-**Status:** User modeling requirement, November 12, 2026. Planning only.
+**Status:** User modeling requirement, November 12, 2026, implemented
+through D185 (November 16, 2026) as named `immigration_stream()`s.
 
 **Decision:** Allow multiple external migrant streams in one simulation.
 Streams may represent countries or world regions of origin, with separate
@@ -3579,7 +3584,9 @@ select separate clocks versus an aggregated arrival clock.
 
 ## D179 — Sample migrant templates from a population (November 12, 2026)
 
-**Status:** User modeling decision, November 12, 2026. Planning only.
+**Status:** User modeling decision, November 12, 2026, implemented
+through D185–D188 (November 16, 2026): household parties by default, or
+clones with `household = NULL`.
 
 **Decision:** Use an existing `hammel_population` as the source template for
 a migrant stream, drawing with replacement. Preserve sampled migrants' age,
@@ -3604,7 +3611,10 @@ parity, birth spacing or previous/current unions initialize.
 ## D180 — Migrant-template preparation and schedules (November 12, 2026)
 
 **Status:** User requirements and design discussion, November 12, 2026.
-Planning only; no helper API or migration implementation is authorized here.
+Template schedules are implemented as cuts of one template (D196) and
+selective migration as weight models and their schedules (D184, D197).
+The truncation requirement is deferred by D184; no preparation helper is
+implemented.
 
 **Requested capabilities:**
 
@@ -3634,8 +3644,11 @@ models remain unresolved.
 
 ## D181 — Migration histories and reusable classifications (November 12, 2026)
 
-**Status:** User-approved design direction, November 12, 2026. Documentation
-only; schemas, classification rules and APIs remain to be specified.
+**Status:** User-approved design direction, November 12, 2026. Personal
+migration facts are implemented as `arrival_time`, `pre_migration` and
+`external_relatives` (D185–D186) and the `birthplace` group (D190);
+classifications such as generation are user-defined groups (D192).
+History depth, provenance and restart persistence remain open.
 
 **Decision:** Keep personal migration facts and family migration history
 separate from derived generation/origin classifications. Support mixed-stream
@@ -3664,8 +3677,10 @@ signature, selection-weight interpretation or household rule is selected.
 
 ## D182 — Rate stratification by personal immigration status and stream (November 12, 2026)
 
-**Status:** User-approved design direction, November 12, 2026. Planning only;
-no rate-table schema or implementation is selected.
+**Status:** User-approved design direction, November 12, 2026, implemented
+through the `birthplace` group (D190). Amended by D190: the
+`birthplace` group carries personal status and stream, and starting populations
+default to `"native"`.
 
 **Decision:** Support rate stratification by a person's own immigration
 status and arrival stream, rather than requiring generational classifications
@@ -3684,7 +3699,6 @@ stratifier, field/category names, starting-population unknowns, supported rate
 processes and validation/coverage rules. Arrival stream remains distinct from
 inherited origin or ancestry. General generation-specific rate stratification
 is not selected by this decision. See [external immigration](immigration.md#rate-stratification).
-
 
 ## D183 — Tidyverse-style error and warning messages (November 14, 2026)
 
@@ -3736,3 +3750,475 @@ check classes, fields and the named function, with snapshot tests for
 message layout.
 Native changes are limited to message tags and follow D175's verification
 policy.
+
+## D184 — Migrant parties, imported histories and external relatives (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026. Implemented in
+phases under D185–D187, authorized the same day.
+
+**Decision:**
+
+- Every arrival is a party. Individual arrivals are one-person parties;
+  household parties are expected to follow D140's membership rule.
+  Relationships inside a party arrive as links between destination members.
+- No one arrives without their current partner, married or cohabiting.
+  Individual arrivals therefore sample only source people without a current
+  partner. Partners whose future is not simulated are never referenced as
+  current partners.
+- Arrivals bring their recorded births, unions and group transitions,
+  including pre-migration events. Every imported date shifts by the same
+  offset as birth time (arrival time minus template endpoint), preserving
+  age and elapsed durations at the template endpoint.
+- Parity, last-birth time, previous-union state and group duration derive
+  from imported records as for a starting population. Group duration
+  continues from the source; arrival does not restart it.
+- People referenced by an arrival's history who are not destination
+  members (previous partners and children not in the party) are recorded in
+  a separate `external_relatives` tibble with the columns of `persons` plus a
+  last-observed time. Their groups are their status at the template endpoint
+  or death, without transition history. They are never simulated and
+  contribute no exposure, events or population counts. A non-partner father
+  of such a child has an unknown parent ID.
+- Templates without histories, such as uniform generated populations, need
+  no special handling.
+- Template truncation (D180) is deferred.
+- Selective migration uses a weight model, as other processes do, in place
+  of D180's predictive-selection proposal. Conditional on a stream arrival,
+  eligible template people are selected with probability proportional to
+  weight, uniformly without a model; stream intensity is unchanged.
+- Proposed phasing: individual arrivals without histories, then imported
+  histories and external relatives, then household parties.
+- Interface: immigration is one process per model. `immigration_stream()`
+  describes a stream (template, intensity, optional weights) as a component;
+  `immigration(...)` holds named streams, with argument names as stream
+  names; `set_immigration(model, ...)` constructs and attaches it, following
+  `set_groups()`. Each call replaces the complete set of streams, and a call
+  without streams removes immigration. Names are required, unique, non-empty
+  and distinct from the non-immigrant label.
+- A stream's intensity is a non-negative number or a rate-style tibble
+  with `time_start`, `time_end` and an intensity column, under D118's
+  calendar conventions: half-open intervals, piecewise-constant values, no
+  overlaps, gaps during the run are errors, zero disables a stream, and
+  boundary changes precede same-time events. This settles D177's
+  calendar-varying intensity schema.
+
+**Rationale:** Sampled migrants do not bring all their relatives, so parity
+and previous-union state cannot be reconstructed from destination members'
+records alone. Recording the needed non-members in one table keeps those
+states derived from records under a single rule that also serves household
+parties. Disallowing a left-behind current partner avoids tracking future
+events for people who are not simulated. The user judged partner group
+history unnecessary: pre-migration partnering should be analyzed on the
+template population.
+
+**Consequences:** Individual-arrival composition is biased against partnered
+adults until household parties exist. Partner characteristics of
+pre-migration unions use the partner's endpoint or death-time groups.
+Separately sampled parties are unrelated, including repeated draws of one
+source person. Calculation and observation functions must exclude
+pre-migration events and exposure and must not count external relatives.
+
+**Open choices:** Eligibility of partnered source people in phase 1,
+the last-observed column name, kin-extraction treatment of external
+relatives, restart representation, multigenerational parties, weight-model
+variables available for template people, calendar-scheduled selection
+weights, all-zero or empty eligible sets, remaining `immigration_stream()`
+arguments, the intensity column name and the non-immigrant label. See
+[external immigration](immigration.md#arriving-parties-and-imported-histories).
+
+## D185 — Phase 1 immigration contract (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026. The user approved
+the specification and authorized implementation the same day; phase 1 is
+implemented.
+
+**Decision:** Phase 1 of external immigration (D184) follows the
+[phase 1 specification](immigration.md#phase-1-specification):
+
+- Eligible template people are alive at the template's `end_time` and have
+  no current partner.
+- Each stream has its own exponential clock at its current intensity,
+  redrawn at intensity boundaries. Arrivals follow group transitions among
+  same-time events. Models without streams make no immigration draws. The
+  intensity column is `intensity`.
+- Phase 1 includes optional weight models using age, sex and
+  template-supplied groups. No eligible person or zero total weight is an
+  error before the run starts.
+- Migrants arrive with fresh IDs, preserved age, unknown parents, no unions,
+  parity zero and no transition history.
+- `persons` gains `arrival_time` and `stream` only when the model has
+  streams or the input population already has those columns.
+- Observation starts at the later of birth and arrival.
+- Same-name group dimensions must declare the same categories and copy
+  template values. Template-only dimensions are ignored. Destination
+  dimensions the template lacks require a `migrant_assignment()` in the
+  stream's `assignment` list, with methods `"fixed"`, `"probability"` and
+  `"custom"`; missing assignments, and assignments for dimensions the
+  template declares, are errors.
+- Ancestry is copied from the template where it tracks the dimension;
+  otherwise the migrant has 100% ancestry in their category, from the
+  template or assignment.
+- Calendar-scheduled templates, weight models and assignments, D182 rate
+  strata and D181 classifications are outside phase 1.
+
+**Rationale:** Parent-based inheritance methods do not apply to migrants
+without destination parents, so assignment is a separate component.
+Copying template ancestry preserves origin information the user wants
+retained; the 100% fallback applies only where the template has none.
+Omitting arrival columns keeps simulations without immigration unchanged.
+
+**Consequences:** Phase 1 migrants' group duration falls back to birth
+time, as for any person without transition history, until phase 2 imports
+source transitions. Every observation and calculation function must honor
+arrival times.
+
+**Open choices:** Remaining `immigration_stream()` and
+`migrant_assignment()` arguments, and the non-immigrant label.
+
+## D186 — Phase 2 imported histories contract (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026. The user approved
+the specification and authorized implementation the same day; phase 2 is
+implemented.
+
+**Decision:** Phase 2 of external immigration (D184) follows the
+[phase 2 specification](immigration.md#phase-2-specification):
+
+- An arrival imports the template person's unions, their partners and
+  children as external relatives, and transitions in shared dimensions,
+  with fresh IDs and dates shifted by the age offset.
+- Template people are looked up in the template's `persons` and
+  `external_relatives`; the distinction is flattened in the destination.
+  Template `arrival_time`, `stream` and `pre_migration` values are ignored.
+- `external_relatives` is a top-level element of `hammel_population` with
+  the `persons` columns plus a stored `censor_time`: the death time, a
+  template external relative's shifted `censor_time`, or the arrival time.
+- `unions` and `transitions` store a logical `pre_migration` column when the
+  population has arrival records.
+- Derived state comes from the imported records, including external
+  children; group duration in shared groups continues from the template,
+  and in assigned groups runs from the arrival time, recorded as a
+  `transitions` row at arrival with `origin = NA` that observation and
+  restarts treat as entry, never as a move.
+- External relatives have `NA` values in groups the template lacks.
+- `check_population()` enforces the specification's eight validation rules.
+- External relatives are never counted in observation but inform members'
+  histories. `extract_kin()` and `count_kin()` exclude them by default;
+  `include_external = TRUE` includes them.
+
+**Rationale:** Templates that passed `check_population()` already resolve
+every union and parent reference, so import needs no handling of missing
+records. Storing `pre_migration` gives users direct access and simplifies
+calculations. Template arrival records describe a different destination.
+
+**Consequence:** Group duration in assigned groups now differs from phase
+1, where it ran from birth.
+
+
+## D187 — Phase 3 household parties contract (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026. The user approved
+the specification, including attaching a dependent whose mother is a
+template external relative to their father and storing no party
+identifier, and authorized implementation the same day; phase 3 is
+implemented.
+
+**Decision:** Phase 3 of external immigration (D184) follows the
+[phase 3 specification](immigration.md#phase-3-specification):
+
+- `immigration_stream()` takes a `household()` rule, reusing D140's object
+  and membership rule unchanged; `NULL` keeps individual arrivals.
+- Households partition the template's living persons; any future household
+  rule, such as multigenerational households, must keep membership
+  exclusive.
+- A household stream samples D140 carriers: the woman in a current union,
+  or an unpartnered independent person. Weight models and `custom`
+  assignment use the carrier's characteristics; household-level
+  characteristics are deferred.
+- `intensity` stays in persons per year. The stream's clock runs at
+  `intensity / E[size]` parties per year, where E[size] is the expected
+  party size under the selection probabilities.
+- Members share arrival time, stream and assigned categories.
+- A current union arrives live. It is pre-migration, so it is not a
+  destination formation, but from arrival it is simulated and observed:
+  dissolution and conversion exposure count from the arrival time in the
+  duration band implied by its original start. Union calculations
+  left-truncate at arrival instead of dropping pre-migration unions.
+
+**Rationale:** Sampling carriers gives each household one selection unit,
+as one clock per household does for moves (D140), so large households are
+not over-sampled. Converting intensity internally keeps one meaning of
+`intensity` for individual and household streams. Left truncation keeps
+imported couples' duration-dependent dissolution while excluding events
+the destination did not observe.
+
+**Consequence:** Person arrivals are compound Poisson for household
+streams, with variance above the mean.
+
+## D188 — Household parties by default; cloning without households (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026, authorizing
+implementation.
+
+**Decision:** `immigration_stream()`'s `household` defaults to `household()`.
+`household = NULL` makes a [cloning stream](immigration.md#cloning-streams):
+
+- Everyone alive at the template's `end_time` is eligible.
+- A clone keeps age, sex, shared group categories and ancestry. Their
+  history begins at arrival: never partnered, parity zero, unknown parents,
+  no imported unions, transitions or external relatives, and group duration
+  from arrival in every dimension, with an entry row per dimension.
+- Constructing a cloning stream from a template with unions or transitions
+  warns (`no_effect`) that these histories are not imported.
+
+**Rationale:** Individual arrivals with histories had to exclude partnered
+people (D184), which distorted age profiles. Households are the realistic
+default. Cloning remains for restricted templates, such as young adults
+sampled as labor migrants, where histories do not matter; dropping every
+relationship makes the partner restriction unnecessary.
+
+**Supersedes:** the individual-arrival eligibility of D185 and the
+individual-arrival imports of D186, which now apply to household members.
+
+## D189 — Household variables in immigration selection (November 16, 2026)
+
+**Status:** User decision, November 16, 2026, authorizing implementation.
+
+**Decision:** Household streams describe each household to weight models
+and `custom` assignment functions by its carrier plus `partnered` (0/1),
+`household_size`, `n_dependents` and `partner_age` (`NA` when unpartnered).
+The partner's sex is omitted because all partnerships are currently
+heterosexual. In formulas, a term with a missing value contributes nothing,
+following the engine's convention for weight models; cloning streams can't
+use these variables.
+
+**Rationale:** With carriers as the selection unit (D187), `sex` alone
+confounds sex with household type: male carriers are always unpartnered.
+These variables let users target household composition directly.
+
+**Supersedes:** D187's deferral of household-level characteristics.
+
+## D190 — Automatic birthplace group (November 16, 2026)
+
+**Status:** User modeling decisions, November 16, 2026, amended November
+17 (ancestry off by default; named `birthplace`, because `origin` and
+`destination` are transition columns), when the user authorized
+implementation. Implemented November 17, 2026. Amended by D198: the
+dimension can't have transitions.
+
+**Decision:** Models with immigration always have a `birthplace` group
+dimension (see the [specification](immigration.md#birthplace-group)):
+
+- Categories are `"native"` and the stream names. Newborns are `"native"`;
+  arrivals take their stream's name. The template's `birthplace` is
+  ignored.
+- It replaces the `stream` column of `persons`; `arrival_time` remains.
+- Ancestry in `birthplace` is tracked with `birthplace_ancestry = TRUE` on
+  `immigration()`/`set_immigration()`; the default is `FALSE`, matching
+  `group()` and avoiding clutter users did not ask for.
+- Stream names can't be `"native"` or `"birthplace_ancestry"`, and models
+  with immigration can't declare their own `birthplace` group.
+- Starting populations without `birthplace` are `"native"`, meaning not an
+  immigrant during the simulation, as expected of a synthetic population;
+  users who know more supply the column. This relaxes D182's requirement
+  that unknown starting-population histories not be classified as known
+  non-immigration, which the user judged too strong.
+- The automatic dimension never counts as a model's only dimension for
+  defaults (D191 plans to remove those defaults).
+
+**Rationale:** `stream` with `NA` read as `"native"` is already this
+category. As a group it reuses rate stratification, weights, matching,
+observation and restarts, settling D182's choice between a declared group
+and a built-in variable for personal status. Ancestry shares give heritage
+and its dilution over generations without extra machinery. Ancestry is
+opt-in, as for other groups.
+
+## D191 — Deprecate only-dimension defaults (November 17, 2026)
+
+**Status:** User decision, November 17, 2026. Planned for a separate change;
+not implemented.
+
+**Decision:** Deprecate the conveniences that resolve an unnamed dimension
+to a model's only declared dimension: `set_group_transition()` without
+`group`, transition rates without `group`, bare `group_exogamy` and
+`prevent_exogamy` values, default matching pools, and `transitions` input
+without a `group` column. Warn (`deprecated`) when one is used in the next
+release, then remove them.
+
+**Rationale:** Defaults that change meaning when a dimension is added are
+fragile; the automatic `birthplace` dimension (D190) exposed this. Explicit
+names behave the same in every model. Until removal, D190 excludes
+`birthplace` from these defaults.
+
+## D192 — User-defined generation classifications (November 17, 2026)
+
+**Status:** User decision, November 17, 2026. No implementation needed.
+
+**Decision:** Hammel provides no built-in generation rule. Users define
+generation status as a declared group dimension with a
+`group_inheritance("custom")` rule for newborns, `migrant_assignment()` for
+arrivals (age at arrival for 1.25/1.5/1.75 splits) and a supplied column for
+starting populations. Depth, crossed parentage and unknown parents are
+choices inside the user's rule.
+
+**Rationale:** Generation is defined many ways in research, and users are
+skilled researchers who should have full control. The cost of calling R at
+each birth is acceptable.
+
+**Limitations:** Under D193, custom assignment gives each arriving member
+their own category, so children arriving in households can be 1.5; a
+template column computed beforehand also works and avoids the callback.
+Ancestry shares in `birthplace` measure heritage, not recency: with
+continuing immigration, every share drifts.
+
+Parents' categories summarize their own ancestry, so a rule can recurse to
+any depth: with categories `3` and `4+`, a child of native-born parents is
+`3` when either parent is `2` or `2.5` (a foreign-born grandparent) and
+`4+` otherwise.
+
+**Future use case:** Immigrant shares by generation depth (the share of
+parents, grandparents and so on who were immigrants: a newborn's share at
+depth d is the average of the parents' shares at depth d - 1) measure
+recency without drift and keep the mixture that a single category loses,
+such as how many grandparents were foreign-born. They are a motivating case for the planned general
+quantitative person characteristics (D176).
+
+## D193 — Custom migrant assignment at arrival, per person (November 17, 2026)
+
+**Status:** User decision, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** `migrant_assignment("custom", fun = )` is called by the engine
+at each arrival with one row per arriving member and returns one category
+per member, as custom inheritance returns a category per birth. Members
+carry their own age, sex, shared groups and `arrival_time`; on household
+streams also `role`, a `household` number and the household's D189
+variables. Random choices are made inside the function. `"fixed"` and
+`"probability"` still draw once per household in the engine, unchanged.
+
+**Rationale:** Person-level classifications such as generation (D192) need
+different categories within a household, which the carrier-level contract
+could not give. Returning a value matches custom inheritance and gives full
+control, including sampling once to keep a household together. Calling at
+arrival, not once per template person, keeps repeated draws of the same
+template person independent and gives the function the calendar time.
+
+**Supersedes:** the probability-returning, carrier-level custom contract
+of D185 and D189.
+
+## D194 — Intensity tables with counts or crude rates (November 17, 2026)
+
+**Status:** User decisions, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** A stream's `intensity` is a table with exactly one of a
+`count` column (arrivals per year, D177) or a `rate` column (arrivals per
+person-year lived by the destination's living population, immigrants
+included from arrival). Calendar columns are optional and follow D118. A
+bare number is no longer accepted. The argument stays `intensity` to mark
+that, unlike rate schedules, it has no strata.
+`calculate_immigration_rates()` reports crude immigration rates; its `by`
+stratifies arrivals and person-years together, as in other calculators,
+and `streams = TRUE` splits arrivals by stream within strata. The user
+then made `intensity` the first argument of `immigration_stream()`, as rates
+come first in rate processes:
+`immigration_stream(intensity, template, weights, assignment, household)`.
+
+**Rationale:** Counts suit known flows; rates let immigration scale with
+the destination, as in crude-rate projections. One table format with the
+column naming the kind matches other processes' rate tables.
+
+**Supersedes:** D177's restriction to absolute intensity, and the numeric
+and `intensity`-column forms of D184.
+
+## D195 — Birth and arrival times in custom weight functions (November 17, 2026)
+
+**Status:** User decision, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** Custom weight functions for person processes receive
+`birth_time` and `arrival_time` (`NA` for people who did not immigrate) in
+`members`; union processes receive `birth_time_w`, `birth_time_h`,
+`arrival_time_w` and `arrival_time_h`. `bin$time` is when the weights are
+evaluated: the event, or for weights stored at refresh (fertility and search
+under weighted matching calibration) the refresh. Formula weights gain no
+time variables, and matching models are unchanged.
+
+**Rationale:** Time since arrival and age change continuously. Formula
+weights are stored at refresh and would go stale between events, while
+custom functions are evaluated at the event, so exact ages and durations
+are available there without engine bookkeeping. Raw times plus the clock
+let users derive age, time since arrival and age at arrival themselves.
+
+**Consequence:** Weights depending on time since arrival in matching remain
+unsupported; search weights can stand in by changing who searches.
+
+## D196 — Template cuts every step (November 17, 2026)
+
+**Status:** User decisions, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** `immigration_stream(..., step = NULL)`. With a positive
+`step`, the run is divided into intervals starting at the run's start, and
+arrivals in each are drawn from the template as it stood at the interval's
+start (the cut), on the template's and destination's shared calendar.
+`step = NULL` keeps drawing from the template's `end_time`. Migrants arrive
+as they were at the cut, with dates shifted by the arrival time minus the
+cut, as now. Every cut must lie within the template's simulated history,
+otherwise it is an error. The truncation to a cut time is an internal
+helper for now.
+
+**Rationale:** One long simulation of an origin population, cut over time,
+gives a changing origin (age structure, fertility, household composition)
+without assembling a list of templates, and on a shared calendar
+approximates a co-simulated origin.
+
+**Supersedes:** D180's list of templates as the way to vary a stream's
+template over time.
+
+## D197 — Calendar schedules of immigration weights (November 17, 2026)
+
+**Status:** User decision, November 17, 2026, authorizing implementation.
+Implemented November 17, 2026.
+
+**Decision:** An immigration stream's `weights` may be a calendar schedule
+in the D123 format (`time_start`, `time_end` and a list column `model`),
+validated as for other processes: intervals cover the run, every row holds
+a complete model, and formulas and functions are not mixed. Stream slices
+start at every template cut (D196) and every schedule boundary inside the
+run; each uses its latest cut's template and the model active at its start,
+with its own selection probabilities and expected party size, so household
+streams keep their person intensity. A custom function's `bin` gains the
+interval's `time_start` and `time_end`. On cloning streams, no model in the
+schedule may use household variables.
+
+**Rationale:** Selection changes over time (such as younger migrants after
+a policy change) without separate streams, and the D123 format matches the
+other processes' weight schedules.
+
+**Supersedes:** the rejection of immigration weight schedules (D185).
+
+## D198 — No group transitions in birthplace (November 18, 2026)
+
+**Status:** User decision, November 18, 2026, authorizing implementation.
+Implemented November 18, 2026.
+
+**Decision:** The automatic `birthplace` dimension (D190) can't have a
+transition process. Naming it in `set_group_transition(group = )` is an
+error at `run_simulation()`, when the model's dimensions are resolved; a
+transition without `group` never falls back to it. A model without
+immigration may still declare and move people in its own group named
+`birthplace`.
+
+**Rationale:** Birthplace is fixed at birth or arrival, so moves in it have
+no meaning. Allowing them broke the rule that an immigrant's birthplace is
+their stream: a move to `"native"` failed result validation after the run,
+and a move to another stream made `calculate_immigration_rates()` attribute
+arrivals to the destination stream, since it reads current birthplace.
+
+**Alternatives:** Allowing moves and recovering each arrival's stream from
+their entry row, which would make the dimension a current immigration
+status rather than a birthplace.
+
+**Amends:** D190's statement that the dimension is used like any group when
+named, and the specification's note on duration-based transitions in it.

@@ -174,3 +174,8 @@ count_run_events <- function(population, event) {
     na.rm = TRUE
   ))
 }
+
+# A constant immigration intensity of `n` arrivals a year (D194).
+per_year <- function(n) {
+  data.frame(count = n)
+}

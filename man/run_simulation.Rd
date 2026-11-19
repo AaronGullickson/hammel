@@ -13,8 +13,9 @@ run_simulation(
 }
 \arguments{
 \item{model}{A \code{hammel_model} containing a population, mortality, fertility,
-and union-formation processes, optionally union dissolution and group
-transition processes. The population must have a finite \code{end_time}.}
+and union-formation processes, optionally union dissolution, group
+transition and immigration processes. The population must have a finite
+\code{end_time}.}
 
 \item{years}{Simulation duration in years; fractional years are
 supported.}
@@ -23,7 +24,7 @@ supported.}
 specified, simulation will use current RNG.}
 
 \item{progress}{Show a console progress bar based on elapsed simulation
-years. Defaults to \verb{TRUE`` in interactive environments and }FALSE`` in
+years. Defaults to \code{TRUE} in interactive environments and \code{FALSE} in
 non-interactive environments. Users can set the \code{hammel.progress} option
 to control its use.}
 }

@@ -34,8 +34,9 @@ models, without affecting overall input rates. Population level effects can
 be smaller where cells are small or homogeneous.
 
 Attach a weight model with the \code{weights} argument of \code{\link[=set_mortality]{set_mortality()}},
-\code{\link[=set_fertility]{set_fertility()}}, \code{\link[=set_union_dissolution]{set_union_dissolution()}}, \code{\link[=set_group_transition]{set_group_transition()}} and
-\code{\link[=set_union_formation]{set_union_formation()}}, or \code{weights_conversion} of \code{\link[=set_union_formation]{set_union_formation()}}.
+\code{\link[=set_fertility]{set_fertility()}}, \code{\link[=set_union_dissolution]{set_union_dissolution()}}, \code{\link[=set_group_transition]{set_group_transition()}},
+\code{\link[=set_union_formation]{set_union_formation()}} and \code{\link[=immigration_stream]{immigration_stream()}}, or \code{weights_conversion}
+of \code{\link[=set_union_formation]{set_union_formation()}}.
 }
 \section{Variables}{
  Group variables are named by the declared group
@@ -50,6 +51,13 @@ when unpartnered) and, when the dimension tracks ancestry, shares
 \code{ancestry_race_A} and \code{ancestry_race_unknown}. Group transitions may also
 use \code{destination}, the destination of the risk in the transition's
 dimension.
+
+Immigration streams select template people rather than cell members, and
+may use \code{age} (at the template's end), \code{sex} and the template's groups
+shared with the simulation. Household streams select households by their
+carriers and may also use \code{partnered} (0/1), \code{household_size},
+\code{n_dependents} and \code{partner_age} (NA when unpartnered, so the term
+contributes nothing for unpartnered carriers).
 
 Dissolution and conversion are union processes and may use \code{race_w},
 \code{race_h}, \code{parity_w}, \code{previous_union_w}, \code{previous_union_h},
@@ -74,15 +82,22 @@ named exactly as the corresponding model-matrix columns, for example
  Instead of using a formula, users can create a
 custom function with \code{fun}. \code{fun(members, bin)} receives a tibble with one
 row per eligible member of the chosen cell, holding the variables above for
-every declared dimension (with labels for categorical variables) and
-identifiers (\code{person_id}, or \code{union_id}, \code{wife_id} and \code{husband_id}), and a
+every declared dimension (with labels for categorical variables),
+identifiers (\code{person_id}, or \code{union_id}, \code{wife_id} and \code{husband_id}) and
+\code{birth_time} and \code{arrival_time} (\code{NA} for people who did not immigrate;
+\code{birth_time_w}, \code{birth_time_h}, \code{arrival_time_w} and \code{arrival_time_h} for
+union processes), and a
 list \code{bin} describing the cell: its \code{process}, strata (each dimension's
 category, or \verb{<dim>_w}/\verb{<dim>_h} for union processes, NA when the rates do
 not stratify by it; \code{origin} and \code{destination} for transitions), band
-(\code{age_start}/\code{age_end} or \code{dur_start}/\code{dur_end}) and the active rate period
-\code{time_start}/\code{time_end} (NA for static rates). Exact ages and times are not
-passed. In fertility with weighted matching calibration, the function is
-evaluated at every refresh of every woman, which can be slow.
+(\code{age_start}/\code{age_end} or \code{dur_start}/\code{dur_end}), the active rate period
+\code{time_start}/\code{time_end} (NA for static rates) and \code{time}, when the weights
+are evaluated. Exact ages and durations follow from these: age is
+\code{bin$time - birth_time} and time since arrival
+\code{bin$time - arrival_time}. Weights are usually evaluated at the event; in
+fertility and search with weighted matching calibration, they are
+evaluated, and \code{time} set, at every refresh of every woman, which can be
+slow.
 }
 
 \section{Time-varying weights}{

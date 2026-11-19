@@ -26,12 +26,14 @@ The available processes are:
 \item \code{\link[=union_formation]{union_formation()}}
 \item \code{\link[=union_dissolution]{union_dissolution()}}
 \item \code{\link[=group_transition]{group_transition()}}
+\item \code{\link[=immigration]{immigration()}}
 }
 
 Use this function to attach an already-created process. The convenience
 setters \code{\link[=set_mortality]{set_mortality()}}, \code{\link[=set_fertility]{set_fertility()}}, \code{\link[=set_union_formation]{set_union_formation()}},
-\code{\link[=set_union_dissolution]{set_union_dissolution()}}, and \code{\link[=set_group_transition]{set_group_transition()}} construct and attach
-the corresponding process in one call.
+\code{\link[=set_union_dissolution]{set_union_dissolution()}}, \code{\link[=set_group_transition]{set_group_transition()}}, and
+\code{\link[=set_immigration]{set_immigration()}} construct and attach the corresponding process in one
+call.
 }
 \examples{
 mortality_process <- mortality(usa_2000_mortality)
@@ -40,5 +42,5 @@ model$processes
 }
 \seealso{
 \code{\link[=mortality]{mortality()}}, \code{\link[=fertility]{fertility()}}, \code{\link[=union_formation]{union_formation()}},
-\code{\link[=union_dissolution]{union_dissolution()}}, \code{\link[=group_transition]{group_transition()}}
+\code{\link[=union_dissolution]{union_dissolution()}}, \code{\link[=group_transition]{group_transition()}}, \code{\link[=immigration]{immigration()}}
 }

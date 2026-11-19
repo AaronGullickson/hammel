@@ -45,10 +45,16 @@
 #'   with exactly one row per person, keyed by `person_id`, one column of shares
 #'   per category (named by the category) and an `unknown` share. Shares must be
 #'   finite, between zero and one, and sum to one per row (tolerance `1e-8`).
+#' @param external_relatives Optional data frame of people referenced by
+#'   immigrants' histories who are not population members, such as previous
+#'   partners and children who did not migrate: the `persons` columns plus
+#'   `censor_time`, the last time they are known to be alive. Usually created
+#'   by [run_simulation()] with [immigration()].
 #'
 #' @return A named list of class `hammel_population` with components `persons`,
 #'   `unions`, and `end_time`, plus an `ancestry` tibble when supplied or when
-#'   persons has groups, and a `transitions` tibble when groups are present.
+#'   persons has groups, a `transitions` tibble when groups are present, and
+#'   `external_relatives` when supplied.
 #' @export
 #' @examples
 #' population <- hammel_population(
@@ -64,7 +70,8 @@ hammel_population <- function(
   end_time,
   ancestry = NULL,
   transitions = NULL,
-  groups = NULL
+  groups = NULL,
+  external_relatives = NULL
 ) {
   if (missing(end_time)) {
     abort_hammel(
@@ -85,6 +92,13 @@ hammel_population <- function(
     ),
     class = "hammel_population"
   )
+  if (!is.null(external_relatives)) {
+    results$external_relatives <- if (is.data.frame(external_relatives)) {
+      tibble::as_tibble(external_relatives)
+    } else {
+      external_relatives
+    }
+  }
   results$groups <- normalize_group_declaration(groups)
   if (!is.null(transitions)) {
     results$transitions <- transitions
@@ -183,14 +197,21 @@ validate_population <- function(results) {
 #'   \item{end_time}{The population's reference time, in years.}
 #'   \item{persons_alive}{The number of persons alive at the reference time.}
 #'   \item{n_births}{The number of recorded persons with a birth time,
-#'     including persons in the starting population.}
+#'     including persons in the starting population but not immigrants.}
 #'   \item{n_births_u}{The number of retained unrealized birth records, or
 #'     `NA` when no unrealized birth table is present.}
 #'   \item{n_deaths}{The number of recorded persons with a death time.}
+#'   \item{n_immigrants}{The number of recorded persons who immigrated, or
+#'     `NA` when the population has no arrival records.}
+#'   \item{immigrants_by_stream}{A named integer vector of immigrants by
+#'     stream (their `birthplace`), or `NULL` when the population has no
+#'     arrival records.}
 #'   \item{n_unions}{The number of recorded union episodes, including
-#'     ended unions.}
+#'     ended unions but not unions that began before an immigrant partner's
+#'     arrival.}
 #'   \item{n_dissolutions}{The number of union episodes with end reason
-#'     `"dissolution"`.}
+#'     `"dissolution"`, excluding dissolutions before an immigrant partner's
+#'     arrival.}
 #'   \item{age_counts}{A tibble of living male and female counts by five-year
 #'     age group, with columns `age`, `male`, and `female`.}
 #'   \item{simulation}{A list describing the latest simulation run, with
@@ -248,8 +269,13 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
 
   if (!is.null(object$simulation)) {
     start <- object$simulation$start_time
+    # Immigrants are present only from arrival (D185).
+    entry <- object$persons$birth_time
+    if ("arrival_time" %in% names(object$persons)) {
+      entry <- pmax(entry, object$persons$arrival_time, na.rm = TRUE)
+    }
     pop_init <- sum(
-      object$persons$birth_time <= start &
+      entry <= start &
         (is.na(object$persons$death_time) | object$persons$death_time > start)
     )
     simulation <- list(
@@ -260,6 +286,28 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
     )
   } else {
     simulation <- NULL
+  }
+
+  # Everyone who immigrated, alive or not, by stream (D185). Immigrants'
+  # births and pre-migration unions are not the population's events (D186).
+  n_immigrants <- NA_integer_
+  immigrants_by_stream <- NULL
+  born <- !is.na(object$persons$birth_time)
+  unions <- object$unions
+  ended <- observed_unions(object)
+  if ("pre_migration" %in% names(unions)) {
+    unions <- unions[!unions$pre_migration, , drop = FALSE]
+  }
+  if ("arrival_time" %in% names(object$persons)) {
+    arrived <- !is.na(object$persons$arrival_time)
+    born <- born & !arrived
+    n_immigrants <- sum(arrived)
+    # An immigrant's birthplace is their stream (D190).
+    streams <- as.character(object$persons$birthplace[arrived])
+    immigrants_by_stream <- c(table(streams))
+    immigrants_by_stream <- stats::setNames(
+      as.integer(immigrants_by_stream), names(immigrants_by_stream)
+    )
   }
 
   if (!is.null(object$groups)) {
@@ -291,14 +339,15 @@ summary.hammel_population <- function(object, interval_pyramid = 5, ...) {
       first_time = min(object$persons$birth_time),
       end_time = object$end_time,
       persons_alive = sum(alive),
-      n_births = sum(!is.na(object$persons$birth_time)),
+      n_births = sum(born),
       n_births_u = ifelse(
         is.null(object$unrealized_births), NA, nrow(object$unrealized_births)
       ),
       n_deaths = sum(!is.na(object$persons$death_time)),
-      n_unions = nrow(object$unions),
-      n_dissolutions = (sum(!is.na(object$unions$end_reason) &
-                              object$unions$end_reason == "dissolution")),
+      n_immigrants = n_immigrants,
+      immigrants_by_stream = immigrants_by_stream,
+      n_unions = nrow(unions),
+      n_dissolutions = sum(ended$end_reason %in% "dissolution"),
       age_counts = age_counts,
       simulation = simulation,
       group_counts = group_counts
@@ -324,6 +373,20 @@ print.summary.hammel_population <- function(x, ...) {
     print_stat("Total unrealized births", x$n_births_u)
   }
   print_stat("Total deaths", x$n_deaths)
+  if (!is.null(x$n_immigrants) && !is.na(x$n_immigrants)) {
+    streams <- x$immigrants_by_stream
+    print_stat(
+      "Total immigrants",
+      if (length(streams)) {
+        paste0(
+          x$n_immigrants, " (",
+          paste(names(streams), streams, collapse = ", "), ")"
+        )
+      } else {
+        x$n_immigrants
+      }
+    )
+  }
   print_stat("Total unions", x$n_unions)
   print_stat("Total dissolutions", x$n_dissolutions)
 
@@ -408,6 +471,9 @@ check_population <- function(
   unions <- x$unions
   time <- x$end_time
   check_time(time, "end_time", call = call)
+  # Union and parent references resolve among persons and any external
+  # relatives of immigrants (D186).
+  external <- x[["external_relatives"]]
   check_columns(
     persons, c(
       "person_id", "sex", "birth_time", "death_time",
@@ -448,7 +514,9 @@ check_population <- function(
     )
     abort_population_rows(
       which(
-        !is.na(ids) & (!ids %in% persons$person_id | ids == persons$person_id)
+        !is.na(ids) &
+          (!ids %in% c(persons$person_id, external$person_id) |
+             ids == persons$person_id)
       ),
       "{.field {field}} must refer to another person or be {.code NA}.",
       "Unknown or self references in {.field {field}}",
@@ -463,10 +531,15 @@ check_population <- function(
     )
   }
   check_unique_ids(unions$union_id, "unions$union_id", call = call)
+  people <- persons[c("person_id", "sex", "birth_time")]
+  if (!is.null(external)) {
+    check_external_relatives(x, call = call)
+    people <- rbind(people, external[c("person_id", "sex", "birth_time")])
+  }
   abort_population_rows(
     which(
-      !unions$wife_id %in% persons$person_id |
-        !unions$husband_id %in% persons$person_id |
+      !unions$wife_id %in% people$person_id |
+        !unions$husband_id %in% people$person_id |
         unions$wife_id == unions$husband_id
     ),
     "Union partners must be two different persons in {.field persons}.",
@@ -474,8 +547,8 @@ check_population <- function(
     table = "unions",
     call = call
   )
-  wife_sex <- persons$sex[match(unions$wife_id, persons$person_id)]
-  husband_sex <- persons$sex[match(unions$husband_id, persons$person_id)]
+  wife_sex <- people$sex[match(unions$wife_id, people$person_id)]
+  husband_sex <- people$sex[match(unions$husband_id, people$person_id)]
   abort_population_rows(
     which(wife_sex != "f" | husband_sex != "m"),
     paste(
@@ -518,7 +591,7 @@ check_population <- function(
     )
   }
   for (partner in c("wife_id", "husband_id")) {
-    born <- persons$birth_time[match(unions[[partner]], persons$person_id)]
+    born <- people$birth_time[match(unions[[partner]], people$person_id)]
     abort_population_rows(
       which(unions$start_time < born),
       "Unions must not start before either partner is born.",
@@ -553,6 +626,8 @@ check_population <- function(
       call = call
     )
   }
+  check_arrivals(persons, time, call = call)
+  check_pre_migration(x, call = call)
   validate_ancestry(x[["ancestry"]], persons, x$groups, call = call)
   invisible(x)
 }

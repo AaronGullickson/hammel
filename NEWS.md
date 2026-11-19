@@ -1,6 +1,7 @@
 # hammel (development version)
 
-- Set progress bar to TRUE in interactive sessions and FALSE in non-interactive sessions. Users can override with option `hammel.progress`.
+- An `immigration` process that allows users to simulate external migration into the simulation over time from multiple immigrant streams. See the new vignette on the "Triple Melting Pot" for details on how to use it and how to track immigrant generations. (#27)
+- Set progress bar to TRUE in interactive sessions and FALSE in non-interactive sessions. Users can override with option `hammel.progress`. (#38)
 
 # hammel 0.2.0
 

@@ -1,0 +1,588 @@
+---
+title: "External Immigration Feature Validation"
+author: "Aaron Gullickson"
+date: today
+format:
+  html:
+    toc: true
+    toc-expand: 1
+    toc-depth: 4
+    number-sections: true
+    self-contained: true
+knitr:
+  opts_chunk:
+    collapse: true
+    comment: '#>'
+execute:
+  eval: true
+  echo: true
+  warning: false
+  error: false
+---
+
+```{r}
+#| label: setup
+#| eval: true
+#| include: false
+
+library(here)
+# installing will lead to faster computation - but unload it
+# first to avoid errors
+if ("hammel" %in% loadedNamespaces()) pkgload::unload("hammel")
+devtools::install(here::here())
+library(hammel)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(ggplot2)
+library(gt)
+library(modelsummary)
+library(tictoc)
+set_theme(theme_bw())
+```
+
+## Overview of Design
+
+The program can already handle internal migration through transition rates. This could be used for a multi-country system or even ego country/rest of the world, but requires tracking all of the details on either side of the migration which can get complicated. The goal of this feature is to allow users to add migration into the simulated population without having to fully simulate the origin area of that migration. 
+
+The basic idea of this feature is that users can define multiple "immigration streams" which will add migrants to the population in continuous time. Each stream is named by the user. A single stream could be used to pool all migrants, or different streams might come from different regions or origin countries. These streams are declared in the `set_migration()` function in a manner similar to that for `set_groups()` where the user provides the named arguments for each migration stream:
+
+```r
+hammel_model() |>
+  set_migration(
+    asia = migration_stream(...)
+    latin_america = migration_stream(...)
+  )
+
+```
+
+Like other processes, the user feeds a rate schedule into the immigration_stream which determines the frequency of new arrivals. There are two ways to track "rates." The first option is to track the expected absolute count of migrants per year in a `count` column. The other option is to track the `rate` per person-year in the simulated population. This is not really a very accurate hazard rate because the exposure of the simulated population is not a good measure of an event that happens to people outside that population. However, it is useful to help benchmark the level of migration against the population size which the user may vary. These values can be stratified by `time_start` and `time_end` to allow them to vary over the simulation as usual. They cannot be stratified by any other characteristic. If a user wants a simple static count or rate of some value X, they can just use `tibble(count = X)` or `tibble(rate = X)`, respectively.  
+
+Each stream requires a "template population" that is a `hammel_population` object. Migrants will be drawn from this population. By default, migrants are drawn from the living population at the end of the simulation. This can be modified in two ways:
+
+- If the template population has a population history that covers the time period of the simulation, users can select a value for the `step` argument in which case, samples will be drawn from the living population that matches the simulated population at intervals of `step`. So for example, if the simulation runs from 100-200 and the template population also has a population history from 100-200, the user could put in `step = 5`. Between 100-105, migrants would be sampled from the population alive at time 100. At 105-110, migrants would be sampled from the population alive at time 105, and so on. This allows the template population to also change over the time of the simulation.
+- Users can apply weight models that sample migrants with different weights. This can be used to modify the age distribution of migrants relative to the total population, sample differently by gender, etc. These weight models can also vary over time using list columns as for other processes.
+
+By default, migrants are sampled as households in a manner analogous to transitions. Users can define these households in the same way. Rates are adjusted for household size to maintain the correct individual migration rates. If migrants are not sampled as households, then any sampled migrant will be treated as never married and as having no children, or group transitions when they migrate.
+
+To maintain correct union and birth histories for migrants, related individuals from those histories who do not migrate (e.g. births to deceased or adult children, partners from previous unions) are kept in a separate `external_relatives` tibble in the output, which has the same structure as persons. Unions and transitions that were completed before the point of migration are added to the `unions` and `transitions` tibbles with a flag for `pre_migration` - they are not counted in the calculate_*_rates functions.
+
+The template population can have the same groups as the simulated population. For example, race might be a group dimension in both populations. In these cases, the migrant's current group status comes with them. If a group dimension does not exist in the template population but does in the simulated population, a `migrant_assignment` model will need to be used to determine how to assign the category of the group. This can be a fixed value, a probability distribution, or a custom function.
+
+For example, it would not make sense for the template population to have the internal `region` group of the simulated population. This can be assigned to migrants when they migrate with a simple probability distribution that gives the local settlement pattern of the migration stream. Like other models, this can be varied over time with a list column approach.
+
+When migration streams are present in a simulation, that simulation will add a reserved group dimension to the simulation named `birthplace`. This gives the origin stream of each person and "native" for those born in the simulated population. A fixed inheritance rule is already set for this rule to establish that all individuals born in the simulation receive "native". This group dimension can be used for stratification of rates just like any other group. By default the ancestry of this group dimension is not tracked, but it can be turned on with `birthplace_ancestry = TRUE` in the `set_migration` command.
+
+An obvious desire of many users would be to track some kind of immigrant generation status for the population. The program has no special feature for this but users can easily construct their own generation status rules and apply them by specifying a `generation` group and creating custom inheritance and assignment rules for them. The example below shows how to do this.
+
+## Proof of Concept
+
+As a proof of concept and to test functionality, we will build a simulation over 50 years that approximates the rise in immigration in the US in the 1960s after changes to immigration law. However, to keep things simple in terms of other characteristics, we will use static fertility and mortality rates.
+
+```{r}
+#| label: start-model
+
+model <- hammel_model() |>
+  set_fertility(usa_2000_fertility) |>
+  set_mortality(usa_2000_mortality)
+```
+
+We need to also include union formation, which will be on demand with no dissolution, but I need to handle groups at the same time so I can include exogamy rates. I am going to add a group for `race` with four racial categories of "White", "Black", "Asian", and "Latino". I also want to show how the immigration here can work together with internal migration so I will include a `region` group with categories of "NE", "MW", "S", and "W".
+
+```{r}
+#| label: define-race-region-groups
+
+race_grp <- group(
+  categories = c("White", "Black", "Asian", "Latino"),
+  ancestry = TRUE,
+  inheritance = "ancestry"
+)
+
+race_exogamy <- c(
+  "White:Black" = -4,
+  "White:Asian" = -2,
+  "White:Latino" = -1.5,
+  "Black:Asian" = -4,
+  "Black:Latino" = -3,
+  "Asian:Latino" = -2
+)
+
+region_grp <- group(
+  categories = c("NE", "MW", "S", "W"),
+  inheritance = "mother"
+)
+```
+
+I also define my exogamy terms for race. Regional exogamy will be disallowed.
+
+### Tracking generations
+
+I want to track the generational status of all individuals in the simulation. I will use the following categories to define generation:
+
+- 1 (migrants who arrives at age 18 or later)
+- 1.5 (migrant how arrives before age 18)
+- 2 (child of two migrants)
+- 2.5 (child of one migrant and one native)
+- 3+ (child of two native-born individuals)
+
+To make this work, I will need to have a custom inheritance function that assigns generation based on the generation of the two parents.
+
+```{r}
+#| label: create-custom-generation-inheritance
+
+# report generation as numeric rounded down
+flatten_gen <- function(gen) {
+  floor(as.numeric(str_remove(gen, "\\+")))
+}
+
+# take numeric value of gen, increment and return character
+increment_gen <- function(gen) {
+  gen <- as.character(min(3, gen + 1))
+  if(gen == "3") {
+    gen = "3+"
+  }
+  gen
+}
+
+gen_inheritance <- function(mother_group, father_group, ...) {
+  if(is.na(father_group) || (mother_group == father_group)) {
+    return(increment_gen(flatten_gen(mother_group)))
+  }
+
+  # get numeric generation of each parent
+  gen_father <- flatten_gen(father_group)
+  gen_mother <- flatten_gen(mother_group)
+
+  # first check for special handling of 2.5 cases. These are
+  # cases where exactly one parent is gen 1
+  if(xor(gen_mother == 1, gen_father == 1)) {
+    return("2.5")
+  }
+
+  # otherwise, take the minimum value and increment
+  increment_gen(min(gen_mother, gen_father))
+}
+```
+
+Let me check to make sure that this function produces the expected output.
+
+```{r}
+#| label: test-gen-inheritance
+
+gens <- c("1", "1.5", "2", "2.5", "3+")
+expand_grid(mother = gens, father = gens) |>
+  mutate(child = map2_chr(mother, father, gen_inheritance)) |>
+  arrange(child) |>
+  print(n = 25)
+```
+
+That looks correct. Now I can put this together to create my `generation` group.
+
+```{r}
+#| label: define-generation-group
+
+generation_grp <- group(
+  categories =c("1", "1.5", "2", "2.5", "3+"), 
+  inheritance = group_inheritance(method = "custom", fun = gen_inheritance)
+)
+
+```
+
+You may notice that this function does not assign the 1 and 1.5 generation status. These statuses are not given by the inheritance function but rather by a custom `migrant_assignment` function that assigns categories to arriving migrants based on their characteristics. I can also set up a custom assignment function that just uses age of the migrant at arrival to determine whether they are the 1 or 1.5 generation.
+
+```{r}
+#| label: create-custom-generation-assignment
+
+# split 1st gen into 1 and 1.5 by age on arrival
+generation_assign <- function(members) {
+  ifelse(members$age < 18, "1.5", "1")
+}
+```
+
+This will be entered later when we set up the immigration streams.
+
+I can now build union formation and groups for the simulation.
+
+```{r}
+#| label: add-union-group-model
+
+model <- hammel_model() |>
+  set_fertility(usa_2000_fertility) |>
+  set_mortality(usa_2000_mortality) |>
+  set_union_formation(
+    "on_demand",
+    matching = age_gap_matching_model(
+      3, 5, 
+      group_exogamy = list(
+        region = NA,
+        race = race_exogamy
+      )
+    )
+  ) |>
+  set_groups(race = race_grp, region = region_grp, generation = generation_grp)
+```
+
+### Set up immigration streams
+
+I am going to use two immigration steams. One immigration stream will be from Asia and the other from Latin America. First I need to create template populations. I will do this by picking some reasonable fertility and mortality schedules and running simple simulations on a uniform starting population for 100 years. 
+
+```{r}
+#| label: create-template-pop-asia
+#| message: true
+
+# Use Taiwan
+mortality_taiwan <- get_mortality_hmd("TWN", 1980, shape = "5x1", open_age = 85)
+fertility_taiwan <- get_fertility_hfd("TWN", 1976)
+
+set.seed(42)
+model_asian_template <- hammel_model() |>
+  set_fertility(fertility_taiwan) |>
+  set_mortality(mortality_taiwan) |>
+  set_union_formation("on_demand") |>
+  set_population(
+    generate_uniform_population(
+      20000,
+      end_time = 50,
+      groups = list(race = c(White = 0, Black = 0, Asian = 1, Latino = 0))
+    )
+  )
+
+pop_asian_template <- run_simulation(model_asian_template, 100, 42)
+summary(pop_asian_template)
+```
+
+```{r}
+#| label: create-template-pop-latin-america
+#| message: true
+
+# use Chile
+mortality_chile <- get_mortality_hmd("CHL", 1992, shape = "5x1", open_age = 85)
+fertility_chile <- get_fertility_hfd("CHL", 1992)
+
+set.seed(42)
+model_latino_template <- hammel_model() |>
+  set_fertility(fertility_chile) |>
+  set_mortality(mortality_chile) |>
+  set_union_formation("on_demand") |>
+  set_population(
+    generate_uniform_population(
+      30000,
+      end_time = 50,
+      groups = list(race = c(White = 0, Black = 0, Asian = 0, Latino = 1))
+    )
+  )
+
+pop_latino_template <- run_simulation(model_latino_template, 100, 42)
+summary(pop_latino_template)
+```
+
+There are a couple of things worth noting here:
+
+- I set race in the Asia template to be 100% Asian and race in the Latin American template to be 100% Latino. You could include groups that vary within the template population as well. In my case, it means that these immigrant flows will grow the Asian and Latino populations in the simulated population.
+- I start the populations at 50 and simulate to 150. This is so that I can line up my template simulation timing to cover my simulated population that will run from 100-150 with immigration streams. This is not required if you just want to use the living population at the end of the simulation for each template, but can be useful if you want to capture changes in the template population.
+
+Now I need to define rates. A bit of searching gives me some ballpark figures for immigration to the US from these two regions as immigration rates by decade.
+
+```{r}
+#| label: create-immigration-rate-schedules
+
+rate_immig_asia <- tribble(
+  ~time_start, ~time_end, ~rate,
+  100,         110,        0.00041,
+  110,         120,        0.00054,
+  120,         130,        0.00068,
+  130,         Inf,        0.00082
+)
+
+# latin american rates will be 4x asian rates
+rate_immig_la <- rate_immig_asia |>
+  mutate(rate = rate * 4)
+```
+
+The times run between 100 and 150 because I will burn in the simulated population for 100 years before adding migration.
+
+I also want to apply a weight model to these template populations to sample working age adults more frequently and men more often than women. I will create a single function that I will use for both streams that just breaks the population into age groups.
+
+```{r}
+#| label: create-migrant-weight-function
+
+migrant_selection_fun <- weight_model(fun = function(members, bin) {
+  w <- ifelse(
+    members$age >= 20 & members$age < 45, 1,
+    ifelse(members$age >= 45 & members$age < 65, 0.3,
+      ifelse(members$age >= 65, 0.05, 0.02))
+  )
+  w <- ifelse(members$sex == "m", 2 * w, w)
+  log(w)
+})
+```
+
+Note that sampling men at a higher rate has an indirect effect. Because women are the "carriers" of multi-person households, sampling men at a higher rate also means sampling more single person households.
+
+Finally, I want to define some exogamy terms for individuals that will differ by birthplace. I use some rough approximations from previous work to set a single value for all exogamous pairings.
+
+```{r}
+#| label: set-birthplace-exogamy
+
+# for birthplace, all non-same birthplace cases get the same value
+birthplace_exogamy <- c(
+  "native:asia" = -1.5,
+  "native:latin_america" = -1.5,
+  "asia:latin_america" = -1.5
+)
+```
+
+### Get starting population
+
+I will get a realistic starting population by burning-in a uniform population over 100 years without immigration streams. The population will start with no Asian or Latino population, so we can see how much it grows from migration alone over the time period.
+
+```{r}
+#| label: setup-starting-pop
+#| message: true
+
+# start with no Asian or Latino members
+region_race_dist <- tibble::tribble(
+  ~race, ~region, ~weight,
+ "White",   "NE",    0.166,
+ "White",   "MW",    0.216,
+ "White",   "S",     0.294,
+ "White",   "W",     0.174,
+ "Black",   "NE",    0.025,
+ "Black",   "MW",    0.026,
+ "Black",   "S",     0.077,
+ "Black",   "W",     0.022,
+ "Asian",   "NE",    0.000,
+ "Asian",   "MW",    0.000,
+ "Asian",   "S",     0.000,
+ "Asian",   "W",     0.000,
+ "Latino",  "NE",    0.000,
+ "Latino",  "MW",    0.000,
+ "Latino",  "S",     0.000,
+ "Latino",  "W",     0.000
+)
+
+set.seed(42)
+pop_uniform <- generate_uniform_population(50000, groups = region_race_dist)
+
+# easier to add this after then stratify my distribution by generation as well
+pop_uniform$persons <- pop_uniform$persons |>
+  mutate(generation = "3+")
+
+model <- model |>
+  set_population(pop_uniform)
+
+pop_start <- run_simulation(model, 100, 42)
+summary(pop_start)
+```
+
+### Run simulation
+
+Now I can run my simulation. I need to set the immigration streams in the model. I also need to redo union formation to include birthplace exogamy parameters. I leave the `step` parameter NULL here so that all migrants are drawn from the final living members of my template population, but I could set it to 1 or 5, for example, to have the migrants drawn from the same time interval as my simulation.
+
+```{r}
+#| label: run-simulation
+
+model <- model |>
+  # set immigration
+  set_immigration(
+    asia = immigration_stream(
+      rate_immig_asia,
+      template = pop_asian_template,
+      step = NULL,
+      assignment = list(
+        region = migrant_assignment(
+          "probability", probs = c("NE" = 0.3, "MW" = 0.15, "S" = 0.15, "W" = 0.4)
+        ),
+        generation = migrant_assignment("custom", fun = generation_assign)
+      ),
+      household = household(),
+      weights = migrant_selection_fun
+    ),
+    latin_america = immigration_stream(
+      rate_immig_la,
+      template = pop_latino_template,
+      step = NULL,
+      assignment = list(
+        region = migrant_assignment(
+          "probability", probs = c("NE" = 0.25, "MW" = 0.2, "S" = 0.2, "W" = 0.35)
+        ),
+        generation = migrant_assignment("custom", fun = generation_assign)
+      ),
+      household = household(),
+      weights = migrant_selection_fun
+    ),
+    birthplace_ancestry = TRUE
+  ) |>
+  # redo union formation for new exogamy
+  set_union_formation(
+    "on_demand",
+    matching = age_gap_matching_model(
+      3, 5,
+      group_exogamy = list(
+        region = NA,
+        race = race_exogamy, 
+        birthplace = birthplace_exogamy
+      )
+    )
+  ) |>
+  # set the population
+  set_population(pop_start)
+
+tic()
+pop_end <- run_simulation(model, 50, 42)
+toc()
+summary(pop_end)
+```
+
+And just like that we have the simulated population. The values for race, generation, and birthplace at the end of the simulation are in the ballpark of what I was expecting. Asians are just under 4% of the population and Latinos are 16% of the population. About 13.4$ of the population is foreign-born. The second generation numbers of around 6% are lower than in actuality, but that is because I started with no pre-existing population of migrants in my starting population.
+
+### Analyzing the simulation
+
+#### Input rate matching
+
+Lets look at the crude immigration rates by time period to ensure that they match our input rates. The new `calculate_immigration_rates` function will allow me to do this. By adding `streams = TRUE`, I will get immigration rates separated by stream. You can also use the normal `by` argument to separate immigration rates by different sub-populations (e.g. `by = "region"` to get immigration rates to specific US regions).
+
+```{r}
+#| label: fig-immigration-rate
+#| fig-cap: Crude immigration rates over time, by stream. 95% confidence bands shown with adjustment for household clustering. Red dotted line shows input rates. 
+
+calculate_immigration_rates(pop_end, c(100, 110, 120, 130, 150),
+                            streams = TRUE, conf_level = 0.95) |>
+  mutate(time_mid = (time_start + time_end) / 2) |>
+  ggplot(aes(x = time_mid, y = rate_immigration))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point()+
+  geom_line(
+    data = bind_rows(
+      rate_immig_asia |> mutate(birthplace = "asia"),
+      rate_immig_la |> mutate(birthplace = "latin_america")
+    ) |>
+      mutate(
+        time_end = ifelse(time_end == Inf, 150, time_end),
+        time_mid = (time_start + time_end) / 2
+      ),
+    aes(y = rate), linetype =2, color = "red"
+  )+
+  facet_wrap(~birthplace)+
+  labs(x = "time (mid-point of period)", y = "crude immigration rate")
+```
+
+@fig-immigration-rate shows that the observed immigration rate fits well to the  input rates.
+
+Lets also check that our fertility and mortality rates within the simulation match expectation.
+
+```{r}
+#| label: fig-fertility-rates
+#| fig-cap: Age-specific fertility rates from simulation. 95% confidence bands shown. Red dotted line shows input rates.
+
+pop_end |>
+  calculate_fertility_rates(
+    time_breaks = c(100, 150),
+    age_breaks = seq(15, 45, 5),
+    conf_level = 0.95
+  ) |>
+  ggplot(aes(x = age_start + 2.5, y = rate_fertility))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = usa_2000_fertility, aes(y = rate), linetype = 2, color = "red")+
+  labs(x = "age", y = "age-specific fertility rate")
+```
+
+```{r}
+#| label: fig-mortality-rates
+#| fig-cap: Age-specific mortality rates from simulation, by sex. 95% confidence bands shown. Red dotted line shows input rates.
+
+pop_end |>
+  calculate_mortality_rates(
+    time_breaks = c(100, 150),
+    age_breaks = c(0, 1, seq(5, 100, 5)),
+    conf_level = 0.95
+  ) |>
+  ggplot(aes(x = age_start + 2.5, y = rate_mortality))+
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high), color = NA, fill = "grey70")+
+  geom_point(size = 0.5)+
+  geom_line(data = usa_2000_mortality, aes(y = rate), linetype = 2, color = "red")+
+  facet_wrap(~sex)+
+  scale_y_log10()+
+  labs(x = "age", y = "age-specific mortality rate")
+```
+
+@fig-fertility-rates and @fig-mortality-rates show that the empirically observed rates match closely to those expected by the inputs.
+
+#### Generation
+
+Lets take a look at the generational variable.
+
+```{r}
+#| label: fig-generation-share
+#| fig-cap: Share of population by generational status over time.
+
+pal_generations <- c(
+  "1"   = "tomato",
+  "1.5" = "maroon",
+  "2"   = "navy",
+  "2.5" = "deepskyblue",
+  "3+"  = "goldenrod"
+)
+
+pop_end |>
+  calculate_population_size(seq(100, 150, 5), by = "generation") |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ungroup() |>
+  ggplot(aes(x = time, y = prop, fill = generation))+
+  geom_area()+
+  scale_fill_manual(values = pal_generations)+
+  scale_y_continuous(labels = scales::percent)+
+  labs(x = "time", y = NULL)
+```
+
+@fig-generation-share shows how generational status changes in the simulation over time. Because the simulation only runs for 50 years, the first generation groups grow faster than the second generation groups, but both grow steadily over time.
+
+```{r}
+#| label: fig-generation-share-race
+#| fig-cap: Share of population by generational status over time, by race.
+
+pop_end |>
+  calculate_population_size(seq(100, 150, 5), by = c("generation", "race")) |>
+  group_by(time, race) |>
+  mutate(prop = population / sum(population)) |>
+  ungroup() |>
+  ggplot(aes(x = time, y = prop, fill = generation))+
+  geom_area()+
+  facet_wrap(~race)+
+  scale_fill_manual(values = pal_generations)+
+  scale_y_continuous(labels = scales::percent)+
+  labs(x = "time", y = NULL)
+```
+
+@fig-generation-share-race shows the same generational share but split by racial identification. Since the Latino and Asian groups started at zero, they grow by immigration alone. So, initially all individuals are first generation (1 and 1.5). The 3rd+ generation is still a small sliver by the end of the simulation.
+
+In contrast, the Black and White groups remain almost entirely 3rd+ generation. However, a small sliver do show as the 2.5 generation. This is due to intermarriage with an Asian or Latino immigrant where the child's race ends up being Black or White due to the inheritance rules.
+
+### Immigrant characteristics
+
+```{r}
+#| label: fig-hist-age-arrival
+#| fig-cap: Distribution of age at arrival among immigrants, by sex.
+
+pop_end$persons |>
+  filter(!is.na(arrival_time)) |>
+  mutate(age_arrival = arrival_time - birth_time) |>
+  ggplot(aes(x = age_arrival))+
+  geom_histogram(binwidth = 5)+
+  facet_wrap(~sex)+
+  labs(x = "age at arrival")
+```
+
+@fig-hist-age-arrival shows the distribution of age at arrival for immigrants. For both sexes, it is bimodal with a peak for the working age population and children. The working age peak was built into the weighting function and the peak for children reflects the movement of children of those working age adults within households.
+
+The peaks are also higher for men, which reflects the heavy weight placed on men over women, but less than one might imagine because this weight interacts in a complicated way with household movement.
+
+
+
+

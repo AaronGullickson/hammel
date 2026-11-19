@@ -59,8 +59,8 @@ hammel_model <- function() {
 #'     `summary.hammel_group_transition` of the dimension's transition
 #'     process, or `NULL` when it has none).}
 #'   \item{processes}{A named list of process summaries, in the order
-#'     mortality, fertility, union formation, union dissolution, for the
-#'     processes present.}
+#'     mortality, fertility, union formation, union dissolution, immigration,
+#'     for the processes present.}
 #'   \item{missing}{A character vector naming the required elements that are
 #'     not set: any of `"population"`, `"mortality"`, `"fertility"`, and
 #'     `"union_formation"`, plus `"transition:<dimension>"` for each group
@@ -172,7 +172,8 @@ required_model_elements <- c(
 
 # Processes included in summary.hammel_model(), in display order.
 summarized_processes <- c(
-  "mortality", "fertility", "union_formation", "union_dissolution"
+  "mortality", "fertility", "union_formation", "union_dissolution",
+  "immigration"
 )
 
 # Per-dimension group information for summary.hammel_model(). Declared
