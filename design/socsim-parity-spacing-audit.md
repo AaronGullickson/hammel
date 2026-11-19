@@ -4,7 +4,7 @@ Static inspection, October 29, 2026. Reference: local `../rsocsim` at commit
 `125450cff968bb3ff762fa99d4c926a8136062a2`, the same pinned MPIDR/rsocsim source
 as the earlier audits. Its root LICENSE.md contains GPLv3. No source was copied
 or adapted. The initial audit was static; an executable follow-up is recorded
-in [the reference experiment](../validation/milestone5/socsim/README.md). This note covers parity and
+in [the reference experiment](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/socsim/README.md). This note covers parity and
 spacing only, not fertility heterogeneity or all variants.
 
 ## Verified source behavior
@@ -51,7 +51,7 @@ validate the superseded correction.
 ## Executable follow-up
 
 The user subsequently requested toy SOCSIM runs to test whether the shortfall
-also occurs in the reference engine. See [reference results and reproduction](../validation/milestone5/socsim/README.md).
+also occurs in the reference engine. See [reference results and reproduction](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/socsim/README.md).
 `load.cpp::add_rate_block()` stores fertility input as negative monthly hazard
 (`lambda = -input`), whereas several other event types use `log(1 - input)`.
 Use annual fertility hazard / 12 for this experiment; do not apply the

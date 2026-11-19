@@ -94,7 +94,7 @@ of the user's empirical report: 50,000 initial persons, maximum initial age 50,
 100 simulated years, 75/25 A/B groups in grouped cases, matching mean age gap
 0/half-weight distance 5 with A:B effect -2, and dissolution enabled in every
 case. Schedules and initial-population seed are fully specified in
-[the benchmark script](../validation/milestone4/benchmark-calibration-intensity.R).
+[the benchmark script](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/benchmark-calibration-intensity.R).
 
 The same saved models were used for seeds 42, 71 and 105. Runs were sequential,
 with version order old/new, new/old, old/new across those seeds; each process
@@ -119,7 +119,7 @@ population sizes, schedule detail, matching formulas or machines.
 
 Full per-run elapsed times, births, deaths, union episodes, dissolutions,
 living A share and directional pairing ratios are retained in
-[the benchmark CSV](../validation/milestone4/calibration-intensity-benchmark.csv). Grouped
+[the benchmark CSV](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone4/calibration-intensity-benchmark.csv). Grouped
 histories differ because actual hazards replace bin-averaged calibration
 hazards; workload counts therefore need not be identical. Three replications
 are not a scientific validation of the resulting demographic distributions.
@@ -133,7 +133,8 @@ returned histories, not just engine state. Counts differ slightly across the
 grouped runs. The tracker adds O(persons) contribution storage and O(available
 women) bounded queue storage; it does not add an age/status/duration tensor.
 
-Reproduction after installing old/new sources into separate libraries:
+Run these commands from a checkout of `be0c031`, which contains the benchmark
+script, after installing the old and new sources into separate libraries:
 
 ```sh
 Rscript validation/milestone4/benchmark-calibration-intensity.R make OLDLIB INPUT.rds

@@ -258,7 +258,7 @@ inferring them again; explicit `categories` still replace them.
   cohabitation, schedule entries) naming different dimensions, and moves that
   change a person's combination.
 - **Symmetry within combinations**
-  ([script](../validation/milestone9/joint_matching.R)): with symmetric
+  ([script](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone9/joint_matching.R)): with symmetric
   effects in both dimensions (race A:B = -1, region N:S = -1; race A 85%),
   wife-in-w/husband-in-h unions against the reverse for every pair of
   different combinations, 6 runs of 60 years each, region independent of or
@@ -302,7 +302,7 @@ inferring them again; explicit `categories` still replace them.
   race; 6 runs of 60 years): A-wife/B-husband over B-wife/A-husband is 1.02
   in the North (0.93–1.12), 1.00 in the South (0.94–1.07) and 1.01 pooled
   (0.96–1.07), with no unions across regions
-  ([script](../validation/milestone9/joint_matching.R)). The cost of finite
+  ([script](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone9/joint_matching.R)). The cost of finite
   effects over many combinations (first table) is unchanged.
 
 ### Stage 6 (November 6, 2026)
@@ -318,7 +318,7 @@ inferring them again; explicit `categories` still replace them.
 - New tests: calendar bands with rates by two dimensions, and cohabitation
   probabilities and conversion by declared dimensions.
 - **Sex symmetry check**
-  ([script](../validation/milestone9/intermarriage_symmetry.R)). With a race
+  ([script](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone9/intermarriage_symmetry.R)). With a race
   pair effect (A:B = -1, race A 85%) and a second dimension, region, without
   matching effects, A-wife/B-husband versus B-wife/A-husband unions formed
   after year 10 of 60:

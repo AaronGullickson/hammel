@@ -175,8 +175,8 @@ Comparisons with midpoint below were produced while both methods existed (commit
 `benchmark-cell-spacing.R` require that commit).
 
 **Recovery evidence** with 1-year, actual-parity cells (10 seeds per method;
-see [the summary CSV](../validation/milestone5/cell-spacing-summary.csv) and
-[the script](../validation/milestone5/check-cell-spacing.R)):
+see [the summary CSV](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/cell-spacing-summary.csv) and
+[the script](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/check-cell-spacing.R)):
 
 | Scenario | Measure | Target | Cell | Midpoint |
 | --- | --- | --- | --- | --- |
@@ -213,13 +213,13 @@ unrealized births (1.8% of births). A piecewise-constant input states the same
 rate at every age in a band and, by the PATFR/D099 convention, at every parity
 in a pooled band, so the user selected option (c) with 1-year age cells. The
 input-band results above come from the first implementation and are kept in
-Git history. [check-cell-resolution.R](../validation/milestone5/check-cell-resolution.R)
+Git history. [check-cell-resolution.R](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/check-cell-resolution.R)
 now confirms that wide, single-year and per-parity supplied bands give
 identical results, and that supplying 0.25-year bands still yields 0.25-year
-cells ([CSV](../validation/milestone5/cell-resolution-summary.csv)).
+cells ([CSV](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/cell-resolution-summary.csv)).
 
-**Performance** ([benchmark](../validation/milestone5/benchmark-cell-spacing.R),
-[CSV](../validation/milestone5/cell-spacing-benchmark.csv)): optimized
+**Performance** ([benchmark](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/benchmark-cell-spacing.R),
+[CSV](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/cell-spacing-benchmark.csv)): optimized
 installed build (`-O2`), 50,000-person baseline aged up to 60, 100 years,
 HFD-shaped single-year schedule for ages 12–54 plus an open 55+ band (one cell
 under the tolerance above), median of three fresh-process runs. Absolute times
@@ -362,8 +362,7 @@ here.
   initialized cohorts; a schedule change and restart (the milestone 1 Niger
   case); later windows of a generational population, including the age-[18,19)
   parity case; union-type transitions (the milestone 2 partnered case); group
-  multipliers. The toy diagnostics in `validation/milestone5/` give the
-  expected pattern.
+  multipliers. The [archived toy diagnostics](https://github.com/AaronGullickson/hammel/blob/be0c03146c88f51750f3bcdcf2f60d070548814c/validation/milestone5/README.md) give the expected pattern.
 - **Comparison with current behavior.** In stationary unstratified populations,
   results should agree statistically with D028; fixed-seed agreement is not
   expected.
