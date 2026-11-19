@@ -178,3 +178,21 @@
 #' fertility(england_wales_1992_onward$fertility)
 #' england_wales_1992_onward$cohabitation_outcomes
 "england_wales_1992_onward"
+
+#' Age-specific fertility in Niger, 2012
+#'
+#' Single-year age-specific fertility estimates for Niger in 2012.
+#'
+#' @format A tibble with 35 rows and three columns:
+#' \describe{
+#'   \item{age_start, age_end}{Half-open single-year age bands from
+#'     `[15, 16)` through `[49, 50)`.}
+#'   \item{rate}{Births per woman-year.}
+#' }
+#' @source United Nations, World Population Prospects 2024, fertility rates
+#'   by single age. Source metadata and the rebuild script are under
+#'   `data-raw/niger_2012/` in the full package repository.
+#' @keywords datasets
+#' @examples
+#' fertility(niger_fertility)
+"niger_fertility"
