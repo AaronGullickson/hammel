@@ -1,0 +1,45 @@
+{
+  "geography": "United States",
+  "fertility_year": 2000,
+  "marriage_survey_year": 2001,
+  "retrieved_at_utc": "2026-10-16T14:55:21.266034+00:00",
+  "fertility_source_url": "https://www.cdc.gov/nchs/data/nvsr/nvsr51/nvsr51_12.pdf",
+  "marriage_source_url": "https://www2.census.gov/programs-surveys/demo/tables/marriage-and-divorce/2001/tab02.xls",
+  "fertility_tables": [
+    1,
+    7,
+    8
+  ],
+  "marriage_table": 2,
+  "rebuild_script": "usa_2000.R",
+  "transformations": [
+    "Extract all-races 2000 fertility rows; retain nonoverlapping five-year groups 15-19 through 40-44; divide per-1000 values by 1000.",
+    "Extract the Table 1 all-races 2000 overall fertility row; retain five-year bands 15-19 through 40-44 and divide rates per 1000 by 1000. Omit 10-14 and 45-49; preserve the published 40-44 rate (not the 40+ numerator used by Tables 7 and 8).",
+    "Map married to partnered and unmarried to unpartnered in usa_2000_fertility_union.",
+    "Extract female marriage transitions in the source age bands, including 70+. Divide estimates per 1000 by 1000 and use directly as rates under the user-selected approximation of October 16, 2026."
+  ],
+  "limitations_document": "README.md",
+  "sha256": {
+    "usa_fertility_revised_nchs_2003.pdf": "16ae048abb16ce0b44ed7c22b65d99e5aaa24072146a33712434ac7319db5ac9",
+    "usa_marriage_transitions_2001_census.xls": "c0ab01bc26b5468ffeef2152d1f0679ce62b629c99ed36923746808cdbb10c2c"
+  },
+  "overall_fertility": {
+    "source_table": 1,
+    "printed_page": 13,
+    "pdf_page": 13,
+    "age_range": "[15,45)",
+    "omitted_age_groups": [
+      "10-14",
+      "45-49"
+    ],
+    "rate_unit": "births per woman-year",
+    "age_40_44_numerator": "Births to women aged 40-44; differs from the 40+ numerator in marital-status Tables 7 and 8."
+  },
+  "marriage_rate_approximation": {
+    "selected_on": "2026-10-16",
+    "formula": "rate = transitions_per_1000 / 1000",
+    "interpreted_unit": "per person-year",
+    "source_denominator": "People unmarried at beginning of period, not person-years",
+    "female_use": "Union-search schedule; realized union formation may differ when searches fail"
+  }
+}

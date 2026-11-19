@@ -9,7 +9,7 @@
 #' are in years, with half-open bands `[age_start, age_end)`. Each source is a
 #' U.S. federal statistical publication. Source files, preparation scripts and
 #' further notes are in the package repository under
-#' `data-raw/usa_2000_2001/`; `data-raw/usa_2000.R` builds the datasets.
+#' `data-raw/usa_2000/`; `data-raw/usa_2000/usa_2000.R` builds the datasets.
 #'
 #' @section Mortality: `usa_2000_mortality` gives death rates by sex for ages
 #'   0-1, 1-5, five-year bands to 100, and an open 100+ band, for use with
