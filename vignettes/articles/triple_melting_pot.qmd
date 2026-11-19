@@ -37,4 +37,29 @@ Ideally, we might like to have detailed immigration streams that capture specifi
 - Southern European: Most commonly Italian immigrants.
 - Eastern European: A mix of Slavic and non-Slavic groups, as well as many Jews.
 
+```{r}
+#| label: fig-migrant-rates
+#| fig-cap: Crude immigration rate to the US from Europe over time, stacked by region of origin.
+
+pal_stream <- c(
+  "Irish" = "green",
+  "NW Europe" = "dodgerblue",
+  "Southern Europe" = "yellow",
+  "Eastern Europe" = "firebrick"
+)
+
+usa_hist_migration |>
+  mutate(
+    stream = factor(
+      stream,
+      levels = c("irish", "nw_europe", "south_europe", "east_europe"),
+      labels = c("Irish", "NW Europe", "Southern Europe", "Eastern Europe")
+    )
+) |>
+  ggplot(aes(x = time_start + 0.5, y = rate, fill = stream))+
+  geom_area()+
+  scale_fill_manual(values = pal_stream)+
+  labs(x = "year", y = "crude immigration rate", fill = "origin")
+```
+
 
