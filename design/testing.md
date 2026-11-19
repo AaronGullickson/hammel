@@ -5,6 +5,24 @@ D050, D077, D093, D105, D116, D127, D130, D141). Software test history and the u
 are distinct evidence; recording acceptance does not independently rerun either.
 Earlier implementation-specific runs and counts remain available in Git history.
 
+## Long-form validation reports
+
+Use `validation/` for long-form examinations of features that go beyond unit
+tests. Write these reports as Quarto documents. Record the date of the final
+render and the repository state used for that render in the report. Include
+the full Git commit hash and record any uncommitted changes that affected the
+run. Add metadata to historical reports only when it can be verified.
+
+Preserve final report sources and rendered outputs as historical records tied
+to the recorded revision. Use a new report to assess later package changes.
+To reproduce a historical report, use its recorded revision and input paths.
+
+Store data inputs and preparation code under `data-raw/`, including inputs
+used only for validation. Prefer project-specific subdirectories that keep
+inputs, preparation scripts, and provenance together. See
+[issue #41](https://github.com/AaronGullickson/hammel/issues/41) for the
+migration of existing inputs.
+
 ## Optional simulation progress (November 12, 2026)
 
 `TZ=UTC Rscript -e 'devtools::test(reporter = "summary")'` passed the full
