@@ -204,6 +204,7 @@ Pretty fast! We can get a nice summary of the population at the end.
 
 ```{r}
 #| label: summarize-pop
+#| message: true
 
 summary(pop_end)
 ```
