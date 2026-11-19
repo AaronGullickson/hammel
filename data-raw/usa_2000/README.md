@@ -97,7 +97,7 @@ Events occurred during the year before the survey, rather than precisely
 calendar 2001. Marriage entry includes first marriages and remarriages.
 
 Source URLs, retrieval time and SHA-256 hashes are recorded in
-[usa_2000_rates.source.json](usa_2000_rates.source.json). The NCHS report
+[sources.json](sources.json). The NCHS report
 permits reproduction with source citation.
 
 ### Interpretation and limits

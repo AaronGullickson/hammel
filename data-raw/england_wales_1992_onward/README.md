@@ -13,7 +13,7 @@ and saves the six-table bundle to `data/england_wales_1992_onward.rda`.
 | `ons_divorce_death_cumulative_2010.csv` | Original ONS cumulative divorce and death estimates |
 
 The script includes the transcribed fertility and cohabitation cohort values.
-`sources.csv` records the exact ONS download URLs, retrieval dates, licences,
+`sources.json` records the exact ONS download URLs, retrieval dates, licences,
 and checksums. Contains public sector information licensed under the
 [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
 
@@ -118,7 +118,7 @@ The verified 2005 extraction is from Wilson and Smallwood (2008),
 [The proportion of marriages ending in divorce](https://sociologytwynham.com/wp-content/uploads/2008/07/proportion-of-marriages-ending-in-divorce.pdf),
 Table 3, printed p.33 (PDF page 6). Attribution, download checksum, and extraction
 method are in
-`marital_divorce_additional_sources.json`. The paper is downloaded only to a
+`sources.json`. The paper is downloaded only to a
 temporary location; the numerical observations are retained here.
 
 Source duration `x` labels the **start** of an interval. Columns g/h report
