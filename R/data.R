@@ -126,9 +126,10 @@
 #'   annual hazards. No hazard conversion, normalization, extrapolation or
 #'   interpolation is applied to these tables.
 #'
-#'   In the full package repository, original numerical sources, preparation
-#'   scripts and provenance are in `data-raw/england_wales_1992_onward/`.
-#'   `data-raw/england_wales_1992_onward.R` builds the bundled dataset.
+#'   In the full package repository, source files and provenance are in
+#'   `data-raw/england_wales_1992_onward/`. The script
+#'   `data-raw/england_wales_1992_onward/england_wales_1992_onward.R`
+#'   builds the dataset from these sources.
 #'
 #' @format A named list containing:
 #' \describe{

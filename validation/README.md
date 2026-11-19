@@ -19,10 +19,9 @@ contract; software checks and empirical assessment are different evidence.
   Historical reports use the input paths from their original revisions.
 - [England and Wales, 1992 onward](../data-raw/england_wales_1992_onward/README.md):
   fertility by three union types, annual marriage evidence and population
-  denominators, cohabitation composition, and duration-specific divorce
-  probabilities for a proposed second-transition demonstration. Observations
-  and British supplementary evidence are retained separately from unselected
-  scenario assumptions; includes an offline rebuild and source manifest.
+  denominators, cohabitation evidence, and cumulative divorce and death
+  observations for the second-transition demonstration. The guide documents
+  the original sources and how to rebuild the bundled dataset.
 - `milestone5.qmd` / `.html`: accepted October 29, 2026 (D105); parity-specific
   fertility, cell-accounted birth spacing, lognormal fertility weights with
   maternal inheritance, and baseline/restart/union-type recovery checks. The
