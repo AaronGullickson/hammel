@@ -111,7 +111,7 @@ Table B1. <a href="https://doi.org/10.1057/pt.2010.10" class="external-link">doi
 <p>Marriage and premarital cohabitation: ONS Marriages in England and Wales,
 2019 workbook; female marital population estimates, 1971–2001 and
 2002–2019. Exact source URLs, retrieval dates and checksums are recorded
-in the repository's source-folder <code>sources.csv</code>.</p>
+in the repository's source-folder <code>sources.json</code>.</p>
 <p>Cohabitation outcomes: Beaujouan E, Ni Bhrolchain M (2011). Cohabitation
 and marriage in Britain since the 1970s. Population Trends 145, Table 3.
 <a href="https://doi.org/10.1057/pt.2011.16" class="external-link">doi:10.1057/pt.2011.16</a>
@@ -140,9 +140,10 @@ the latest cohort are retained.</p>
 <p>Marital divorce/death tables are cumulative competing-risk proportions, not
 annual hazards. No hazard conversion, normalization, extrapolation or
 interpolation is applied to these tables.</p>
-<p>Original numerical sources and their provenance remain in
-<code>validation/data/england_wales_1992_onward/</code> in the repository. The offline
-preparation script is <code>data-raw/england_wales_1992_onward.R</code>.</p>
+<p>In the full package repository, source files and provenance are in
+<code>data-raw/england_wales_1992_onward/</code>. The script
+<code>data-raw/england_wales_1992_onward/england_wales_1992_onward.R</code>
+builds the dataset from these sources.</p>
     </div>
 
     <div class="section level2">

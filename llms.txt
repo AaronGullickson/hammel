@@ -321,6 +321,8 @@ Packaged demographic inputs for examples and exploration.
   : United States example rates, around 2000
 - [`england_wales_1992_onward`](https://aarongullickson.github.io/hammel/reference/england_wales_1992_onward.md)
   : England and Wales inputs for a second demographic transition example
+- [`niger_fertility`](https://aarongullickson.github.io/hammel/reference/niger_fertility.md)
+  : Age-specific fertility in Niger, 2012
 
 # Articles
 
