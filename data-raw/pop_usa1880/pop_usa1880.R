@@ -1,3 +1,12 @@
+# This script will generate a hammel_population sample of the 1880 Census sample
+# from IPUMS.
+
+# TODO: sample households
+# TODO: create custom generation inheritance
+# TODO: distribute by religion
+
+# Loab libraries --------------------------------------------------------------
+
 library(here)
 library(readr)
 library(tibble)
@@ -5,26 +14,9 @@ library(dplyr)
 library(tidyr)
 library(hammel)
 
-pop <- read_fwf(
-  here("data-raw", "pop_usa1880", "usa_00159.dat.gz"),
-  col_positions = fwf_cols(
-    SEX = c(85, 85),
-    AGE = c(86, 88),
-    RACE = c(90, 90),
-    BPL = c(94, 96),
-    MBPL = c(102, 104),
-    FBPL = c(110, 112),
-    MOMLOC = c(72, 73),
-    POPLOC = c(74, 75),
-    STEPPOP = c(76, 76),
-    SPLOC = c(77, 78),
-    RELATE = c(79, 80),
-    SERIAL = c(11, 18),
-    PERNUM = c(55, 58)
-  ), 
-  col_types = cols(.default = "i")
-)
+# Create custom functions -----------------------------------------------------
 
+# function for coding birthplace from IPUMS categories
 code_bpl <- function(bpl) {
 
   case_when(
@@ -38,11 +30,37 @@ code_bpl <- function(bpl) {
   )
 }
 
+# Read in data ----------------------------------------------------------------
+
+pop <- read_fwf(
+  here("data-raw", "pop_usa1880", "usa_00161.dat.gz"),
+  col_positions = fwf_cols(
+    SEX = c(85, 85),
+    AGE = c(86, 88),
+    RACE = c(90, 90),
+    BPL = c(94, 96),
+    MBPL = c(102, 104),
+    FBPL = c(110, 112),
+    MOMLOC = c(71, 72),
+    STEPMOM = c(73, 73),
+    POPLOC = c(74, 75),
+    STEPPOP = c(76, 76),
+    SPLOC = c(77, 78),
+    RELATE = c(79, 80),
+    SERIAL = c(11, 18),
+    PERNUM = c(55, 58),
+    FAMUNIT = c(69, 70)
+  ), 
+  col_types = cols(.default = "i")
+)
+
+# Code basic individual demographic information -------------------------------
+
 pop <- pop |>
   mutate(
     person_id = 1:nrow(pop), 
     sex = if_else(SEX == 1, "m", "f"),
-    birth_time = 1880.5 - AGE + runif(n()),
+    birth_time = 1880.5 - AGE - runif(n()),
     death_time = NA_real_,
     race = case_when(
       RACE == 1 ~ "White",
@@ -59,6 +77,7 @@ pop <- pop |>
     )
   )
 
+# checks
 table(pop$SEX, pop$sex, exclude = NULL)
 table(pop$RACE, pop$race, exclude = NULL)
 table(pop$BPL, pop$birthplace, exclude = NULL)
@@ -70,11 +89,21 @@ table(
   pop$generation[tf]
 )
 
-# should be -1
+# should be close to -1
 cor(pop$AGE, pop$birth_time)
 
+# remove missing values
 pop <- pop |>
   filter(!is.na(race), !is.na(birthplace), !is.na(generation))
+
+# Add in mother, father, and spouse links -------------------------------------
+
+# remove step parent links
+pop <- pop |>
+  mutate(
+    POPLOC = if_else(STEPPOP > 0, NA, POPLOC),
+    MOMLOC = if_else(STEPMOM > 0, NA, MOMLOC)
+  )
 
 mom_lookup <- pop |>
   select(SERIAL, PERNUM, person_id) |>
@@ -84,15 +113,116 @@ dad_lookup <- pop |>
   select(SERIAL, PERNUM, person_id) |>
   rename(father_id = person_id, POPLOC = PERNUM)
 
+partner_lookup <- pop |>
+  select(SERIAL, PERNUM, person_id) |>
+  rename(spouse_id = person_id, SPLOC = PERNUM)
+
 pop <- pop |>
   left_join(mom_lookup, by = c("SERIAL", "MOMLOC")) |>
-  left_join(dad_lookup, by = c("SERIAL", "POPLOC"))
+  left_join(dad_lookup, by = c("SERIAL", "POPLOC")) |>
+  left_join(partner_lookup, by = c("SERIAL", "SPLOC"))
+
+# Determine arrival time for non-natives --------------------------------------
+
+# determine arrival time by runif between last non-native
+# birth time and now
+family_arrivals <- pop |>
+  group_by(SERIAL, FAMUNIT) |>
+  summarize(
+    last_birth = max(c(-Inf, birth_time[which(birthplace != "native")])),
+    .groups = "drop"
+  ) |>
+  mutate(
+    last_birth = if_else(is.finite(last_birth), last_birth, NA_real_),
+    arrival_time = last_birth + runif(n()) * (1880.5 - last_birth)
+  ) |>
+  select(SERIAL, FAMUNIT, arrival_time)
 
 pop <- pop |>
-  select(person_id, sex, birth_time, death_time, mother_id, father_id,
-         race, birthplace, generation)
+  left_join(family_arrivals, by =c("SERIAL", "FAMUNIT")) |>
+  mutate(
+    # don't use arrival time for native born members of immigrant families
+    arrival_time = if_else(birthplace == "native", NA, arrival_time),
+    # check 1.5 generation status
+    generation = if_else(
+      generation == "1" & (arrival_time - birth_time) < 18, "1.5", generation
+    )
+  )
 
-pop_usa1880 <- list(persons = pop, unions = NULL, end_time = 1880.5)
+pop |>
+  group_by(generation) |>
+  summarize(arrival_time = mean(arrival_time))
+
+# Create the unions dataset ---------------------------------------------------
+
+# create  unions
+unions <- pop |>
+  filter(sex == "f") |>
+  select(
+    person_id,
+    birth_time_w = birth_time,
+    birthplace_w = birthplace,
+    generation_w = generation,
+    race_w = race
+  ) |>
+  inner_join(
+    pop |>
+      filter(sex == "m") |>
+      select(
+        spouse_id,
+        birth_time_h = birth_time,
+        birthplace_h = birthplace,
+        generation_h = generation,
+        race_h = race,
+        husband_id = person_id
+      ),
+    by = join_by(person_id == spouse_id)
+  ) |>
+  mutate(union_id = 1:n()) |>
+  select(union_id, wife_id = person_id, husband_id, husband_id, ends_with("_w"),
+         ends_with("_h"))
+
+# use first child birthdate from union to get range of potential starting times
+# and then draw a starting time for each couple
+unions <- unions |>
+  left_join(
+    pop |>
+      select(mother_id, father_id, birth_time, birthplace) |>
+      rename(birth_time_c = birth_time, birthplace_c = birthplace),
+    by = join_by(wife_id == mother_id, husband_id == father_id)
+  ) |>
+  group_by(union_id, birth_time_h, birth_time_w) |>
+  summarize(
+    first_child_time = min(birth_time_c),
+    .groups = "drop"
+  ) |>
+  mutate(
+  younger_birth = pmax(birth_time_h, birth_time_w),
+  early_date = pmin(younger_birth + 15, 1880),
+  early_date = if_else(
+    !is.na(first_child_time) & first_child_time <= early_date,
+    first_child_time - 1,
+    early_date
+  ),
+  early_date = pmax(early_date, younger_birth),
+  late_date = coalesce(first_child_time, 1880.5),
+  early_date = if_else(early_date <= late_date, early_date, NA_real_),
+  start_time = early_date + runif(n()) * (late_date - early_date)
+) |>
+  select(union_id, start_time) |>
+  right_join(unions) |>
+  mutate(end_time = NA_real_, end_reason = NA_character_) |>
+  select(union_id, wife_id, husband_id, start_time, end_time, end_reason,
+         starts_with("birthplace"), starts_with("generation"),
+         starts_with("race"))
+
+# Convert into hammel_population object ---------------------------------------
+
+pop <- pop |>
+  select(person_id, sex, birth_time, death_time, mother_id, father_id, race,
+         birthplace, generation)
+
+pop_usa1880 <- list(persons = pop, unions = unions, end_time = 1880.5)
 # assign groups
 pop_usa1880$groups <- list(
   race = hammel::group(
@@ -104,11 +234,6 @@ pop_usa1880$groups <- list(
     inheritance = group_inheritance("mother")
   )
 )
-
-# TODO: create arrival_time (and assign as 1.5)
-# TODO: sample households
-# TODO create custom generation inheritance
-# TODO distribute by religion
 
 pop_usa1880 <- do.call(hammel::hammel_population, pop_usa1880)
 summary(pop_usa1880)
