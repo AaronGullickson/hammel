@@ -1,4 +1,4 @@
-Description: Revision of (For creation of starting population in hammel program) - add SPLOC
+Description: Revision of (Revision of (Revision of (For creation of starting population in hammel program))) - add STEPMOM
 Samples selected:
       1880 1%
 File Type:                    rectangular
@@ -13,9 +13,9 @@ Case Selection:               No
   GQ                           H  54              1     X       
   PERNUM                       P  55-58           4     X       
   PERWT                        P  59-68          10     X       
-  FAMSIZE                      P  69-70           2     X       
-  SUBFAM                       P  71              1     X       
-  MOMLOC                       P  72-73           2     X       
+  FAMUNIT                      P  69-70           2     X       
+  MOMLOC                       P  71-72           2     X       
+  STEPMOM                      P  73              1     X       
   POPLOC                       P  74-75           2     X       
   STEPPOP                      P  76              1     X       
   SPLOC                        P  77-78           2     X       
@@ -249,77 +249,77 @@ GQ                  Group quarters status
 5                   Additional households under 2000 definition
 6                   Fragment
 
-FAMSIZE             Number of own family members in household
-01                  1 family member present
-02                  2 family members present
-03                  3
-04                  4
-05                  5
-06                  6
-07                  7
-08                  8
-09                  9
-10                  10
-11                  11
-12                  12
-13                  13
-14                  14
-15                  15
-16                  16
-17                  17
-18                  18
-19                  19
-20                  20
-21                  21
-22                  22
-23                  23
-24                  24
-25                  25
-26                  26
-27                  27
-28                  28
-29                  29
-30                  30
-31                  31
-32                  32
-33                  33
-34                  34
-35                  35
-36                  36
-37                  37
-38                  38
-39                  39
-40                  40
-41                  41
-42                  42
-43                  43
-44                  44
-45                  45
-46                  46
-47                  47
-48                  48
-49                  49
-50                  50
-51                  51
-52                  52
-53                  53
-54                  54
-55                  55
-56                  56
-57                  57
-58                  58
+FAMUNIT             Family unit membership
+01                  1st family in household or group quarters
+02                  2nd family in household or group quarters
+03                  3rd
+04                  4th
+05                  5th
+06                  6th
+07                  7th
+08                  8th
+09                  9th
+10                  10th
+11                  11th
+12                  12th
+13                  13th
+14                  14th
+15                  15th
+16                  16th
+17                  17th
+18                  18th
+19                  19th
+20                  20th
+21                  21th
+22                  22th
+23                  23th
+24                  24th
+25                  25th
+26                  26th
+27                  27th
+28                  28th
+29                  29th
+30                  30th
+31                  31st
+32                  32nd
+33                  33rd
+34                  34th
+35                  35th
+36                  36th
+37                  37th
+38                  38th
+39                  39th
+40                  40th
+41                  41st
+42                  42nd
+43                  43rd
+44                  44th
+45                  45th
+46                  46th
+47                  47th
+48                  48th
+49                  49th
+50                  50th
+51                  51st
+52                  52nd
+53                  53rd
+54                  54th
+55                  55th
+56                  56th
+57                  57th
+58                  58th
+59                  59th
+60                  60th
 
-SUBFAM              Subfamily membership
-0                   Group quarters or not in subfamily
-1                   1st subfamily in household
-2                   2nd subfamily in household
-3                   3rd
-4                   4th
-5                   5th
-6                   6th
-7                   7th
-8                   8th
-9                   9th
+STEPMOM             Probable step/adopted mother
+0                   No stepmother present
+1                   Improbable age difference
+2                   Spouse of father
+3                   Identified stepmother
+4                   No surviving children
+5                   Identified as adopted
+6                   Birthplace/marriage duration mismatch
+7                   Number of children born/children surviving check
 
 STEPPOP             Probable step/adopted father
 0                   No stepfather present
