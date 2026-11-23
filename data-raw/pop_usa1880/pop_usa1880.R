@@ -199,18 +199,6 @@ family_arrivals <- pop |>
   ) |>
   select(SERIAL, FAMUNIT, arrival_time)
 
-family_arrivals <- pop |>
-  group_by(SERIAL, FAMUNIT) |>
-  summarize(
-    last_birth = max(c(-Inf, birth_time[which(birthplace != "native")])),
-    .groups = "drop"
-  ) |>
-  mutate(
-    last_birth = if_else(is.finite(last_birth), last_birth, NA_real_),
-    arrival_time = last_birth + runif(n()) * (1880.5 - last_birth)
-  ) |>
-  select(SERIAL, FAMUNIT, arrival_time)
-
 pop <- pop |>
   left_join(family_arrivals, by =c("SERIAL", "FAMUNIT")) |>
   mutate(
@@ -245,6 +233,7 @@ unions <- pop |>
       select(
         spouse_id,
         birth_time_h = birth_time,
+        arrival_time_h = arrival_time,
         birthplace_h = birthplace,
         generation_h = generation,
         race_h = race,
@@ -252,12 +241,18 @@ unions <- pop |>
       ),
     by = join_by(person_id == spouse_id)
   ) |>
-  mutate(union_id = 1:n()) |>
-  select(union_id, wife_id = person_id, husband_id, husband_id, ends_with("_w"),
-         ends_with("_h"))
+  mutate(
+    union_id = 1:n(),
+    younger_birth = pmax(birth_time_w, birth_time_h),
+    mixed_nativity = (birthplace_w == "native") != (birthplace_h == "native"),
+    arrival_time = pmax(arrival_time_w, arrival_time_h, na.rm = TRUE)
+  ) |>
+  select(union_id, wife_id = person_id, husband_id, husband_id,
+         younger_birth, mixed_nativity, arrival_time, starts_with("birthplace"),
+         starts_with("generation"), starts_with("race"))
 
-# use first child birthdate from union to get range of potential starting times
-# and then draw a starting time for each couple
+# use birthdate of youngest spouse, first child birthdate from union, and arrival time
+# to get range of potential starting times and then draw a starting time for each couple
 unions <- unions |>
   left_join(
     pop |>
@@ -265,35 +260,49 @@ unions <- unions |>
       rename(birth_time_c = birth_time, birthplace_c = birthplace),
     by = join_by(wife_id == mother_id, husband_id == father_id)
   ) |>
-  group_by(union_id, birth_time_h, birth_time_w) |>
+  group_by(union_id, younger_birth, mixed_nativity, arrival_time) |>
   summarize(
     first_child_time = min(birth_time_c),
+    first_child_born_abroad = any(
+      birth_time_c == first_child_time & birthplace_c != "native",
+      na.rm = TRUE
+    ),
     .groups = "drop"
   ) |>
   mutate(
-  younger_birth = pmax(birth_time_h, birth_time_w),
-  early_date = pmin(younger_birth + 15, 1880),
-  early_date = if_else(
-    !is.na(first_child_time) & first_child_time <= early_date,
-    first_child_time - 1,
-    early_date
-  ),
-  early_date = pmax(early_date, younger_birth),
-  late_date = coalesce(first_child_time, 1880.5),
-  early_date = if_else(early_date <= late_date, early_date, NA_real_),
-  start_time = early_date + runif(n()) * (late_date - early_date)
-) |>
-  select(union_id, start_time) |>
+    early_date = pmin(younger_birth + 15, 1880),
+    # check for children born before early date and modify
+    early_date = if_else(
+      !is.na(first_child_time) & first_child_time <= early_date,
+      first_child_time - 1,
+      early_date
+    ),
+    early_date = pmax(early_date, younger_birth),
+    # check for mixed nativity - allow pre-migration marriage only if children
+    # born abroad
+    early_date = if_else(
+      mixed_nativity &
+        !(first_child_born_abroad & first_child_time < arrival_time),
+      pmax(early_date, arrival_time),
+      early_date
+    ),
+    late_date = coalesce(first_child_time, 1880.5),
+    early_date = if_else(early_date <= late_date, early_date, NA_real_),
+    start_time = early_date + runif(n()) * (late_date - early_date)
+  ) |>
+  select(union_id, start_time, arrival_time) |>
   right_join(unions) |>
   mutate(
     end_time = NA_real_, 
     end_reason = NA_character_,
-    pre_migration = !is.na(arrival_time_w) & arrival_time_w > start_time
+    pre_migration = !is.na(arrival_time) & arrival_time > start_time
   ) |>
   select(union_id, wife_id, husband_id, start_time, end_time, end_reason,
-         pre_migration,
-         starts_with("birthplace"), starts_with("generation"),
-         starts_with("race"))
+    pre_migration,
+    starts_with("birthplace"), starts_with("generation"),
+    starts_with("race"))
+
+table(unions$birthplace_w, unions$birthplace_h, unions$pre_migration)
 
 # Convert into hammel_population object ---------------------------------------
 
