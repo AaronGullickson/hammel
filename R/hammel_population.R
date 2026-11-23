@@ -39,6 +39,8 @@
 #'   dimension must chain to their current category and lie within life dates
 #'   and the known endpoint. Grouped populations always include this tibble,
 #'   even when empty, with character `group`, `origin` and `destination`.
+#'   If persons has arrival records, default empty unions and transitions
+#'   include a logical `pre_migration` column.
 #' @param ancestry Optional ancestry shares for dimensions declared with
 #'   `group(ancestry = TRUE)`: a named list with one data frame per such group
 #'   dimension (a bare data frame when only one dimension tracks ancestry), each
@@ -92,6 +94,9 @@ hammel_population <- function(
     ),
     class = "hammel_population"
   )
+  if (is.null(unions) && all(arrival_columns %in% names(persons))) {
+    results$unions$pre_migration <- logical()
+  }
   if (!is.null(external_relatives)) {
     results$external_relatives <- if (is.data.frame(external_relatives)) {
       tibble::as_tibble(external_relatives)

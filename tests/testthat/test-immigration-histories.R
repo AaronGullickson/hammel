@@ -346,6 +346,37 @@ test_that("template external relatives are flattened with their censor times", {
   )
 })
 
+test_that("default empty histories reflect the arrival schema", {
+  persons <- history_template()$persons
+  persons$region <- "A"
+  groups <- list(region = group())
+  plain <- hammel_population(persons, end_time = 0, groups = groups)
+  expect_false("pre_migration" %in% names(plain$unions))
+  expect_false("pre_migration" %in% names(plain$transitions))
+
+  persons$arrival_time <- c(-1, rep(NA_real_, 5))
+  arrived <- hammel_population(persons, end_time = 0, groups = groups)
+  expect_identical(arrived$unions$pre_migration, logical())
+  expect_identical(arrived$transitions$pre_migration, logical())
+
+  supplied_unions <- arrived$unions
+  expect_identical(
+    hammel_population(
+      persons, unions = supplied_unions, end_time = 0, groups = groups
+    )$transitions$pre_migration,
+    logical()
+  )
+  expect_hammel_error(
+    hammel_population(
+      persons,
+      end_time = 0,
+      groups = groups,
+      transitions = plain$transitions
+    ),
+    "population", "hammel_population"
+  )
+})
+
 test_that("populations with external relatives are validated", {
   model <- set_immigration(make_model(10), a = history_stream(intensity = 3))
   result <- run_simulation(model, 1, seed = 12)

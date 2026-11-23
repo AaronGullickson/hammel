@@ -24,6 +24,9 @@ normalize_population_transitions <- function(population) {
   tx <- population$transitions
   if (is.null(tx)) {
     population$transitions <- empty_transitions()
+    if (all(arrival_columns %in% names(population$persons))) {
+      population$transitions$pre_migration <- logical()
+    }
     return(population)
   }
   tx <- tibble::as_tibble(tx)

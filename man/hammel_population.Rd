@@ -39,7 +39,9 @@ finite, between zero and one, and sum to one per row (tolerance \code{1e-8}).}
 declared), \code{origin}, and \code{destination}. Each person's history in each
 dimension must chain to their current category and lie within life dates
 and the known endpoint. Grouped populations always include this tibble,
-even when empty, with character \code{group}, \code{origin} and \code{destination}.}
+even when empty, with character \code{group}, \code{origin} and \code{destination}.
+If persons has arrival records, default empty unions and transitions
+include a logical \code{pre_migration} column.}
 
 \item{groups}{Optional group declaration: a character vector of dimension
 names (each with \code{\link[=group]{group()}} defaults) or a named list of \code{\link[=group]{group()}} objects.
