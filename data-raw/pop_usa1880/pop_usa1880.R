@@ -1,9 +1,16 @@
 # This script will generate a hammel_population sample of the 1880 Census sample
-# from IPUMS.
+# from IPUMS. The script includes only the white and black population and
+# collapses immigrant origins into NW Europe (including Germany), Irish,
+# South Europe, East Europe, and Other. Arrival times for immigrants are
+# sampled from a uniform distribution from the earliest non-native birth
+# time for the family unit. Union start times are sampled from a uniform
+# distribution from when the younger member was 15 or first birth time
+# for the union.
+#
+# These data are generated for demonstration purposes only and should not be
+# directly used for research purposes.
 
-# TODO: sample households
 # TODO: create custom generation inheritance
-# TODO: distribute by religion
 
 # Loab libraries --------------------------------------------------------------
 
@@ -13,6 +20,8 @@ library(tibble)
 library(dplyr)
 library(tidyr)
 library(hammel)
+
+set.seed(42)
 
 # Create custom functions -----------------------------------------------------
 
@@ -30,7 +39,39 @@ code_bpl <- function(bpl) {
   )
 }
 
-# Read in data ----------------------------------------------------------------
+# custom function for inheritance. We wrap it in local so it and its helper
+# functions will travel with the saved object.
+gen_inheritance <- local({
+  # Report generation as numeric, rounded down.
+  flatten_gen <- function(gen) {
+    floor(as.numeric(sub("\\+$", "", gen)))
+  }
+
+  # Increment the generation and cap it at "3+".
+  increment_gen <- function(gen) {
+    gen <- min(3, gen + 1)
+    if (gen == 3) "3+" else as.character(gen)
+  }
+
+  function(mother_group, father_group, ...) {
+    gen_mother <- flatten_gen(mother_group)
+
+    if (is.na(father_group) || mother_group == father_group) {
+      return(increment_gen(gen_mother))
+    }
+
+    gen_father <- flatten_gen(father_group)
+
+    # Exactly one first-generation parent produces generation 2.5.
+    if (xor(gen_mother == 1, gen_father == 1)) {
+      return("2.5")
+    }
+
+    increment_gen(min(gen_mother, gen_father))
+  }
+})
+
+# Read in data and sample households ------------------------------------------
 
 pop <- read_fwf(
   here("data-raw", "pop_usa1880", "usa_00161.dat.gz"),
@@ -52,7 +93,9 @@ pop <- read_fwf(
     FAMUNIT = c(69, 70)
   ), 
   col_types = cols(.default = "i")
-)
+) |>
+  # sample 10K households
+  filter(SERIAL %in% sample(unique(SERIAL), size = 10000))
 
 # Code basic individual demographic information -------------------------------
 
@@ -125,7 +168,37 @@ pop <- pop |>
 # Determine arrival time for non-natives --------------------------------------
 
 # determine arrival time by runif between last non-native
-# birth time and now
+# birth time and first-native birth/`now
+immigrant_ids <- pop$person_id[which(pop$birthplace != "native")]
+
+family_arrivals <- pop |>
+  mutate(
+    us_born_child = birthplace == "native" &
+      (mother_id %in% immigrant_ids | father_id %in% immigrant_ids)
+  ) |>
+  group_by(SERIAL, FAMUNIT) |>
+  summarize(
+    last_foreign_birth = max(
+      c(-Inf, birth_time[which(birthplace != "native")])
+    ),
+    first_native_birth = min(c(Inf, birth_time[which(us_born_child)])),
+    .groups = "drop"
+  ) |> 
+  mutate(
+    earliest_arrival = if_else(
+      is.finite(last_foreign_birth), last_foreign_birth, NA_real_
+    ),
+    latest_arrival = if_else(
+      is.finite(first_native_birth), first_native_birth, 1880.5
+    ),
+    # possible that some foreign born births come after native
+    # so assign at exactly last foreign birth for these cases
+    latest_arrival = pmax(earliest_arrival, latest_arrival),
+    arrival_time = earliest_arrival +
+      runif(n()) * (latest_arrival - earliest_arrival)
+  ) |>
+  select(SERIAL, FAMUNIT, arrival_time)
+
 family_arrivals <- pop |>
   group_by(SERIAL, FAMUNIT) |>
   summarize(
@@ -161,6 +234,7 @@ unions <- pop |>
   select(
     person_id,
     birth_time_w = birth_time,
+    arrival_time_w = arrival_time,
     birthplace_w = birthplace,
     generation_w = generation,
     race_w = race
@@ -211,16 +285,21 @@ unions <- unions |>
 ) |>
   select(union_id, start_time) |>
   right_join(unions) |>
-  mutate(end_time = NA_real_, end_reason = NA_character_) |>
+  mutate(
+    end_time = NA_real_, 
+    end_reason = NA_character_,
+    pre_migration = !is.na(arrival_time_w) & arrival_time_w > start_time
+  ) |>
   select(union_id, wife_id, husband_id, start_time, end_time, end_reason,
+         pre_migration,
          starts_with("birthplace"), starts_with("generation"),
          starts_with("race"))
 
 # Convert into hammel_population object ---------------------------------------
 
 pop <- pop |>
-  select(person_id, sex, birth_time, death_time, mother_id, father_id, race,
-         birthplace, generation)
+  select(person_id, sex, birth_time, death_time, mother_id, father_id,
+         birthplace, arrival_time, generation, race)
 
 pop_usa1880 <- list(persons = pop, unions = unions, end_time = 1880.5)
 # assign groups
@@ -231,9 +310,11 @@ pop_usa1880$groups <- list(
   ),
   generation = hammel::group(
     categories = c("1", "1.5", "2", "2.5", "3+"),
-    inheritance = group_inheritance("mother")
+    inheritance = group_inheritance("custom", fun = gen_inheritance)
   )
 )
 
 pop_usa1880 <- do.call(hammel::hammel_population, pop_usa1880)
 summary(pop_usa1880)
+
+save(pop_usa1880, file = here("data", "pop_usa1880.rda"))
