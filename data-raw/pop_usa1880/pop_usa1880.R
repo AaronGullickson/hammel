@@ -229,8 +229,6 @@ unions <- pop |>
     birth_time_w = birth_time,
     arrival_time_w = arrival_time,
     birthplace_w = birthplace,
-    generation_w = generation,
-    race_w = race
   ) |>
   inner_join(
     pop |>
@@ -240,8 +238,6 @@ unions <- pop |>
         birth_time_h = birth_time,
         arrival_time_h = arrival_time,
         birthplace_h = birthplace,
-        generation_h = generation,
-        race_h = race,
         husband_id = person_id
       ),
     by = join_by(person_id == spouse_id)
@@ -253,8 +249,7 @@ unions <- pop |>
     arrival_time = pmax(arrival_time_w, arrival_time_h, na.rm = TRUE)
   ) |>
   select(union_id, wife_id = person_id, husband_id, husband_id,
-         younger_birth, mixed_nativity, arrival_time, starts_with("birthplace"),
-         starts_with("generation"), starts_with("race"))
+         younger_birth, mixed_nativity, arrival_time, starts_with("birthplace"))
 
 # use birthdate of youngest spouse, first child birthdate from union, and arrival time
 # to get range of potential starting times and then draw a starting time for each couple
@@ -302,12 +297,8 @@ unions <- unions |>
     end_reason = NA_character_,
     pre_migration = !is.na(arrival_time) & arrival_time > start_time
   ) |>
-  select(union_id, wife_id, husband_id, start_time, end_time, end_reason,
-    pre_migration,
-    starts_with("birthplace"), starts_with("generation"),
-    starts_with("race"))
-
-table(unions$birthplace_w, unions$birthplace_h, unions$pre_migration)
+  select(union_id, wife_id, husband_id, start_time, end_time, end_reason, 
+         pre_migration)
 
 # Convert into hammel_population object ---------------------------------------
 

@@ -196,3 +196,67 @@
 #' @examples
 #' fertility(niger_fertility)
 "niger_fertility"
+
+#' Example starting population from the 1880 U.S. Census
+#'
+#' A starting population for demonstrating Hammel simulations with family
+#' links, immigrant arrivals, and group inheritance. The preparation script
+#' draws 10,000 households from the IPUMS USA 1880 1% sample, then retains
+#' eligible people coded as White or Black, as well as information on 
+#' region of origin for immigrants and immigrant generation.
+#'
+#' @md
+#' @format A [hammel_population()] with 46,812 people, 7,868 unions, and a
+#'   reference time of 1880.5. Times are in calendar years.
+#' \describe{
+#'   \item{persons}{Person IDs, sex, birth and death times, linked parent
+#'     IDs, birthplace, arrival time, immigrant generation, and race.
+#'     Death times are missing because the starting population consists of
+#'     people alive at the reference time. Arrival times are missing for
+#'     U.S.-born people.}
+#'   \item{unions}{Spouse IDs, imputed start times, missing end times and
+#'     end reasons. The `pre_migration` flags unions that began before either 
+#'     spouse's inferred arrival.}
+#'   \item{groups, transitions}{Group declarations for race and generation,
+#'     including newborn inheritance rules, and an empty transition history.}
+#' }
+#' @details
+#' Birth times are drawn within the year implied by each person's reported
+#' age. Parent and spouse IDs are derived from IPUMS household links. Parent
+#' links flagged as probable step or adoptive relationships are excluded.
+#'
+#' Foreign-born members of a family unit share an imputed arrival time.
+#' The draw runs from the latest foreign-born birth to the earliest U.S.-born
+#' child of a foreign-born parent in the unit, or to 1880.5 when no such
+#' child is linked. If the bounds conflict, the latest foreign-born birth
+#' is used as the inferred return date. Union start dates are imputed using
+#' spouses' ages, linked children's births, and arrival dates for mixed
+#' native-born and foreign-born couples.
+#'
+#' Generation is coded as `"1"` for foreign-born people who arrived at age
+#' 18 or older and `"1.5"` for those who arrived before age 18. For U.S.-born
+#' people, `"2"`, `"2.5"`, and `"3+"` distinguish foreign-born, mixed,
+#' and U.S.-born parental origins, respectively. When only one parent's
+#' birthplace is known, that parent's nativity determines generation.
+#'
+#' @section Data use:
+#' The included subsample is intended only for demonstration. Please cite
+#' IPUMS USA as shown below and obtain permission before redistributing the
+#' data. Send redistribution requests to \email{ipums@umn.edu}. For other
+#' uses, access the data directly through \url{https://usa.ipums.org/usa/}.
+#' See the [IPUMS USA terms of use](https://usa.ipums.org/usa/terms.shtml).
+#'
+#' @source IPUMS USA, 1880 U.S. Census 1% sample
+#'   (\url{https://usa.ipums.org/usa/sampdesc.shtml}). The preparation script
+#'   is `data-raw/pop_usa1880/pop_usa1880.R` in the package repository.
+#'
+#'   Steven Ruggles, Sarah Flood, Matthew Sobek, Daniel Backman, Grace Cooper,
+#'   Julia A. Rivera Drew, Stephanie Richards, Renae Rodgers, Jonathan
+#'   Schroeder, and Kari C.W. Williams. *IPUMS USA: Version 16.0* \[dataset\].
+#'   Minneapolis, MN: IPUMS, 2025. \url{https://doi.org/10.18128/D010.V16.0}.
+#' @seealso [set_population()]
+#' @keywords datasets
+#' @examples
+#' summary(pop_usa1880)
+#' model <- set_population(hammel_model(), pop_usa1880)
+"pop_usa1880"
