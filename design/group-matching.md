@@ -150,10 +150,8 @@ effects in both the formula and pair table intentionally add together.
 
 ## Ancestry endogamy
 
-*Implemented (D199, November 24, 2026), except the faster weight solver.*
-The user selected the interface, argument names, rounding and calibration
-described here. Weights are currently solved with the dense Newton method,
-which is slow with many types; the conjugate-gradient solver is pending.
+*Implemented (D199, November 24, 2026).* The user selected the interface,
+argument names, rounding and calibration described here.
 Calibration by ancestry type is specified in
 [weighted-choice matching](weighted-choice-matching.md#ancestry-types).
 

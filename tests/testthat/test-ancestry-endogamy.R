@@ -494,3 +494,45 @@ test_that("rate-mode searches calibrate by type with consistent cells", {
   expect_gt(nrow(result$unions), 200)
   expect_identical(run_simulation(model, 15, seed = 37), result)
 })
+
+test_that("typed weights are held for a month unless set otherwise", {
+  set.seed(38)
+  n <- 600
+  persons <- data.frame(
+    person_id = seq_len(n),
+    sex = rep(c("f", "m"), n / 2),
+    birth_time = -runif(n, 15, 30),
+    death_time = NA_real_,
+    mother_id = NA_integer_,
+    father_id = NA_integer_,
+    heritage = sample(c("irish", "nw", "other"), n, replace = TRUE)
+  )
+  population <- hammel_population(
+    persons, end_time = 0, groups = list(heritage = group(ancestry = TRUE))
+  )
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(
+      data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf,
+        rate = 0.005)
+    ) |>
+    set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.15)) |>
+    set_union_formation(
+      "on_demand",
+      matching = age_gap_matching_model(
+        2, 5, ancestry_endogamy = c(irish = 1, nw = 1, other = 1)
+      )
+    )
+  monthly <- run_simulation(model, 10, seed = 39)
+  withr::with_options(
+    list(hammel.ancestry_recalibration = 1 / 12),
+    expect_identical(run_simulation(model, 10, seed = 39), monthly)
+  )
+  # Recalibrating at every search is a different, equally valid history.
+  every <- withr::with_options(
+    list(hammel.ancestry_recalibration = 0),
+    run_simulation(model, 10, seed = 39)
+  )
+  expect_false(identical(every$unions, monthly$unions))
+  expect_gt(nrow(every$unions), 100)
+})

@@ -571,6 +571,12 @@ run_simulation <- function(
     group_input$ancestry_matching <- ancestry_layout[
       c("offsets", "sizes", "units")
     ]
+    # Models with ancestry endogamy reuse their weights for 1/12 year
+    # (D199). The internal option sets another interval; 0 recalibrates at
+    # every search.
+    group_input$ancestry_matching$interval <- as.numeric(
+      getOption("hammel.ancestry_recalibration", 1 / 12)
+    )
   }
   # Each transition process: strata over its own dimension (the origin) and
   # any other dimensions its table uses; destinations; and each person's

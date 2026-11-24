@@ -263,8 +263,7 @@ number of searches that used approximate weights.
 
 ## Ancestry types
 
-*Implemented with the dense Newton solve (D199, November 24, 2026); the
-conjugate-gradient solver is pending.* This extends calibration to the
+*Implemented (D199, November 24, 2026).* This extends calibration to the
 ancestry term of
 [group matching](group-matching.md#ancestry-endogamy).
 
@@ -292,6 +291,14 @@ and every rule above applies with type in place of group:
   absorbed by the weights, as a `male_group` main effect is. The symmetric
   absolute-difference term is not absorbed.
 - Models without an ancestry term keep category weights.
+- **Held weights.** A model with the term recalibrates at most every 1/12
+  year and uses its latest weights for searches in between, instead of
+  recalibrating at every search (user decision, November 24, 2026). It
+  recalibrates sooner when a type appears whose men are old enough to be
+  drawn, or when a model schedule switches; newborn types wait, since none
+  of their men can be chosen. The interval is fixed, not a user argument.
+  Draws remain exact given the held weights. Models without the term still
+  recalibrate at every search.
 
 The purpose is the user's: under symmetric preferences and sex-balanced
 types, ancestry intermarriage should not be unbalanced by sex, just as for
@@ -357,16 +364,25 @@ Combined with race and generation, 1960 had 558 types at 1/8 and 1,023 at
 1/16. Profiles keep diversifying over generations, so longer runs have
 more types; endogamy would slow this.
 
-- **Solver.** The dense Newton solve costs about T^3 per iteration, too
-  slow at a few hundred types with one solve per search. Models with an
-  ancestry term solve the same objective, to the same tolerance and
-  warm-started from the previous search, by Newton steps found with
-  conjugate gradients. Hessian-vector products use the Hessian's form, a
-  diagonal minus per-woman rank-one terms, so it is never formed. Models
-  without an ancestry term keep the dense solve unchanged, so their
-  histories are unchanged. The choice is numerical; solutions agree within
-  the tolerance. Expected-flow evaluation, about occupied female cells
-  times T per iteration at every search, also needs benchmarking.
+- **Solver.** Models with an ancestry term solve the same objective, to
+  the same tolerance and warm-started from their previous solve, by Newton
+  steps found with Jacobi-preconditioned conjugate gradients. Hessian-vector
+  products use the Hessian's form, a diagonal minus per-row rank-one terms,
+  so it is never formed. Models without an ancestry term keep the dense
+  solve, and their seeded histories are unchanged.
+- **Measured cost** (November 24, 2026; optimized build, one seed; the
+  `pop_usa1880` object from external-migration `751e66b` rebuilt without
+  immigration, birthplace endogamy with `native = 1` and other origins 2,
+  r = 1/8). Without the term, 20 years took 1.0 s and 80 years 3.5 s.
+  Recalibrating at every search took 23.8 s for 20 years with dense
+  Newton, 10.4 s with conjugate gradients and contiguous sums, and 609 s
+  for 80 years (190 s at r = 1/4); a solve costs about occupied female
+  cells times types, and both grow as profiles diversify. With weights
+  held for 1/12 year, 20 years took 1.2 s and 80 years 26.5 s. Over 10
+  seeds of 20 years, held and per-search weights gave union counts, mean
+  partner ancestry distance and husband-minus-wife shares by origin that
+  agreed within about 1.5 standard errors (exploratory; scripts not
+  archived).
 - **Diagnostics.** The user chose to remove the `.log_weight_<group>`
   union columns and the `diagnostics` they provide, since one column per
   type does not scale. A later helper that builds wife-side

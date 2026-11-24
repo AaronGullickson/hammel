@@ -559,6 +559,16 @@ class Simulation {
   bool union_weighted = false, father_weighted = false, cohab_weighted = false;
   std::map<int, LagTable> scheduled_lags;
   std::vector<double> union_warm, father_warm, cohab_warm;
+  // Models with ancestry endogamy reuse their last weights for up to
+  // `typed_interval` years (D199), recalibrating sooner when a type with
+  // drawable men appears or a model schedule switches.
+  struct HeldWeights {
+    double time = R_NegInf;
+    int types = -1;
+    std::vector<double> log_weights;
+  };
+  HeldWeights union_held, father_held, cohab_held;
+  double typed_interval = 0;
   std::map<SEXP, std::vector<double>> deltas;  // target log shifts by model
   double weighted_infeasible = 0;
 
@@ -876,6 +886,9 @@ void Simulation::read_groups(Nullable<List> group_input, int persons) {
       group_count, as<std::vector<int>>(layout["offsets"]),
       as<std::vector<int>>(layout["sizes"]), as<int>(layout["units"])
     );
+    if (layout.containsElementNamed("interval")) {
+      typed_interval = as<double>(layout["interval"]);
+    }
   }
   matching_dim.assign(dimensions, 0);
   for (int d : matching_spec.dims) {
@@ -1602,6 +1615,7 @@ bool Simulation::update_models(double now) {
     union_warm.clear();
     father_warm.clear();
     cohab_warm.clear();
+    union_held = father_held = cohab_held = HeldWeights();
     if (calibrator) {
       calibrator->set_table(union_table_id, get_scheduled_lag(general_id));
       calibrator->set_table(father_table_id, get_scheduled_lag(father_id));
@@ -1812,7 +1826,31 @@ int Simulation::find_candidate(
   std::vector<double> log_weights(types.count(), 0.0);
   const bool weighted =
     cohab_role ? cohab_weighted : (father ? father_weighted : union_weighted);
-  if (calibrator && weighted) {
+  HeldWeights& held =
+    cohab_role ? cohab_held : (father ? father_held : union_held);
+  bool hold = calibrator && weighted && draw.ancestry.active() &&
+              typed_interval > 0 && held.types >= 0 &&
+              now - held.time < typed_interval;
+  // Types registered since the weights were found hold zero log weights
+  // while none of their men can be drawn (all younger than the cutoff).
+  if (hold && held.types < types.count()) {
+    const int last = pool.last_bin(now, min_male_age);
+    for (int t = held.types; hold && t < types.count(); ++t) {
+      for (int k = 0; k <= last; ++k) {
+        if (!pool.members(t, k).empty()) {
+          hold = false;
+          break;
+        }
+      }
+    }
+    if (hold) {
+      held.log_weights.resize(types.count(), 0.0);
+      held.types = types.count();
+    }
+  }
+  if (hold) {
+    log_weights = held.log_weights;
+  } else if (calibrator && weighted) {
     if (probability_tracker) {
       probability_tracker->advance(now);
     }
@@ -1881,6 +1919,11 @@ int Simulation::find_candidate(
       ++weighted_infeasible;
     }
     log_weights = weights.log_weights;
+    if (draw.ancestry.active()) {
+      held.time = now;
+      held.types = types.count();
+      held.log_weights = log_weights;
+    }
   }
   return draw_partner(
     pool, draw, types, people[woman].type, people[woman].born, now,

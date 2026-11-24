@@ -3740,8 +3740,7 @@ policy.
 ## D199 — Ancestry endogamy in matching (November 24, 2026)
 
 **Status:** User decisions, November 24, 2026, for the
-`ancestry-share-matching` branch. Implemented except the
-conjugate-gradient solver. The number
+`ancestry-share-matching` branch. Implemented. The number
 follows D198 on the unmerged external-migration branch; renumber at merge
 if needed.
 
@@ -3779,7 +3778,13 @@ ethnicity at birth.
 
 **Solver and diagnostics:** Models with an ancestry term use Newton
 steps found by conjugate gradients; models without one keep the dense
-Newton solve unchanged. The `.log_weight_<group>` union diagnostics are
+Newton solve unchanged. Models with the term hold their weights for 1/12
+year between calibrations (sooner when a type with drawable men appears or
+a schedule switches), which supersedes D066's recalculation at each search
+for those models only; the interval is fixed and not a user argument
+(user decision, November 24, 2026, after per-search calibration took 609 s
+against 3.5 s for an 80-year 1880 run).
+The `.log_weight_<group>` union diagnostics are
 removed (supersedes the recording part of D070); a helper that builds
 wife-side conditional-logit data with weight offsets may follow as a
 separate feature. The user confirmed the argument name
