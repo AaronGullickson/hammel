@@ -517,6 +517,29 @@ pop_end |>
 ```
 
 
+```{r}
+
+pal_generations <- c(
+  "1"   = "tomato",
+  "1.5" = "maroon",
+  "2"   = "navy",
+  "2.5" = "deepskyblue",
+  "3+"  = "goldenrod"
+)
+
+pop_end |>
+  calculate_population_size(times = 1880:1960, by = "generation") |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  ggplot(aes(x = time + 0.5, y = prop, fill = generation))+
+  geom_area() +
+  scale_fill_manual(values = pal_generations)
+
+
+```
+
+
+
 
 
 
