@@ -97,10 +97,7 @@ model_template <- hammel_model() |>
   set_population(
     generate_uniform_population(
       20000,
-      end_time = 1780,
-      groups = list(
-        race = c(White = 1, Black = 0)
-      )
+      end_time = 1780
     )
   )
 
@@ -118,7 +115,8 @@ stream_irish <- immigration_stream(
   usa_historical_migration |> filter(stream == "irish") |> select(-stream),
   template = pop_template,
   assignment = list(
-    generation = migrant_assignment("custom", fun = generation_assign)
+    generation = migrant_assignment("custom", fun = generation_assign),
+    race = migrant_assignment("fixed", fixed_value = "White")
   )
 )
 
@@ -126,7 +124,8 @@ stream_nw_europe <- immigration_stream(
   usa_historical_migration |> filter(stream == "nw_europe") |> select(-stream),
   template = pop_template,
   assignment = list(
-    generation = migrant_assignment("custom", fun = generation_assign)
+    generation = migrant_assignment("custom", fun = generation_assign),
+    race = migrant_assignment("fixed", fixed_value = "White")
   )
 )
 
@@ -134,7 +133,8 @@ stream_south_europe <- immigration_stream(
   usa_historical_migration |> filter(stream == "south_europe") |> select(-stream),
   template = pop_template,
   assignment = list(
-    generation = migrant_assignment("custom", fun = generation_assign)
+    generation = migrant_assignment("custom", fun = generation_assign),
+    race = migrant_assignment("fixed", fixed_value = "White")
   )
 )
 
@@ -142,7 +142,17 @@ stream_east_europe <- immigration_stream(
   usa_historical_migration |> filter(stream == "east_europe") |> select(-stream),
   template = pop_template,
   assignment = list(
-    generation = migrant_assignment("custom", fun = generation_assign)
+    generation = migrant_assignment("custom", fun = generation_assign),
+    race = migrant_assignment("fixed", fixed_value = "White")
+  )
+)
+
+stream_other <- immigration_stream(
+  usa_historical_migration |> filter(stream == "other") |> select(-stream),
+  template = pop_template,
+  assignment = list(
+    generation = migrant_assignment("custom", fun = generation_assign),
+    race = migrant_assignment("fixed", fixed_value = "Other")
   )
 )
 ```
@@ -163,7 +173,7 @@ model <- hammel_model() |>
     matching = age_gap_matching_model(
       3, 5,
       group_exogamy = list(
-        race = c("White:Black" = -10)
+        race = c("White:Black" = -7, "White:Other" = -4, "Black:Other" = -7)
       )
     )
   ) |>
@@ -172,25 +182,25 @@ model <- hammel_model() |>
     nw_europe = stream_nw_europe,
     east_europe = stream_east_europe,
     south_europe = stream_south_europe,
+    other = stream_other,
     birthplace_ancestry = TRUE
   ) |>
   set_population(pop_usa1880)
 
 pop_end <- run_simulation(model, 79.5, 42)
-
+summary(pop_end)
 
 ```
 
 ```{r}
 
 pop_end |> calculate_immigration_rates(time_breaks = 1881:1960, streams = TRUE, conf_level = 0.95) |>
-  filter(birthplace != "other") |>
   ggplot(aes(x = time_start, y = rate_immigration, color = birthplace)) +
   geom_ribbon(aes(ymin = conf_low, ymax = conf_high, fill = birthplace), color = NA, alpha = 0.2) +
   geom_point() +
   geom_line(
     data = usa_historical_migration |> 
-      filter(time_start >= 1881 & time_start <= 1960, stream != "other"),
+      filter(time_start >= 1881 & time_start <= 1960),
     aes(y = rate, color = stream),
     linetype = 2
   )
@@ -200,11 +210,17 @@ pop_end |> calculate_immigration_rates(time_breaks = 1881:1960, streams = TRUE, 
 ```{r}
 
 diversity <- pop_end$ancestry$birthplace |>
-  mutate(
-    diversity = 1 - (native^2 + irish^2 + nw_europe^2 + east_europe^2 + south_europe^2)
+  select(-unknown) |>
+  pivot_longer(cols = -person_id) |>
+  mutate(diversity = value^2, entropy = value * log(1/ value, 6)) |>
+  group_by(person_id) |>
+  summarize(
+    diversity = 1 - sum(diversity),
+    entropy = sum(entropy, na.rm = TRUE),
+    .groups = "drop"
   ) |>
   left_join(pop_end$persons |> select(person_id, birth_time, race)) |>
-  select(person_id, race, birth_time, diversity)
+  select(person_id, race, birth_time, diversity, entropy)
 
 # diversity |>
 #   filter(birth_time >= 1880) |>
@@ -217,10 +233,10 @@ diversity |>
   filter(birth_time >= 1800) |>
   mutate(year = floor(birth_time)) |>
   group_by(year, race) |>
-  summarize(mean = mean(diversity), .groups = "drop") |>
+  summarize(mean = mean(entropy), .groups = "drop") |>
   ggplot(aes(x = year, y = mean, color = race))+
-  geom_line()
-
+  geom_line()+
+  labs(y = "mean entropy")
 ```
 
 

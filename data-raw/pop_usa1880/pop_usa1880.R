@@ -105,7 +105,8 @@ pop <- pop |>
     death_time = NA_real_,
     race = case_when(
       RACE == 1 ~ "White",
-      RACE == 2 | RACE == 3 ~ "Black"
+      RACE == 2 | RACE == 3 ~ "Black",
+      TRUE ~ "Other"
     ),
     birthplace = code_bpl(BPL),
     birthplace_mom = code_bpl(MBPL),
@@ -207,6 +208,16 @@ while(nrow(pending) > 0) {
   pending <- pop |>
     filter(!(person_id %in% ancestry$person_id))
 }
+
+# To maintain consistency with how this connects to immigration streams
+# any other ancestry means you will get re-assigned to the Other racial
+# category (unless they are classified as Black)
+
+other_ids <- ancestry |>
+  filter(other > 0) |>
+  pull(person_id)
+
+pop$race[pop$person_id %in% other_ids & pop$race != "Black"] <- "Other"
 
 # Determine arrival time for non-natives --------------------------------------
 
@@ -348,8 +359,8 @@ pop_usa1880 <- list(persons = pop, unions = unions, end_time = 1880.5)
 # assign groups
 pop_usa1880$groups <- list(
   race = hammel::group(
-    categories = c("White", "Black"),
-    inheritance = group_inheritance("hierarchy", order = c("Black", "White"))
+    categories = c("White", "Black", "Other"),
+    inheritance = group_inheritance("hierarchy", order = c("Black", "Other", "White"))
   ),
   generation = hammel::group(
     categories = c("1", "1.5", "2", "2.5", "3+"),
@@ -370,3 +381,4 @@ pop_usa1880 <- do.call(hammel::hammel_population, pop_usa1880)
 summary(pop_usa1880)
 
 save(pop_usa1880, file = here("data", "pop_usa1880.rda"))
+

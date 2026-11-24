@@ -201,9 +201,9 @@
 #'
 #' A starting population for demonstrating Hammel simulations with family
 #' links, immigrant arrivals, and group inheritance. The preparation script
-#' draws 10,000 households from the IPUMS USA 1880 1% sample, then retains
-#' eligible people coded as White or Black, as well as information on 
-#' region of origin for immigrants and immigrant generation.
+#' draws 10,000 households from the IPUMS USA 1880 1% sample, retaining
+#' information on world region of origin for immigrants and immigrant
+#' generation.
 #'
 #' @md
 #' @format A [hammel_population()] with 46,812 people, 7,868 unions, and a
@@ -240,6 +240,11 @@
 #' people, `"2"`, `"2.5"`, and `"3+"` distinguish foreign-born, mixed,
 #' and U.S.-born parental origins, respectively. When only one parent's
 #' birthplace is known, that parent's nativity determines generation.
+#'
+#' The only non-White and non-Black race reported on the 1880 Census was
+#' Chinese, which is recorded as "Other" race. To be consistent with the
+#' birthplace distinction used in the dataset, any respondent with ancestry
+#' from a non-European location was given "Other" as a racial classification.
 #'
 #' @section Data use:
 #' The included subsample is intended only for demonstration. Please cite
