@@ -314,6 +314,37 @@ mortality_1875_1960 |>
   ggplot(aes(x = (time_start + time_end) /2, y = ex, color = sex))+
   geom_point()+
   geom_line()
+
+
+# lets get black/white mortality ratios for 1900 from Haines
+mortality_race_ratios <- mortality_haines |>
+  filter(
+    method == "preston_haines_west",
+    year == 1900,
+    population %in% c("black", "white")
+  ) |>
+  mutate(age_start = if_else(age_start >= 1 & age_start < 5, 1, age_start)) |>
+  group_by(sex, age_start, population) |>
+  summarize(rate = sum(dx) / sum(nLx), .groups = "drop") |>
+  pivot_wider(names_from = population, values_from = rate) |>
+  mutate(log_ratio = log(black / white))
+
+# build a custom weight functions to use these ratios
+race_log_ratios <- stats::xtabs(
+  log_ratio ~ age_start + sex,
+  data = mortality_race_ratios
+)
+
+mortality_weights <- weight_model(
+  fun = function(members, bin) {
+    race_log_ratio <- race_log_ratios[
+      as.character(bin$age_start), members$sex
+    ]
+
+    (members$race == "Black") * race_log_ratio +
+      log(1.05) * (members$birthplace %in% foreign_birthplaces)
+  }
+)
 ```
 
 
@@ -381,20 +412,7 @@ stream_other <- immigration_stream(
 
 model <- hammel_model() |>
   set_fertility(fertility_1880_1960) |>
-  set_mortality(
-    mortality_1875_1960,
-    weights = weight_model(
-      ~ race + birthplace,
-      c(
-        raceBlack = log(1.30),
-        raceOther = 0,
-        stats::setNames(
-          rep(log(1.05), length(foreign_birthplaces)),
-          paste0("birthplace", foreign_birthplaces)
-        )
-      )
-    )
-  ) |>
+  set_mortality(mortality_1875_1960, weights = mortality_weights) |>
   set_union_formation(
     "on_demand",
     matching = age_gap_matching_model(
@@ -432,6 +450,25 @@ pop_end |> calculate_immigration_rates(time_breaks = 1881:1960, streams = TRUE, 
     linetype = 2
   )
 ```
+
+```{r}
+
+calculate_mortality_rates(
+  pop_end, 
+  seq(1880, 1960, 10),
+  c(0, 1, seq(5, 80, 5)), 
+  by = "race"
+) |>
+  calculate_life_expectancy() |>
+  print(n = 100)
+
+
+|>
+  ggplot(aes(x = (time_start + time_end) / 2, y = ex, color = race))+
+  geom_line()+
+  facet_wrap(~sex)
+```
+
 
 
 ```{r}
