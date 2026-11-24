@@ -14,6 +14,7 @@ execute:
 library(hammel)
 library(dplyr)
 library(tidyr)
+library(stringr)
 library(ggplot2)
 ```
 
@@ -104,6 +105,144 @@ model_template <- hammel_model() |>
 pop_template <- run_simulation(model_template, 100, 42)
 summary(pop_template)
 ```
+
+```{r}
+fertility_rates <- get_fertility_hfd("USA", 1933:1960)
+
+# we can't use canned HFD values because we need something
+# that matches Haines 15-49 five year age groups
+read_usa_hfd <- function(item) {
+  HMDHFDplus::readHFDweb(
+    CNTRY = "USA",
+    item = item,
+    username = Sys.getenv("HFD_USERNAME"),
+    password = Sys.getenv("HFD_PASSWORD"),
+    fixup = FALSE
+  )
+}
+
+births <- read_usa_hfd("birthsRR") |>
+  as_tibble() |>
+  rename(year = Year, age = Age, births = Total) |>
+  mutate(age = as.numeric(str_remove(age, "\\+|\\-")))
+exposure <- read_usa_hfd("exposRR") |>
+  as_tibble() |>
+  rename(year = Year, age = Age, exposure = Exposure)
+
+fertility <- full_join(births, exposure)
+
+fertility_rates <- fertility |>
+  filter(year <= 1960, !is.na(age) & age >= 15 & age < 50) |>
+  mutate(
+    time_start = year,
+    time_end = time_start + 1,
+    age_start = 5 * floor(age / 5),
+    age_end = age_start + 5
+  ) |>
+  group_by(time_start, time_end, age_start, age_end) |>
+  summarize(rate = sum(births) / sum(exposure), .groups = "drop")
+
+fertility_rates |>
+  calculate_tfr()
+
+# stratify, allowing for slightly higher black fetility rates throughout
+birthplaces <- pop_usa1880$groups$birthplace$categories
+fertility_1933_1960 <- fertility_rates |>
+  stratify_rates(
+    by = list(
+      race = c(White = 1, Black = 1.10, Other = 1),
+      birthplace = stats::setNames(rep(1, length(birthplaces)), birthplaces)
+    )
+  )
+
+fertility_1933_1960 |> calculate_tfr()
+
+# use Haines 1989
+
+haines_asfr <- tribble(
+  ~race,   ~native,   ~time_start, ~time_end, ~age_start, ~age_end, ~rate,
+  "White", "native",  1900,        1910,      15,         20,       0.04867,
+  "White", "native",  1900,        1910,      20,         25,       0.16196,
+  "White", "native",  1900,        1910,      25,         30,       0.18367,
+  "White", "native",  1900,        1910,      30,         35,       0.14471,
+  "White", "native",  1900,        1910,      35,         40,       0.10149,
+  "White", "native",  1900,        1910,      40,         45,       0.02409,
+  "White", "native",  1900,        1910,      45,         50,       0.00383,
+  "White", "foreign", 1900,        1910,      15,         20,       0.05856,
+  "White", "foreign", 1900,        1910,      20,         25,       0.18794,
+  "White", "foreign", 1900,        1910,      25,         30,       0.22502,
+  "White", "foreign", 1900,        1910,      30,         35,       0.20548,
+  "White", "foreign", 1900,        1910,      35,         40,       0.16368,
+  "White", "foreign", 1900,        1910,      40,         45,       0.05500,
+  "White", "foreign", 1900,        1910,      45,         50,       0.00802,
+  "Black", "native",  1900,        1910,      15,         20,       0.09994,
+  "Black", "native",  1900,        1910,      20,         25,       0.25308,
+  "Black", "native",  1900,        1910,      25,         30,       0.19358,
+  "Black", "native",  1900,        1910,      30,         35,       0.15269,
+  "Black", "native",  1900,        1910,      35,         40,       0.18413,
+  "Black", "native",  1900,        1910,      40,         45,       0.06766,
+  "Black", "native",  1900,        1910,      45,         50,       0.01837,
+)
+
+# expand to all immigrant streams. Assume Other racial group look likes 
+# white case
+foreign_birthplaces <- setdiff(
+  pop_usa1880$groups$birthplace$categories,
+  "native"
+)
+
+fertility_1900_1910 <- haines_asfr |>
+  bind_rows(
+    haines_asfr |>
+      filter(race == "White") |>
+      mutate(race = "Other"),
+    haines_asfr |>
+      filter(race == "Black", native == "native") |>
+      mutate(native = "foreign")
+  ) |>
+  mutate(
+    birthplace = lapply(native, function(nativity) {
+      if (nativity == "native") "native" else foreign_birthplaces
+    })
+  ) |>
+  unnest_longer(birthplace) |>
+  select(race, birthplace, time_start, time_end, age_start, age_end, rate) |>
+  arrange(race, birthplace, time_start, age_start)
+
+# linear interpolation between those points
+keys <- c("race", "birthplace", "age_start", "age_end")
+
+start_rates <- fertility_1900_1910 |>
+  select(dplyr::all_of(keys), rate_1910 = rate)
+
+end_rates <- fertility_1933_1960 |>
+  filter(time_start == 1933) |>
+  select(all_of(keys), rate_1933 = rate)
+
+fertility_1910_1933 <- start_rates |>
+  inner_join(
+    end_rates,
+    by = keys,
+    relationship = "one-to-one",
+    unmatched = "error"
+  ) |>
+  cross_join(tibble(time_start = 1910:1932)) |>
+  mutate(
+    time_end = time_start + 1,
+    rate = rate_1910 +
+      (time_start - 1910) / (1933 - 1910) * (rate_1933 - rate_1910)
+  ) |>
+  select(-rate_1910, -rate_1933)
+
+fertility_1900_1960 <- bind_rows(
+  fertility_1900_1910,
+  fertility_1910_1933,
+  fertility_1933_1960
+)
+```
+
+
+
 
 ```{r}
 
@@ -238,6 +377,20 @@ diversity |>
   geom_line()+
   labs(y = "mean entropy")
 ```
+
+```{r}
+
+pop_end |>
+  calculate_population_size(times = 1880:1960, by = "birthplace") |>
+  group_by(time) |>
+  mutate(prop = population / sum(population)) |>
+  filter(birthplace == "native") |>
+  mutate(prop_foreign = 1 - prop) |>
+  ggplot(aes(x = time, y = prop_foreign))+
+  geom_line()
+
+```
+
 
 
 
