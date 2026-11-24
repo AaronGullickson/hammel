@@ -15,6 +15,7 @@ library(hammel)
 library(dplyr)
 library(tidyr)
 library(stringr)
+library(readr)
 library(ggplot2)
 ```
 
@@ -239,6 +240,80 @@ fertility_1900_1960 <- bind_rows(
   fertility_1910_1933,
   fertility_1933_1960
 )
+
+# for 1880 to 1900 use the 4.24 to 3.56 TFR change from 1880 to 1900
+# from Haines and Hecker (2002) for white population to benchmark the change
+fertility_1880_1900 <- fertility_1900_1910 |>
+  select(-time_start, -time_end) |>
+  cross_join(tibble::tibble(time_start = 1880:1899)) |>
+  mutate(
+    time_end = time_start + 1,
+    rate = rate * (1 + (4.24 / 3.56 - 1) * (1900 - time_start) / 20)
+  )
+
+fertility_1880_1960 <- bind_rows(
+  fertility_1880_1900,
+  fertility_1900_1910,
+  fertility_1910_1933,
+  fertility_1933_1960
+)
+```
+
+```{r}
+
+mortality_hmd <- get_mortality_hmd("USA", 1933:1960, shape = "5x1", open_age = 80)
+
+
+mortality_haines <- read_csv(
+  here::here("data-raw", "haines_life_tables_1880_1900.csv")
+)
+
+mortality_1875_1905 <- mortality_haines |>
+  filter(method == "us_brass", population == "total") |>
+  # need to collapse 1-5 group
+  mutate(
+    age_start = if_else(age_start >= 1 & age_start < 5, 1, age_start),
+    age_end = if_else(age_end >= 2 & age_end < 5, 5, age_end),
+    time_start = year - 5,
+    time_end = year + 5,
+  ) |>
+  # pool to get rate
+  group_by(time_start, time_end, sex, age_start, age_end) |>
+  summarize(rate = sum(dx) / sum(nLx), .groups = "drop")
+
+# Carry the last Haines rates to the 1905 boundary, then interpolate to 1933.
+mortality_keys <- c("sex", "age_start", "age_end")
+
+mortality_1905_1933 <- mortality_1875_1905 |>
+  filter(time_end == 1905) |>
+  select(all_of(mortality_keys), rate_1905 = rate) |>
+  inner_join(
+    mortality_hmd |>
+      filter(time_start == 1933) |>
+      select(all_of(mortality_keys), rate_1933 = rate),
+    by = mortality_keys,
+    relationship = "one-to-one",
+    unmatched = "error"
+  ) |>
+  cross_join(tibble(time_start = 1905:1932)) |>
+  mutate(
+    time_end = time_start + 1,
+    rate = rate_1905 +
+      (time_start - 1905) / (1933 - 1905) * (rate_1933 - rate_1905)
+  ) |>
+  select(-rate_1905, -rate_1933)
+
+mortality_1875_1960 <- bind_rows(
+  mortality_1875_1905,
+  mortality_1905_1933,
+  mortality_hmd
+)
+
+mortality_1875_1960 |>
+  calculate_life_expectancy() |>
+  ggplot(aes(x = (time_start + time_end) /2, y = ex, color = sex))+
+  geom_point()+
+  geom_line()
 ```
 
 
@@ -305,8 +380,21 @@ stream_other <- immigration_stream(
 # TODO: add religion as a group and give it exogamy terms
 
 model <- hammel_model() |>
-  set_fertility(usa_2000_fertility) |>
-  set_mortality(usa_2000_mortality) |>
+  set_fertility(fertility_1880_1960) |>
+  set_mortality(
+    mortality_1875_1960,
+    weights = weight_model(
+      ~ race + birthplace,
+      c(
+        raceBlack = log(1.30),
+        raceOther = 0,
+        stats::setNames(
+          rep(log(1.05), length(foreign_birthplaces)),
+          paste0("birthplace", foreign_birthplaces)
+        )
+      )
+    )
+  ) |>
   set_union_formation(
     "on_demand",
     matching = age_gap_matching_model(
