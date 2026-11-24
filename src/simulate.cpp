@@ -49,6 +49,7 @@ struct Person {
   double id, born, died, mother, father, last_birth;
   bool female;
   int group;
+  int type = 0;  // matching type: group and ancestry profile (D199)
 };
 
 // Event processes, in their same-time priority order.
@@ -246,8 +247,11 @@ bool has_cohab_fertility(DataFrame rates) {
 
 // Whether group weights can change a model's choices. When a model prevents
 // all exogamy, every woman sees only her own group's men.
+// Strict endogamy leaves weights no effect, unless ancestry endogamy splits a
+// woman's allowed men into several types (D199).
 bool applies_weights(const List& model) {
-  return !as<bool>(model["prevent_exogamy_all"]);
+  return !as<bool>(model["prevent_exogamy_all"]) ||
+         read_ancestry_term(model).active();
 }
 
 // An Exp(1) cumulative-hazard threshold from R's RNG, which shares the seed
@@ -527,7 +531,13 @@ class Simulation {
   std::vector<double> previous_union_end;
   double next_union_id = 0;
 
-  // Exact partner draws (D072): living, unpartnered men by group and bin.
+  // Matching types (D199) and each person's ancestry profile.
+  MatchingTypes types;
+  std::vector<int> profile;
+  void set_group(int person, int group);
+  void grow_types();
+
+  // Exact partner draws (D072): living, unpartnered men by type and bin.
   MalePool pool;
   DrawModel union_draw, father_draw_storage, cohab_draw_storage;
   const DrawModel* union_draw_current = &union_draw;
@@ -858,6 +868,15 @@ void Simulation::read_groups(Nullable<List> group_input, int persons) {
   }
   matching_spec = read_spec("matching");
   group_count = matching_spec.count;
+  // Ancestry endogamy (D199): components of the named dimensions and units.
+  types = MatchingTypes(group_count);
+  if (groups.size() && groups.containsElementNamed("ancestry_matching")) {
+    const List layout = groups["ancestry_matching"];
+    types = MatchingTypes(
+      group_count, as<std::vector<int>>(layout["offsets"]),
+      as<std::vector<int>>(layout["sizes"]), as<int>(layout["units"])
+    );
+  }
   matching_dim.assign(dimensions, 0);
   for (int d : matching_spec.dims) {
     matching_dim[d] = 1;
@@ -934,10 +953,17 @@ Simulation::read_people(DataFrame persons, NumericMatrix initial_ancestry) {
       ++parity[m];
     }
   }
-  pool = MalePool(min_birth, end, group_count, kWeightBinWidth);
+  profile.assign(people.size(), 0);
+  for (int i = 0; i < static_cast<int>(people.size()); ++i) {
+    profile[i] = types.profile_of(
+      ancestry.data() + static_cast<size_t>(i) * ancestry_components
+    );
+    people[i].type = types.type(people[i].group, profile[i]);
+  }
+  pool = MalePool(min_birth, end, types.count(), kWeightBinWidth);
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
     if (!people[i].female && NumericVector::is_na(people[i].died)) {
-      pool.add(i, people[i].group, people[i].born);
+      pool.add(i, people[i].type, people[i].born);
     }
   }
   return index;
@@ -1005,12 +1031,12 @@ void Simulation::setup_calibration() {
       any_weighted = any_weighted || applies_weights(as<List>(model));
     }
   }
-  if (!any_weighted || group_count <= 1) {
+  if (!any_weighted || (group_count <= 1 && !types.active())) {
     return;
   }
-  calibrator.reset(new WeightCalibrator(
-    min_birth, end, group_count, kWeightBinWidth, min_male_age
-  ));
+  calibrator.reset(
+    new WeightCalibrator(min_birth, end, &types, kWeightBinWidth, min_male_age)
+  );
   if (scheduled_models) {
     union_table_id = calibrator->add_table(get_scheduled_lag(general_id));
     father_table_id = calibrator->add_table(get_scheduled_lag(father_id));
@@ -1053,7 +1079,7 @@ void Simulation::setup_calibration() {
   }
   for (int man = 0; man < static_cast<int>(people.size()); ++man) {
     if (pool.contains(man)) {
-      calibrator->add_man(people[man].group, people[man].born, 1);
+      calibrator->add_man(people[man].type, people[man].born, 1);
     }
   }
   for (int woman = 0; woman < static_cast<int>(people.size()); ++woman) {
@@ -1477,7 +1503,7 @@ void Simulation::load_processes(double now) {
         }
         search_calibration.update(
           woman, cell,
-          calibrator->bin_index(people[woman].group, people[woman].born), w
+          calibrator->bin_index(people[woman].type, people[woman].born), w
         );
       });
     } else if (search_weights_spec) {
@@ -1682,7 +1708,7 @@ void Simulation::remove_male(int man) {
   }
   pool.remove(man);
   if (calibrator) {
-    calibrator->add_man(people[man].group, people[man].born, -1);
+    calibrator->add_man(people[man].type, people[man].born, -1);
   }
 }
 
@@ -1691,9 +1717,9 @@ void Simulation::add_male(int man) {
       current_partner[man] >= 0 || pool.contains(man)) {
     return;
   }
-  pool.add(man, people[man].group, people[man].born);
+  pool.add(man, people[man].type, people[man].born);
   if (calibrator) {
-    calibrator->add_man(people[man].group, people[man].born, 1);
+    calibrator->add_man(people[man].type, people[man].born, 1);
   }
 }
 
@@ -1707,7 +1733,7 @@ void Simulation::add_counted_woman(int woman, double now) {
     return;
   }
   counted_woman[woman] = 1;
-  calibrator->add_woman(people[woman].group, people[woman].born, 1);
+  calibrator->add_woman(people[woman].type, people[woman].born, 1);
   if (probability_tracker) {
     probability_tracker->activate(
       woman, people[woman].born, probability_schedule(woman), now
@@ -1723,7 +1749,7 @@ void Simulation::remove_counted_woman(int woman) {
   if (probability_tracker) {
     probability_tracker->remove(woman);
   }
-  calibrator->add_woman(people[woman].group, people[woman].born, -1);
+  calibrator->add_woman(people[woman].type, people[woman].born, -1);
 }
 
 // Draw models and lag tables of scheduled matching models, built on first
@@ -1783,7 +1809,7 @@ int Simulation::find_candidate(
   if (pool.empty()) {
     return -1;
   }
-  std::vector<double> log_weights(group_count, 0.0);
+  std::vector<double> log_weights(types.count(), 0.0);
   const bool weighted =
     cohab_role ? cohab_weighted : (father ? father_weighted : union_weighted);
   if (calibrator && weighted) {
@@ -1797,7 +1823,7 @@ int Simulation::find_candidate(
         std::vector<double> scan(filled.size(), 0.0);
         for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w) {
           if (counted_woman[w]) {
-            scan[calibrator->bin_index(people[w].group, people[w].born)] +=
+            scan[calibrator->bin_index(people[w].type, people[w].born)] +=
               cells->hazard(w);
           }
         }
@@ -1857,8 +1883,9 @@ int Simulation::find_candidate(
     log_weights = weights.log_weights;
   }
   return draw_partner(
-    pool, draw, people[woman].group, people[woman].born, now, min_male_age,
-    log_weights, [this](int person) { return people[person].born; },
+    pool, draw, types, people[woman].type, people[woman].born, now,
+    min_male_age, log_weights,
+    [this](int person) { return people[person].born; },
     [this, woman](int man) {
       return kinship->generations() > 0 && kinship->known_related(woman, man);
     },
@@ -2414,7 +2441,7 @@ FertilityCells::State Simulation::fertility_state(int w) {
   st.stratum = cells->stratum(
     person_stratum(fertility_spec, w), type, parity_specific ? parity[w] : 0
   );
-  st.group = p.group;
+  st.group = p.type;
   st.report = person_stratum(report_spec, w);
   if (st.stratum < 0) {
     stop(
@@ -2507,7 +2534,7 @@ void Simulation::refresh_person(int i, double now) {
           search->set_weight(i, w);
         }
         search_calibration.update(
-          i, cell, calibrator->bin_index(p.group, p.born), w
+          i, cell, calibrator->bin_index(p.type, p.born), w
         );
       }
     }
@@ -2642,7 +2669,7 @@ void Simulation::move_party(
     tx_initiator.push_back(initiator);
     cats[cell] = destination;
     if (matching_dim[tp.dim]) {
-      people[m].group = person_stratum(matching_spec, m);
+      set_group(m, person_stratum(matching_spec, m));
     }
     tp.entry[m] = now;
     if (people[m].female) {
@@ -3083,13 +3110,15 @@ void Simulation::on_birth(int i, double now) {
     cats[static_cast<size_t>(child) * dimensions + d] =
       newborn_category(d, child, i, father_position, female, partner >= 0);
   }
-  const int child_group = person_stratum(matching_spec, child);
-  people[child].group = child_group;
+  profile.push_back(types.profile_of(
+    ancestry.data() + static_cast<size_t>(child) * ancestry_components
+  ));
+  set_group(child, person_stratum(matching_spec, child));
   kinship->append(i, father_position);
   if (!female) {
-    pool.add(child, child_group, now);
+    pool.add(child, people[child].type, now);
     if (calibrator) {
-      calibrator->add_man(child_group, now, 1);
+      calibrator->add_man(people[child].type, now, 1);
     }
   }
   person_unions.emplace_back();
@@ -3109,6 +3138,21 @@ void Simulation::on_birth(int i, double now) {
   // union state, in on-demand mode) has changed.
   refresh_person(child, now);
   refresh_person(i, now);
+}
+
+// A person's matching group and the type it gives with their ancestry
+// profile; new types extend the pool and calibration arrays.
+void Simulation::set_group(int person, int group) {
+  people[person].group = group;
+  people[person].type = types.type(group, profile[person]);
+  grow_types();
+}
+
+void Simulation::grow_types() {
+  pool.grow(types.count());
+  if (calibrator) {
+    calibrator->grow();
+  }
 }
 
 // A newborn's ancestry is the average of the parents'. A missing father

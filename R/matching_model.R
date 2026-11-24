@@ -930,6 +930,7 @@ calculate_matching_probabilities <- function(
 prepare_matching_model <- function(
   matching,
   population_groups = NULL,
+  ancestry = NULL,
   call = rlang::caller_env()
 ) {
   validate_matching_groups(matching, population_groups, call = call)
@@ -989,6 +990,7 @@ prepare_matching_model <- function(
     group_formula = group_formula,
     needs_groups = group_formula || nrow(pairs) > 0,
     pair_offsets = offsets,
+    ancestry_lambda = ancestry_lambda(matching, ancestry),
     evaluate = function(
       age_difference, female_group = NULL,
       male_group = NULL

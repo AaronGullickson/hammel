@@ -82,10 +82,145 @@ NumericVector matching_utilities(
   return utility;
 }
 
+MatchingTypes::MatchingTypes(
+  int categories,
+  std::vector<int> offsets,
+  std::vector<int> sizes,
+  int units
+)
+    : categories_(categories),
+      units_(units),
+      offsets_(std::move(offsets)),
+      sizes_(std::move(sizes)) {
+  if (categories < 1 || offsets_.size() != sizes_.size() || units < 0 ||
+      (units > 0) != !offsets_.empty()) {
+    stop("Invalid matching types.");
+  }
+  // Without ancestry endogamy, category c is type c with the empty profile.
+  if (!active()) {
+    profiles_.emplace_back();
+    profile_ids_[profiles_.back()] = 0;
+    for (int c = 0; c < categories; ++c) {
+      type(c, 0);
+    }
+  }
+}
+
+int MatchingTypes::profile_of(const double* shares) {
+  if (!active()) {
+    return 0;
+  }
+  std::vector<int> key;
+  for (size_t d = 0; d < offsets_.size(); ++d) {
+    const std::vector<int> part =
+      round_profile(shares + offsets_[d], sizes_[d], units_);
+    key.insert(key.end(), part.begin(), part.end());
+  }
+  const auto found = profile_ids_.find(key);
+  if (found != profile_ids_.end()) {
+    return found->second;
+  }
+  const int id = static_cast<int>(profiles_.size());
+  profile_ids_[key] = id;
+  profiles_.push_back(std::move(key));
+  return id;
+}
+
+int MatchingTypes::type(int category, int profile) {
+  if (category < 0 || category >= categories_ || profile < 0 ||
+      profile >= static_cast<int>(profiles_.size())) {
+    stop("Invalid matching type.");
+  }
+  const auto key = std::make_pair(category, profile);
+  const auto found = type_ids_.find(key);
+  if (found != type_ids_.end()) {
+    return found->second;
+  }
+  const int id = count();
+  type_ids_[key] = id;
+  category_.push_back(category);
+  profile_.push_back(profile);
+  return id;
+}
+
+std::vector<int> round_profile(const double* shares, int size, int units) {
+  std::vector<int> out(size);
+  std::vector<double> remainder(size);
+  int left = units;
+  for (int j = 0; j < size; ++j) {
+    const double scaled = shares[j] * units;
+    // A small tolerance keeps shares on the grid (0.375 at 1/8) whole.
+    out[j] = static_cast<int>(std::floor(scaled + 1e-9));
+    remainder[j] = scaled - out[j];
+    left -= out[j];
+  }
+  // Remainders within 1e-9 of each other tie; the earlier component wins.
+  std::vector<char> used(size, 0);
+  for (; left > 0; --left) {
+    int best = -1;
+    for (int j = 0; j < size; ++j) {
+      if (!used[j] && (best < 0 || remainder[j] > remainder[best] + 1e-9)) {
+        best = j;
+      }
+    }
+    if (best < 0) {
+      stop("Ancestry shares must sum to one.");
+    }
+    used[best] = 1;
+    ++out[best];
+  }
+  if (left < 0) {
+    stop("Ancestry shares must sum to one.");
+  }
+  return out;
+}
+
+double
+AncestryTerm::value(const MatchingTypes& types, int female, int male) const {
+  if (lambda.empty()) {
+    return 0;
+  }
+  const std::vector<int>& a = types.profile_units(female);
+  const std::vector<int>& b = types.profile_units(male);
+  double sum = 0;
+  for (size_t k = 0; k < lambda.size(); ++k) {
+    sum += lambda[k] * std::abs(a[k] - b[k]);
+  }
+  return -sum / types.units();
+}
+
+double
+AncestryTerm::factor(const MatchingTypes& types, int female, int male) const {
+  if (lambda.empty()) {
+    return 1;
+  }
+  if (female >= static_cast<int>(cache.size())) {
+    cache.resize(female + 1);
+  }
+  std::vector<double>& row = cache[female];
+  if (male >= static_cast<int>(row.size())) {
+    row.resize(male + 1, R_NaN);
+  }
+  if (std::isnan(row[male])) {
+    row[male] = std::exp(value(types, female, male));
+  }
+  return row[male];
+}
+
+AncestryTerm read_ancestry_term(const List& model) {
+  AncestryTerm term;
+  if (model.containsElementNamed("ancestry_lambda")) {
+    const NumericVector lambda = model["ancestry_lambda"];
+    term.lambda.assign(lambda.begin(), lambda.end());
+  }
+  return term;
+}
+
 LagTable
 build_lag_table(const List& model, int groups, int bins, double width) {
   LagTable table;
   table.groups = groups;
+  table.ancestry = read_ancestry_term(model);
   table.span = 2 * bins - 1;
   const size_t n = static_cast<size_t>(groups) * groups * table.span;
   NumericVector gaps(n);
@@ -153,6 +288,7 @@ build_lag_table(const List& model, int groups, int bins, double width) {
 DrawModel make_draw_model(const List& model, int groups, double gap_range) {
   DrawModel draw;
   draw.model = model;
+  draw.ancestry = read_ancestry_term(model);
   draw.groups = groups;
   draw.offsets = as<NumericMatrix>(model["pair_offsets"]);
   draw.blocked = as<LogicalMatrix>(model["blocked_pairs"]);
@@ -192,7 +328,8 @@ DrawModel make_draw_model(const List& model, int groups, double gap_range) {
 int draw_partner(
   const MalePool& pool,
   const DrawModel& draw,
-  int female_group,
+  const MatchingTypes& types,
+  int female_type,
   double female_born,
   double now,
   double cutoff,
@@ -205,6 +342,12 @@ int draw_partner(
   if (pool.empty()) {
     return -1;
   }
+  const int female_group = types.category(female_type);
+  const int female_profile = types.profile(female_type);
+  // The ancestry term is constant within a cell, so bounds stay exact.
+  auto ancestry = [&](int type) {
+    return draw.ancestry.value(types, female_profile, types.profile(type));
+  };
   const int last = pool.last_bin(now, cutoff);
   const double w = pool.width();
   ws.group.clear();
@@ -213,19 +356,23 @@ int draw_partner(
   ws.cumulative.clear();
   double peak = R_NegInf;
   for (int g = 0; g < pool.groups(); ++g) {
-    if (!draw.allowed(female_group, g)) {
+    const int male_group = types.category(g);
+    if (!draw.allowed(female_group, male_group)) {
       continue;
     }
+    const double term = ancestry(g);
     for (int k = 0; k <= last; ++k) {
       const std::vector<int>& members = pool.members(g, k);
       if (members.empty()) {
         continue;
       }
       const double oldest_birth = static_cast<double>(pool.first() + k) * w;
-      const double top = draw.bound(
-        female_group, g, female_born - oldest_birth - w,
-        female_born - oldest_birth
-      );
+      const double top =
+        draw.bound(
+          female_group, male_group, female_born - oldest_birth - w,
+          female_born - oldest_birth
+        ) +
+        term;
       const double value =
         log_weights[g] + top + std::log(static_cast<double>(members.size()));
       ws.group.push_back(g);
@@ -254,8 +401,12 @@ int draw_partner(
     );
     const std::vector<int>& members = pool.members(ws.group[c], ws.bin[c]);
     const int man = members[uniform_index(R::runif(0, 1), members.size())];
+    const int type = ws.group[c];
     const double utility =
-      draw.utility(female_group, ws.group[c], female_born - born_of(man));
+      draw.utility(
+        female_group, types.category(type), female_born - born_of(man)
+      ) +
+      ancestry(type);
     const double ratio = std::exp(utility - ws.top[c]);
     if (ratio > 1 + 1e-9) {
       approximate += 1;  // custom-formula bound was too low
@@ -273,7 +424,8 @@ int draw_partner(
   std::vector<int> candidates;
   std::vector<double> scores;
   for (int g = 0; g < pool.groups(); ++g) {
-    if (!draw.allowed(female_group, g)) {
+    const int male_group = types.category(g);
+    if (!draw.allowed(female_group, male_group)) {
       continue;
     }
     std::vector<int> men;
@@ -291,10 +443,12 @@ int draw_partner(
     for (size_t j = 0; j < men.size(); ++j) {
       gaps[j] = female_born - born_of(men[j]);
     }
-    const NumericVector utility = draw.utilities(female_group, g, gaps);
+    const NumericVector utility =
+      draw.utilities(female_group, male_group, gaps);
+    const double term = ancestry(g);
     for (size_t j = 0; j < men.size(); ++j) {
       candidates.push_back(men[j]);
-      scores.push_back(log_weights[g] + utility[j]);
+      scores.push_back(log_weights[g] + utility[j] + term);
     }
   }
   if (candidates.empty()) {
@@ -341,7 +495,9 @@ NumericVector inspect_group_matching_cpp(
 }
 
 // Internal entry point: exact draws from a frozen pool, with the exact
-// full-pool conditional-logit probabilities for comparison.
+// full-pool conditional-logit probabilities for comparison. With an ancestry
+// layout, rows of `male_shares` and `female_shares` give ancestry shares and
+// `log_weights` are by category (shared by a category's types).
 // [[Rcpp::export]]
 List inspect_exact_draw_cpp(
   NumericVector male_born,
@@ -354,12 +510,29 @@ List inspect_exact_draw_cpp(
   int groups,
   double now,
   double cutoff,
-  int draws
+  int draws,
+  Nullable<List> ancestry_layout = R_NilValue,
+  Nullable<NumericMatrix> male_shares = R_NilValue,
+  Nullable<NumericVector> female_shares = R_NilValue
 ) {
   if (male_group.size() != male_born.size() ||
       male_excluded.size() != male_born.size() ||
       log_weights.size() != groups || draws < 0) {
     stop("Invalid exact-draw inputs.");
+  }
+  MatchingTypes types = inspect_types(groups, ancestry_layout);
+  std::vector<int> male_type(male_born.size());
+  int female_type = female_group;
+  if (types.active()) {
+    const NumericMatrix shares(male_shares.get());
+    const NumericVector own(female_shares.get());
+    for (R_xlen_t i = 0; i < male_born.size(); ++i) {
+      const NumericVector row = shares(i, _);
+      male_type[i] = types.type(male_group[i], types.profile_of(row.begin()));
+    }
+    female_type = types.type(female_group, types.profile_of(own.begin()));
+  } else {
+    std::copy(male_group.begin(), male_group.end(), male_type.begin());
   }
   double lo = std::min(female_born, now), hi = now;
   for (double born : male_born) {
@@ -367,11 +540,15 @@ List inspect_exact_draw_cpp(
     hi = std::max(hi, born);
   }
   MalePool pool(lo, hi, groups, kWeightBinWidth);
+  pool.grow(types.count());
   for (R_xlen_t i = 0; i < male_born.size(); ++i) {
-    pool.add(i, male_group[i], male_born[i]);
+    pool.add(i, male_type[i], male_born[i]);
   }
   const DrawModel draw = make_draw_model(matching, groups, hi - lo);
-  const std::vector<double> weights(log_weights.begin(), log_weights.end());
+  std::vector<double> weights(types.count());
+  for (int t = 0; t < types.count(); ++t) {
+    weights[t] = log_weights[types.category(t)];
+  }
   auto born_of = [&](int man) { return male_born[man]; };
   auto excluded = [&](int man) {
     return static_cast<bool>(male_excluded[man]);
@@ -385,8 +562,8 @@ List inspect_exact_draw_cpp(
       checkUserInterrupt();
     }
     const int man = draw_partner(
-      pool, draw, female_group, female_born, now, cutoff, weights, born_of,
-      excluded, ws, approximate
+      pool, draw, types, female_type, female_born, now, cutoff, weights,
+      born_of, excluded, ws, approximate
     );
     if (man < 0) {
       ++failures;
@@ -402,8 +579,11 @@ List inspect_exact_draw_cpp(
         !draw.allowed(female_group, g)) {
       continue;
     }
-    score[i] =
-      weights[g] + draw.utility(female_group, g, female_born - male_born[i]);
+    score[i] = weights[male_type[i]] +
+               draw.utility(female_group, g, female_born - male_born[i]) +
+               draw.ancestry.value(
+                 types, types.profile(female_type), types.profile(male_type[i])
+               );
     best = std::max(best, score[i]);
   }
   NumericVector probability(male_born.size());
@@ -423,4 +603,19 @@ List inspect_exact_draw_cpp(
     _["counts"] = counts, _["probability"] = probability,
     _["failures"] = failures, _["approximate"] = approximate
   );
+}
+
+// Internal entry point: each row's shares rounded to whole units (D199).
+// [[Rcpp::export]]
+IntegerMatrix inspect_round_profile_cpp(NumericMatrix shares, int units) {
+  IntegerMatrix out(shares.nrow(), shares.ncol());
+  for (int i = 0; i < shares.nrow(); ++i) {
+    const NumericVector row = shares(i, _);
+    const std::vector<int> rounded =
+      round_profile(row.begin(), shares.ncol(), units);
+    for (int j = 0; j < shares.ncol(); ++j) {
+      out(i, j) = rounded[j];
+    }
+  }
+  return out;
 }

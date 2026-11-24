@@ -150,11 +150,10 @@ effects in both the formula and pair table intentionally add together.
 
 ## Ancestry endogamy
 
-*Specified (D199, November 24, 2026); being implemented in stages.* The
-user selected the interface, argument names, rounding and calibration
-described here. The arguments and their checks are implemented; the engine
-does not apply the term yet, so `run_simulation()` refuses models that use
-it.
+*Implemented (D199, November 24, 2026), except the faster weight solver.*
+The user selected the interface, argument names, rounding and calibration
+described here. Weights are currently solved with the dense Newton method,
+which is slow with many types; the conjugate-gradient solver is pending.
 Calibration by ancestry type is specified in
 [weighted-choice matching](weighted-choice-matching.md#ancestry-types).
 
@@ -210,8 +209,10 @@ predictors do not include ancestry. Identical profiles contribute zero.
 Hard group restrictions still apply; ancestry never prohibits a pair.
 Father and cohabitation models follow the existing rules: NULL
 `father_matching` inherits the term and an explicit model has its own.
-Each entry of a matching-model schedule (D123) carries its own term and
-resolution.
+Each entry of a matching-model schedule (D123) carries its own term.
+All models in a run share one pool of matching types, so every model with
+the term must name the same dimensions with the same resolution; their
+weights may differ. Models without the term may join such a run.
 
 ### Rounded profiles
 

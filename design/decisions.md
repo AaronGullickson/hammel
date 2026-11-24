@@ -3740,7 +3740,8 @@ policy.
 ## D199 — Ancestry endogamy in matching (November 24, 2026)
 
 **Status:** User decisions, November 24, 2026, for the
-`ancestry-share-matching` branch. Specified, not implemented. The number
+`ancestry-share-matching` branch. Implemented except the
+conjugate-gradient solver. The number
 follows D198 on the unmerged external-migration branch; renumber at merge
 if needed.
 
@@ -3759,6 +3760,9 @@ specified in [group matching](group-matching.md#ancestry-endogamy) and
   rounded jointly by largest remainder, ties broken by category order.
 - Calibrated weights are per male type: matching category combined with
   rounded profile. Targets mirror women of the same type.
+- Models in a run share one pool of types, so every model with the term
+  must name the same dimensions with the same resolution; weights may
+  differ (user decision, November 24, 2026).
 
 **Rationale:** Raw shares vary within age-by-category cells, so neither
 calibration nor the exact draw bounds can use them at reasonable cost.

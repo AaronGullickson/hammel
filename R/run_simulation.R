@@ -383,21 +383,10 @@ run_simulation <- function(
     population, lapply(transition_list, `[[`, "rates")
   )
   # Ancestry endogamy (D199) is checked against the tracked dimensions before
-  # the models are translated. TODO(D199 stage 2): remove this guard when the
-  # engine applies the term.
-  uses_ancestry <- check_matching_ancestry(
+  # the models are translated.
+  ancestry_spec <- check_matching_ancestry(
     union_process, declaration, population, registries
   )
-  if (uses_ancestry) {
-    abort_hammel(
-      c(
-        "Ancestry endogamy isn't available in simulations yet.",
-        "i" = "Remove {.arg ancestry_endogamy} from the matching models."
-      ),
-      "specification",
-      argument = "ancestry_endogamy"
-    )
-  }
   resolved <- resolve_matching_models(union_process, declaration, registries)
   union_process <- resolved$process
   match_dims <- if (length(resolved$dims)) {
@@ -422,6 +411,9 @@ run_simulation <- function(
   )
   sizes <- vapply(components, length, integer(1))
   offsets <- cumsum(c(0L, utils::head(sizes, -1)))
+  ancestry_layout <- matching_ancestry_layout(
+    ancestry_spec, dimensions, components, offsets
+  )
   for (d in dimensions) {
     if (!d %in% tracked &&
           any(
@@ -470,7 +462,8 @@ run_simulation <- function(
   model_context <- if (scheduled_models) {
     prepare_model_schedules(
       model_arguments, group_values, unname(inheritance_arguments),
-      registries, components, start, start + years
+      registries, components, start, start + years,
+      ancestry = ancestry_layout
     )
   } else {
     NULL
@@ -573,6 +566,11 @@ run_simulation <- function(
         dissolution = dissolution$spec
       )
     )
+  }
+  if (!is.null(ancestry_layout)) {
+    group_input$ancestry_matching <- ancestry_layout[
+      c("offsets", "sizes", "units")
+    ]
   }
   # Each transition process: strata over its own dimension (the origin) and
   # any other dimensions its table uses; destinations; and each person's
@@ -742,21 +740,30 @@ run_simulation <- function(
     matching <- if (scheduled_models) {
       model_context$matching
     } else {
-      prepare_matching_model(union_process$matching, group_values)
+      prepare_matching_model(
+        union_process$matching, group_values,
+        ancestry = ancestry_layout
+      )
     }
     father_matching <- if (scheduled_models) {
       model_context$father_matching
     } else if (is.null(union_process$father_matching)) {
       matching
     } else {
-      prepare_matching_model(union_process$father_matching, group_values)
+      prepare_matching_model(
+        union_process$father_matching, group_values,
+        ancestry = ancestry_layout
+      )
     }
     cohab_matching <- if (scheduled_models) {
       model_context$cohab_matching
     } else if (is.null(union_process$cohab_matching)) {
       matching
     } else {
-      prepare_matching_model(union_process$cohab_matching, group_values)
+      prepare_matching_model(
+        union_process$cohab_matching, group_values,
+        ancestry = ancestry_layout
+      )
     }
     native <- call_native(
       simulate_cpp(

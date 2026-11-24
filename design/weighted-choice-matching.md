@@ -263,8 +263,9 @@ number of searches that used approximate weights.
 
 ## Ancestry types
 
-*Specified, not implemented (D199, November 24, 2026).* This extends
-calibration to the ancestry term of
+*Implemented with the dense Newton solve (D199, November 24, 2026); the
+conjugate-gradient solver is pending.* This extends calibration to the
+ancestry term of
 [group matching](group-matching.md#ancestry-endogamy).
 
 ### Types replace groups

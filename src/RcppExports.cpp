@@ -151,8 +151,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // inspect_exact_draw_cpp
-List inspect_exact_draw_cpp(NumericVector male_born, IntegerVector male_group, LogicalVector male_excluded, double female_born, int female_group, NumericVector log_weights, List matching, int groups, double now, double cutoff, int draws);
-RcppExport SEXP _hammel_inspect_exact_draw_cpp(SEXP male_bornSEXP, SEXP male_groupSEXP, SEXP male_excludedSEXP, SEXP female_bornSEXP, SEXP female_groupSEXP, SEXP log_weightsSEXP, SEXP matchingSEXP, SEXP groupsSEXP, SEXP nowSEXP, SEXP cutoffSEXP, SEXP drawsSEXP) {
+List inspect_exact_draw_cpp(NumericVector male_born, IntegerVector male_group, LogicalVector male_excluded, double female_born, int female_group, NumericVector log_weights, List matching, int groups, double now, double cutoff, int draws, Nullable<List> ancestry_layout, Nullable<NumericMatrix> male_shares, Nullable<NumericVector> female_shares);
+RcppExport SEXP _hammel_inspect_exact_draw_cpp(SEXP male_bornSEXP, SEXP male_groupSEXP, SEXP male_excludedSEXP, SEXP female_bornSEXP, SEXP female_groupSEXP, SEXP log_weightsSEXP, SEXP matchingSEXP, SEXP groupsSEXP, SEXP nowSEXP, SEXP cutoffSEXP, SEXP drawsSEXP, SEXP ancestry_layoutSEXP, SEXP male_sharesSEXP, SEXP female_sharesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -167,7 +167,22 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type now(nowSEXP);
     Rcpp::traits::input_parameter< double >::type cutoff(cutoffSEXP);
     Rcpp::traits::input_parameter< int >::type draws(drawsSEXP);
-    rcpp_result_gen = Rcpp::wrap(inspect_exact_draw_cpp(male_born, male_group, male_excluded, female_born, female_group, log_weights, matching, groups, now, cutoff, draws));
+    Rcpp::traits::input_parameter< Nullable<List> >::type ancestry_layout(ancestry_layoutSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericMatrix> >::type male_shares(male_sharesSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type female_shares(female_sharesSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_exact_draw_cpp(male_born, male_group, male_excluded, female_born, female_group, log_weights, matching, groups, now, cutoff, draws, ancestry_layout, male_shares, female_shares));
+    return rcpp_result_gen;
+END_RCPP
+}
+// inspect_round_profile_cpp
+IntegerMatrix inspect_round_profile_cpp(NumericMatrix shares, int units);
+RcppExport SEXP _hammel_inspect_round_profile_cpp(SEXP sharesSEXP, SEXP unitsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type shares(sharesSEXP);
+    Rcpp::traits::input_parameter< int >::type units(unitsSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_round_profile_cpp(shares, units));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -245,8 +260,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // inspect_weighted_calibration_cpp
-List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector female_groups, LogicalVector female_fertile, NumericVector male_born, IntegerVector male_groups, DataFrame rates, List matching, int group_count, double now, double cutoff, double width, bool fertility, Nullable<IntegerVector> female_previous, Nullable<NumericVector> female_previous_ends);
-RcppExport SEXP _hammel_inspect_weighted_calibration_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP female_fertileSEXP, SEXP male_bornSEXP, SEXP male_groupsSEXP, SEXP ratesSEXP, SEXP matchingSEXP, SEXP group_countSEXP, SEXP nowSEXP, SEXP cutoffSEXP, SEXP widthSEXP, SEXP fertilitySEXP, SEXP female_previousSEXP, SEXP female_previous_endsSEXP) {
+List inspect_weighted_calibration_cpp(NumericVector female_born, IntegerVector female_groups, LogicalVector female_fertile, NumericVector male_born, IntegerVector male_groups, DataFrame rates, List matching, int group_count, double now, double cutoff, double width, bool fertility, Nullable<IntegerVector> female_previous, Nullable<NumericVector> female_previous_ends, Nullable<List> ancestry_layout, Nullable<NumericMatrix> female_shares, Nullable<NumericMatrix> male_shares);
+RcppExport SEXP _hammel_inspect_weighted_calibration_cpp(SEXP female_bornSEXP, SEXP female_groupsSEXP, SEXP female_fertileSEXP, SEXP male_bornSEXP, SEXP male_groupsSEXP, SEXP ratesSEXP, SEXP matchingSEXP, SEXP group_countSEXP, SEXP nowSEXP, SEXP cutoffSEXP, SEXP widthSEXP, SEXP fertilitySEXP, SEXP female_previousSEXP, SEXP female_previous_endsSEXP, SEXP ancestry_layoutSEXP, SEXP female_sharesSEXP, SEXP male_sharesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -264,7 +279,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< bool >::type fertility(fertilitySEXP);
     Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type female_previous(female_previousSEXP);
     Rcpp::traits::input_parameter< Nullable<NumericVector> >::type female_previous_ends(female_previous_endsSEXP);
-    rcpp_result_gen = Rcpp::wrap(inspect_weighted_calibration_cpp(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous, female_previous_ends));
+    Rcpp::traits::input_parameter< Nullable<List> >::type ancestry_layout(ancestry_layoutSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericMatrix> >::type female_shares(female_sharesSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericMatrix> >::type male_shares(male_sharesSEXP);
+    rcpp_result_gen = Rcpp::wrap(inspect_weighted_calibration_cpp(female_born, female_groups, female_fertile, male_born, male_groups, rates, matching, group_count, now, cutoff, width, fertility, female_previous, female_previous_ends, ancestry_layout, female_shares, male_shares));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -301,11 +319,12 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_count_kin_cpp", (DL_FUNC) &_hammel_count_kin_cpp, 6},
     {"_hammel_inspect_matching_cpp", (DL_FUNC) &_hammel_inspect_matching_cpp, 2},
     {"_hammel_inspect_group_matching_cpp", (DL_FUNC) &_hammel_inspect_group_matching_cpp, 4},
-    {"_hammel_inspect_exact_draw_cpp", (DL_FUNC) &_hammel_inspect_exact_draw_cpp, 11},
+    {"_hammel_inspect_exact_draw_cpp", (DL_FUNC) &_hammel_inspect_exact_draw_cpp, 14},
+    {"_hammel_inspect_round_profile_cpp", (DL_FUNC) &_hammel_inspect_round_profile_cpp, 2},
     {"_hammel_person_lexis_cpp", (DL_FUNC) &_hammel_person_lexis_cpp, 8},
     {"_hammel_person_snapshot_cpp", (DL_FUNC) &_hammel_person_snapshot_cpp, 6},
     {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 29},
-    {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 14},
+    {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 17},
     {"_hammel_inspect_weighted_incremental_cpp", (DL_FUNC) &_hammel_inspect_weighted_incremental_cpp, 11},
     {NULL, NULL, 0}
 };
