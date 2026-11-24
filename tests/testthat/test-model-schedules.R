@@ -246,7 +246,6 @@ test_that("weighted calibration switches from hard within-group matching and bac
     m$population$persons$sex <- rep(c("f", "m"), each = 200)
     m$population$persons$group <- rep(c("A", "B"), 200)
     m$population$groups <- list(group = group())
-    m$processes$union_formation$diagnostics <- TRUE
     m$processes$union_formation$matching <- model_calendar(before, after, 1e-6)
     reference <- m
     reference$processes$union_formation$matching <- after

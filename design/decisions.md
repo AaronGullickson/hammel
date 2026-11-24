@@ -3736,3 +3736,52 @@ check classes, fields and the named function, with snapshot tests for
 message layout.
 Native changes are limited to message tags and follow D175's verification
 policy.
+
+## D199 — Ancestry endogamy in matching (November 24, 2026)
+
+**Status:** User decisions, November 24, 2026, for the
+`ancestry-share-matching` branch. Specified, not implemented. The number
+follows D198 on the unmerged external-migration branch; renumber at merge
+if needed.
+
+**Decision:** Matching models can favor partners with similar ancestry,
+specified in [group matching](group-matching.md#ancestry-endogamy) and
+[weighted-choice matching](weighted-choice-matching.md#ancestry-types):
+
+- `ancestry_endogamy` on `matching_model()` and `age_gap_matching_model()`
+  takes a named vector of weights per ancestry category (list form keyed by
+  dimension). It adds `-sum(lambda[k] * |q_i[k] - q_j[k]|)` to pair utility
+  after the formula. `unknown` may be named.
+- The term is additive. It has no interactions with age or formula terms,
+  and there is no ancestry formula for now.
+- Matching uses profiles rounded to a resolution set on the matching model,
+  default 1/8, in both calibration and draws. All shares of a dimension are
+  rounded jointly by largest remainder, ties broken by category order.
+- Calibrated weights are per male type: matching category combined with
+  rounded profile. Targets mirror women of the same type.
+
+**Rationale:** Raw shares vary within age-by-category cells, so neither
+calibration nor the exact draw bounds can use them at reasonable cost.
+Rounding everywhere keeps calibration and draws exact for the stated model;
+scoring exact shares with rounded calibration would meet targets only
+approximately. Additivity keeps the age table separate from a small
+profile table. Typed weights are the purpose of the work: avoiding
+sex-unbalanced intermarriage by ancestry under symmetric preferences.
+
+**Unselected:** Raw shares as formula predictors (the earlier scope);
+representative profiles for calibration with exact scoring; a general
+ancestry formula or R function; category-only weights; assigning discrete
+ethnicity at birth.
+
+**Solver and diagnostics:** Models with an ancestry term use Newton
+steps found by conjugate gradients; models without one keep the dense
+Newton solve unchanged. The `.log_weight_<group>` union diagnostics are
+removed (supersedes the recording part of D070); a helper that builds
+wife-side conditional-logit data with weight offsets may follow as a
+separate feature. The user confirmed the argument name
+`ancestry_resolution`.
+
+**Consequences:** Differences in ancestry smaller than the resolution do
+not affect matching. Calibration no longer reduces to unit weights or
+skips strict endogamy when a model has an ancestry term. Seeded histories
+of models without the term are unchanged.

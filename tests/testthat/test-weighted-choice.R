@@ -240,13 +240,6 @@ test_that("grouped weighted choice runs in both modes, restarts, and is reproduc
     expect_equal(restart$end_time, first$end_time + 5)
     expect_identical(restart$persons[seq_len(nrow(first$persons)), c("person_id", "birth_time")],
                      first$persons[c("person_id", "birth_time")])
-    # Diagnostics consume no random draws and do not change histories.
-    diagnosed <- run_simulation(weighted_model(population, initiation,
-                                         matching = matching, diagnostics = TRUE), 20, seed = 905)
-    expect_identical(diagnosed$persons, first$persons)
-    expect_identical(diagnosed$unions[names(first$unions)], first$unions)
-    expect_true(all(c(".log_weight_A", ".log_weight_B") %in% names(diagnosed$unions)))
-    expect_false(any(c(".n_eligible", ".utility_rank") %in% names(diagnosed$unions)))
   }
   # Rate mode: unpartnered births select fathers through their own calibration.
   father <- age_gap_matching_model(3, 4, group_exogamy = c("A:B" = -1), delta = c(B = -.3))
@@ -327,20 +320,20 @@ test_that("male-group formula terms warn about absorbed utilities", {
   expect_silent(matching_model(~ same_group, c(same_group = 1)))
 })
 
-test_that("strict endogamy has zero group log weights even with delta adjustments", {
+test_that("strict endogamy uses unit weights even with delta adjustments", {
   population <- weighted_population(600, c(A = 3, B = 1))
   matching <- age_gap_matching_model(0, 5, group_exogamy = NA)
   for (initiation in c("on_demand", "rate")) {
-    baseline <- run_simulation(weighted_model(population, initiation, matching =
-      matching,
-                                        diagnostics = TRUE), 15, seed = 912)
+    baseline <- run_simulation(
+      weighted_model(population, initiation, matching = matching), 15,
+      seed = 912
+    )
     adjusted <- matching
     adjusted$delta <- c(B = 2)
     expect_no_warning(result <- run_simulation(weighted_model(population,
       initiation,
-      matching = adjusted, diagnostics = TRUE), 15, seed = 912))
+      matching = adjusted), 15, seed = 912))
     expect_identical(result, baseline)
-    expect_true(all(as.matrix(result$unions[c(".log_weight_A", ".log_weight_B")]) == 0))
     unions <- augment_unions(result)
     expect_true(all(unions$group_w == unions$group_h))
   }
@@ -365,44 +358,18 @@ test_that("weighted choice handles identities created during the run", {
     set_mortality(data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.01)) |>
     set_fertility(data.frame(age_start = 15, age_end = 45, rate = 0.15)) |> set_inheritance(rule, extra = "AB") |>
     set_union_formation("on_demand",
-      matching = age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -1, "A:AB" = -0.5, "B:AB" = -0.5)),
-      diagnostics = TRUE)
+      matching = age_gap_matching_model(
+        0, 5,
+        group_exogamy = c("A:B" = -1, "A:AB" = -0.5, "B:AB" = -0.5)
+      )
+    )
   expect_no_warning(result <- run_simulation(model, 40, seed = 913))
   expect_identical(result, run_simulation(model, 40, seed = 913))
   expect_true(any(result$persons$group == "AB"))
   unions <- augment_unions(result)
   expect_true(any(unions$group_w == "AB" | unions$group_h == "AB"))
-  expect_true(all(c(".log_weight_A", ".log_weight_B", ".log_weight_AB") %in% names(result$unions)))
   restart <- run_simulation(set_population(model, result), 5, seed = 914)
   expect_equal(restart$end_time, result$end_time + 5)
-})
-
-test_that("diagnostics record the group log weights applied at each union", {
-  population <- weighted_population(600, c(A = 3, B = 1))
-  matching <- age_gap_matching_model(0, 5, group_exogamy = c("A:B" = -2))
-  model <- weighted_model(population, matching = matching, diagnostics = TRUE)
-  first <- run_simulation(model, 10, seed = 915)
-  columns <- c(".log_weight_A", ".log_weight_B")
-  expect_true(all(columns %in% names(first$unions)))
-  weights <- as.matrix(first$unions[columns])
-  expect_true(nrow(weights) > 0 && all(is.finite(weights)))
-  # One group is the reference (log weight 0); only differences between groups matter.
-  expect_true(any(weights[, 1] != weights[, 2]))
-  expect_true(all(apply(weights, 1, function(w) any(w == 0))))
-  # Diagnostics add columns without changing histories.
-  plain <- run_simulation(weighted_model(population, matching = matching), 10,
-    seed = 915)
-  expect_identical(first$persons, plain$persons)
-  expect_identical(first$unions[names(plain$unions)], plain$unions)
-  # Restarts keep earlier rows and fill only new unions.
-  second <- run_simulation(set_population(model, first), 5, seed = 916)
-  expect_identical(second$unions[seq_len(nrow(first$unions)), columns], first$unions[columns])
-  expect_true(all(is.finite(as.matrix(second$unions[-seq_len(nrow(first$unions)), columns]))))
-  # Zero-duration runs retain diagnostic columns; no groups means no columns.
-  expect_true(all(columns %in% names(run_simulation(model, 0)$unions)))
-  ungrouped <- run_simulation(weighted_model(weighted_population(300),
-                                       diagnostics = TRUE), 5, seed = 917)
-  expect_false(any(grepl("^\\.log_weight_", names(ungrouped$unions))))
 })
 
 test_that("unmet targets hidden by near-zero weights are reported as approximate", {

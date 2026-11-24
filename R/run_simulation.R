@@ -752,7 +752,6 @@ run_simulation <- function(
         union_process$initiation == "rate",
         union_rates, father_matching,
         union_process$cancel_birth_if_no_match,
-        union_process$diagnostics,
         ancestry_matrix(population, tracked),
         inheritance, ffab, dissolution_rates, cohab$prob,
         cohab$conversion,
@@ -864,25 +863,6 @@ run_simulation <- function(
         "simulation",
         draws = draws
       )
-    }
-  }
-  if (union_process$diagnostics) {
-    # Weighted choice records the log group weights applied at each union's
-    # search (0 = unit weight), one column per group; earlier unions are NA.
-    if (!is.null(group_values)) {
-      added <- if (years > 0) {
-        native$diagnostic_log_weights
-      } else {
-        matrix(numeric(), 0, length(group_values))
-      }
-      new_rows <- seq_len(nrow(added)) + nrow(population$unions)
-      for (g in seq_along(group_values)) {
-        column <- paste0(".log_weight_", as.character(group_values)[g])
-        if (!column %in% names(result$unions)) {
-          result$unions[[column]] <- rep(NA_real_, nrow(result$unions))
-        }
-        result$unions[[column]][new_rows] <- added[, g]
-      }
     }
   }
   result$end_time <- start + years

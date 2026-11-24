@@ -23,7 +23,7 @@ supported.}
 specified, simulation will use current RNG.}
 
 \item{progress}{Show a console progress bar based on elapsed simulation
-years. Defaults to \verb{TRUE`` in interactive environments and }FALSE`` in
+years. Defaults to \code{TRUE} in interactive environments and \code{FALSE} in
 non-interactive environments. Users can set the \code{hammel.progress} option
 to control its use.}
 }

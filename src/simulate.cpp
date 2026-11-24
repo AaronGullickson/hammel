@@ -300,7 +300,6 @@ class Simulation {
     DataFrame union_rates,
     List father_matching,
     bool cancel_birth_if_no_match,
-    bool diagnostics,
     NumericMatrix initial_ancestry,
     List inheritance,
     double ffab,
@@ -371,7 +370,6 @@ class Simulation {
     const List& choice_model,
     const DrawModel& draw,
     bool father,
-    std::vector<double>* applied,
     bool cohab_role = false
   );
   int form_union(int woman, double now);
@@ -479,8 +477,7 @@ class Simulation {
     all_conversion, all_probability;
   List matching, father_matching, cohab_matching;
   double start, years, end, birth_interval, min_male_age, ffab;
-  bool rate_initiation, cancel_birth_if_no_match, diagnostics, counts_cohab,
-    check_cells;
+  bool rate_initiation, cancel_birth_if_no_match, counts_cohab, check_cells;
   std::set<double> calendar_boundaries;
 
   // Calendar schedules of matching and inheritance models (D123).
@@ -529,8 +526,6 @@ class Simulation {
   std::vector<int> previous_union, legal_previous;
   std::vector<double> previous_union_end;
   double next_union_id = 0;
-  // Log group weights applied at each union-forming search (empty = unit).
-  std::vector<std::vector<double>> diagnostic_log_weights;
 
   // Exact partner draws (D072): living, unpartnered men by group and bin.
   MalePool pool;
@@ -630,7 +625,6 @@ Simulation::Simulation(
   DataFrame union_rates,
   List father_matching,
   bool cancel_birth_if_no_match,
-  bool diagnostics,
   NumericMatrix initial_ancestry,
   List inheritance,
   double ffab,
@@ -664,7 +658,6 @@ Simulation::Simulation(
       ffab(ffab),
       rate_initiation(rate_initiation),
       cancel_birth_if_no_match(cancel_birth_if_no_match),
-      diagnostics(diagnostics),
       counts_cohab(counts_cohab),
       check_cells(check_cells) {
   // R performs input validation and seed handling.
@@ -1785,7 +1778,6 @@ int Simulation::find_candidate(
   const List& choice_model,
   const DrawModel& draw,
   bool father,
-  std::vector<double>* applied,
   bool cohab_role
 ) {
   if (pool.empty()) {
@@ -1864,9 +1856,6 @@ int Simulation::find_candidate(
     }
     log_weights = weights.log_weights;
   }
-  if (applied) {
-    *applied = log_weights;
-  }
   return draw_partner(
     pool, draw, people[woman].group, people[woman].born, now, min_male_age,
     log_weights, [this](int person) { return people[person].born; },
@@ -1884,13 +1873,11 @@ int Simulation::form_union(int woman, double now) {
   if (partner >= 0) {
     return partner;
   }
-  std::vector<double> applied;
   const double p = cohab_probability(woman, now);
   const bool is_cohab = cohab_enabled && R::runif(0, 1) < p;
   partner = find_candidate(
     woman, now, is_cohab ? cohab_matching : matching,
-    is_cohab ? *cohab_draw : *union_draw_current, false,
-    diagnostics ? &applied : nullptr, is_cohab
+    is_cohab ? *cohab_draw : *union_draw_current, false, is_cohab
   );
   if (partner < 0) {
     return partner;
@@ -1899,9 +1886,6 @@ int Simulation::form_union(int woman, double now) {
   const int u = static_cast<int>(union_history.size());
   union_history.push_back({++next_union_id, now, NA_REAL, woman, partner});
   union_history.back().cohab = is_cohab;
-  if (diagnostics) {
-    diagnostic_log_weights.push_back(applied);
-  }
   person_unions[woman].push_back(u);
   person_unions[partner].push_back(u);
   current_partner[woman] = partner;
@@ -3020,9 +3004,6 @@ void Simulation::on_conversion(int i, int unit, double now) {
   union_history.back().converted_from = prior_id;
   person_unions[i].push_back(next);
   person_unions[partner].push_back(next);
-  if (diagnostics) {
-    diagnostic_log_weights.emplace_back(group_count, NA_REAL);
-  }
   ++conversion_count;
   refresh_union(unit, now);  // the cohabitation closes; the marriage enters
   refresh_person(i, now);
@@ -3052,7 +3033,7 @@ void Simulation::on_birth(int i, double now) {
   int father_position = partner;
   if (partner < 0 && rate_initiation) {
     father_position =
-      find_candidate(i, now, father_matching, *father_draw, true, nullptr);
+      find_candidate(i, now, father_matching, *father_draw, true);
   }
   if (father_position < 0 && cancel_birth_if_no_match) {
     // No child was born: retain last_birth; her union state may have changed.
@@ -3350,17 +3331,6 @@ List Simulation::results() {
           _["end_time"] = out_end, _["end_reason"] = out_reason
         );
 
-  // Rows are new unions in order; columns are group indices. Unions formed
-  // without weights (unit weights) record zeros.
-  NumericMatrix log_weights(
-    static_cast<int>(diagnostic_log_weights.size()), group_count
-  );
-  for (size_t u = 0; u < diagnostic_log_weights.size(); ++u) {
-    for (int g = 0; g < group_count; ++g) {
-      log_weights(u, g) =
-        diagnostic_log_weights[u].empty() ? 0 : diagnostic_log_weights[u][g];
-    }
-  }
   return List::create(
     _["persons"] = DataFrame::create(
       _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
@@ -3380,8 +3350,7 @@ List Simulation::results() {
     _["weighted_infeasible"] = weighted_infeasible,
     _["draw_approximate"] = draw_approximate, _["unrealized"] = unrealized,
     _["cells_consistent"] = cells_consistent,
-    _["hetfert"] = wrap(fertility_weights),
-    _["diagnostic_log_weights"] = log_weights
+    _["hetfert"] = wrap(fertility_weights)
   );
 }
 
@@ -3407,7 +3376,6 @@ List simulate_cpp(
   DataFrame union_rates,
   List father_matching,
   bool cancel_birth_if_no_match,
-  bool diagnostics,
   NumericMatrix initial_ancestry,
   List inheritance,
   double ffab,
@@ -3427,10 +3395,10 @@ List simulate_cpp(
   Simulation simulation(
     persons, mortality_rates, fertility_rates, start, years, birth_interval,
     unions, matching, min_male_age, kinship_generations, rate_initiation,
-    union_rates, father_matching, cancel_birth_if_no_match, diagnostics,
-    initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob,
-    conversion_rates, cohab_matching, counts_cohab, check_cells, hetfert,
-    transition_input, model_schedule_input, weight_input, group_input
+    union_rates, father_matching, cancel_birth_if_no_match, initial_ancestry,
+    inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates,
+    cohab_matching, counts_cohab, check_cells, hetfert, transition_input,
+    model_schedule_input, weight_input, group_input
   );
   return simulation.run(progress);
 }

@@ -5,6 +5,34 @@ unspecified features or a standing pause instruction. The current user request
 controls work. Start with [the documentation index](README.md),
 [scientific contract](scientific-contract.md) and [decisions](decisions.md).
 
+## Ancestry endogamy in matching (November 24, 2026)
+
+The user wants this work in a separate PR on `ancestry-share-matching`,
+branched at `6b12c31`, before the external-migration tip `c775be1`.
+Recheck the branch base when resuming. No engine code has changed.
+
+**Agreed (D199).** The earlier plan to put raw shares in the matching
+formula was replaced. Matching models get `ancestry_endogamy`, a named
+weight vector per ancestry category (list form keyed by dimension;
+`unknown` allowed), adding `-sum(lambda[k] * |q_i[k] - q_j[k]|)` to pair
+utility. The term is additive, with no age interactions and no ancestry
+formula for now. Profiles are rounded jointly by largest remainder at a
+resolution argument on the matching model (default 1/8), used in both
+calibration and draws. Calibrated weights are per male type (category x
+rounded profile), so ancestry intermarriage is balanced by sex under
+symmetric preferences. Father and cohabitation models follow the existing
+inheritance rules. The specification is drafted in
+[group matching](group-matching.md#ancestry-endogamy) and
+[weighted-choice matching](weighted-choice-matching.md#ancestry-types)
+for the user's review.
+
+**Also decided.** Typed models solve weights by Newton with conjugate
+gradients; category-only models keep the dense solve. The
+`.log_weight_<group>` diagnostics are removed; a clogit-data helper may
+follow separately. The name `ancestry_resolution` is confirmed.
+`pop_usa1880` has no supplied birthplace ancestry shares yet; the user
+planned to add them on the external-migration branch.
+
 ## Accepted milestones and active render
 
 Milestones 1–8 are complete by user acceptance: mortality/fertility (D029,

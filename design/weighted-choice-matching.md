@@ -261,6 +261,117 @@ target receives log weight -1000. If no women have positive intensity, all
 weights are 1. As selected by the user, `run_simulation()` warns once, reporting the
 number of searches that used approximate weights.
 
+## Ancestry types
+
+*Specified, not implemented (D199, November 24, 2026).* This extends
+calibration to the ancestry term of
+[group matching](group-matching.md#ancestry-endogamy).
+
+### Types replace groups
+
+For a model with `ancestry_endogamy`, the weighted unit is a man's type:
+his matching category combined with his rounded profile in each dimension
+the model names. Selection becomes
+
+    P(j | i, C) = b[t(j)] exp(U[i,j]) / sum over k in C of b[t(k)] exp(U[i,k])
+
+and every rule above applies with type in place of group:
+
+- **Targets.** Each type of man gets the per-capita search intensity of
+  unpartnered women of the same type. Types with men but no counted women
+  use the per-capita intensity of their block. `delta` stays keyed by
+  category and applies to every type in that category.
+- **Blocks.** Ancestry terms are finite and never split markets; each type
+  belongs to its category's block (D138).
+- **Shortcuts.** Unit weights apply only when a block has a single
+  occupied type. The strict-endogamy shortcut no longer applies to a model
+  with an ancestry term, since a woman's allowed men can then differ in
+  type.
+- **Absorption.** A term depending only on the man's profile would be
+  absorbed by the weights, as a `male_group` main effect is. The symmetric
+  absolute-difference term is not absorbed.
+- Models without an ancestry term keep category weights.
+
+The purpose is the user's: under symmetric preferences and sex-balanced
+types, ancestry intermarriage should not be unbalanced by sex, just as for
+categorical groups.
+
+### Ancestry-type examples
+
+Static, no ages, equal per-woman intensity, zero delta, women and men with
+the same type shares. Profiles are pure Irish (I), pure Northwestern
+European (N) and half each (H), with `c(irish = 1.5, nw_europe = 1.5)`, so
+I–N pairs score -3 and I–H and N–H pairs -1.5.
+
+- **Two pure profiles, 75/25.** The term equals `group_exogamy` with
+  `"I:N" = -3`, and the expectations match the table below: b_N = 1.683,
+  IN = NI = 0.02038.
+- **Three profiles, shares 0.5 / 0.3 / 0.2.** Weights b = 1, 1.2556,
+  1.2767 give
+
+  | Woman \ man | I | N | H |
+  | --- | ---: | ---: | ---: |
+  | I | .43423 | .01629 | .04948 |
+  | N | .01629 | .24644 | .03728 |
+  | H | .04948 | .03728 | .11324 |
+
+  Female choice (b = 1) gives I men 0.526 and H men 0.182 of unions,
+  against women's 0.5 and 0.2, and IH = 0.0399 against HI = 0.0590.
+
+The table is symmetric, not only balanced in its margins. In this static
+case, with symmetric utilities, no prohibitions and matching sex
+compositions, expected flows are a diagonal scaling of a symmetric
+positive matrix with equal row and column totals. That scaling is unique,
+so the table equals its transpose for any number of types. Ages and
+differing sex compositions break this; directional balance should then be
+assessed as for groups.
+
+### Ancestry-type representation
+
+Because the ancestry term is additive, the pool sum for a female cell and
+male type factors as exp(A[female profile, male profile]) times the
+age/group sum. The age/group sums are maintained per male type with the
+existing incremental updates, so the cost of a man joining or leaving the
+pool does not grow with the number of female profiles. The ancestry factor
+is applied at each search. Draws use male cells of type and birth bin; the
+ancestry term is constant within a cell, so native bounds stay exact.
+Profiles that first appear during a run extend the tables.
+
+### Cost, solver and diagnostics
+
+Exploratory count (November 24, 2026; external-migration branch at
+`c775be1`; stylized 1880–1960 run with four immigration streams, no
+ancestry endogamy, founders pure in their birthplace; scripts not
+archived): unpartnered people aged 15–59 numbered about 19,000 in 1960,
+with 264 occupied birthplace profiles at r = 1/8 (316 at 1/16; 78 at 1/4)
+and 352 race-by-generation-by-profile combinations. Endogamy would reduce
+mixing; supplied founder shares would increase it.
+
+- **Solver.** The dense Newton solve costs about T^3 per iteration, too
+  slow at a few hundred types with one solve per search. Models with an
+  ancestry term solve the same objective, to the same tolerance and
+  warm-started from the previous search, by Newton steps found with
+  conjugate gradients. Hessian-vector products use the Hessian's form, a
+  diagonal minus per-woman rank-one terms, so it is never formed. Models
+  without an ancestry term keep the dense solve unchanged, so their
+  histories are unchanged. The choice is numerical; solutions agree within
+  the tolerance. Expected-flow evaluation, about occupied female cells
+  times T per iteration at every search, also needs benchmarking.
+- **Diagnostics.** The user chose to remove the `.log_weight_<group>`
+  union columns and the `diagnostics` they provide, since one column per
+  type does not scale. A later helper that builds wife-side
+  conditional-logit data, with each alternative's log weight as an offset,
+  is a possible separate feature, not yet specified.
+
+### Ancestry-type validation
+
+Tests should cover the analytical examples above, equivalence with
+category weights when every profile is pure, symmetry of the static table,
+binned calibration against an exact person-level R reference with ancestry
+types, delta by category, blocks, profiles appearing mid-run, restarts and
+reproducibility. A long-form report should compare directional ancestry
+flows with and without the term.
+
 ## Worked examples
 
 Unweighted female choice below is a mathematical comparison, not an API option.
@@ -322,17 +433,13 @@ Consequences:
 
 ## Diagnostics and interpreting estimates
 
-Weights consume no random draws. In a grouped population, `diagnostics = TRUE` records `.log_weight_<group>` on each new union: the log group weights applied
-at the search that formed it (October 23, 2026, D070). One group is the
-reference with log weight 0; only differences between groups matter, and
-searches where calibration cannot affect choice record 0 for every group. Earlier unions and new groups'
-columns for earlier rows are NA. In a wife-side choice set, using the column
-for each alternative's group as an offset gives the exact benchmark, in place
-of approximating the weights with a male-group main effect. Nonmarital father
-selections form no union and are not recorded.
+Weights consume no random draws and are not recorded on unions. The
+`.log_weight_<group>` diagnostics that recorded them (D070) were removed by
+D199; a helper that builds wife-side choice sets with each alternative's
+log weight as an offset may follow as a separate feature.
 
-A conditional logit fitted to reconstructed wife-side choice sets should
-include the recorded log group weights as offsets. A male-group main effect
+A conditional logit fitted to reconstructed wife-side choice sets is exact
+with the applied log weights as offsets. A male-group main effect
 can approximate varying calibration weights but cannot reproduce each search
 exactly. In the static analysis, calibrated weights left the age
 term (-0.0278 against -0.0277) and symmetric group term (-2.87 to -2.91,
@@ -415,9 +522,9 @@ binned calibration against an exact individual-level R reference for native
 and custom formulas in both intensity types, three-group convergence, zero and
 unattainable targets, a male group with no counted women, identities created
 during a run (custom AB inheritance) and restarts with them, strict endogamy
-with unit weights, recorded log weights across restarts, one/no-group
+with unit weights, one/no-group
 unit-weight shortcuts in both initiation modes, reproducibility, restarts, separate father models,
-diagnostics without changed histories, the single warning, and input
+the single warning, and input
 validation, and incremental pool sums against a full rebuild after thousands
 of pool changes and cutoff crossings.
 

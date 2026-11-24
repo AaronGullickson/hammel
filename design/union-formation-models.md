@@ -482,16 +482,6 @@ birth-spacing interval; any spacing from an actual prior birth remains valid.
 A man becoming eligible after several cancellations can therefore be selected
 at the next birth attempt, without an artificial spacing delay.
 
-## Optional union diagnostics
-
-`diagnostics = TRUE` on the union process records, when the general matching
-model uses weighted choice in a grouped population, the log group weights
-applied at each union's search as `.log_weight_<group>` columns (D070). The
-earlier `.n_eligible` and `.utility_rank` columns were removed with candidate
-sampling (D072): without a sample there is no candidate set to count, and a
-rank would need a pass over the whole pool. Diagnostics default off, consume no
-random draws, and do not change matching or event timing.
-
 ## Age-gap matching helper
 
 `age_gap_matching_model(preferred_age_gap, half_weight_distance)` converts
