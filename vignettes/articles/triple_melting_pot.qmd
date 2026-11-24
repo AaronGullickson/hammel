@@ -79,6 +79,150 @@ usa_historical_migration |>
 
 ```
 
+Lets do a real simple test first.
+
+```{r}
+#| label: create-template-pop
+#| message: true
+
+# Use Taiwan
+mortality_taiwan <- get_mortality_hmd("TWN", 1980, shape = "5x1", open_age = 85)
+fertility_taiwan <- get_fertility_hfd("TWN", 1976)
+
+set.seed(42)
+model_template <- hammel_model() |>
+  set_fertility(fertility_taiwan) |>
+  set_mortality(mortality_taiwan) |>
+  set_union_formation("on_demand") |>
+  set_population(
+    generate_uniform_population(
+      20000,
+      end_time = 1780,
+      groups = list(
+        race = c(White = 1, Black = 0)
+      )
+    )
+  )
+
+pop_template <- run_simulation(model_template, 100, 42)
+summary(pop_template)
+```
+
+```{r}
+
+generation_assign <- function(members) {
+  ifelse(members$age < 18, "1.5", "1")
+}
+
+stream_irish <- immigration_stream(
+  usa_historical_migration |> filter(stream == "irish") |> select(-stream),
+  template = pop_template,
+  assignment = list(
+    generation = migrant_assignment("custom", fun = generation_assign)
+  )
+)
+
+stream_nw_europe <- immigration_stream(
+  usa_historical_migration |> filter(stream == "nw_europe") |> select(-stream),
+  template = pop_template,
+  assignment = list(
+    generation = migrant_assignment("custom", fun = generation_assign)
+  )
+)
+
+stream_south_europe <- immigration_stream(
+  usa_historical_migration |> filter(stream == "south_europe") |> select(-stream),
+  template = pop_template,
+  assignment = list(
+    generation = migrant_assignment("custom", fun = generation_assign)
+  )
+)
+
+stream_east_europe <- immigration_stream(
+  usa_historical_migration |> filter(stream == "east_europe") |> select(-stream),
+  template = pop_template,
+  assignment = list(
+    generation = migrant_assignment("custom", fun = generation_assign)
+  )
+)
+```
+
+
+
+
+```{r}
+# TODO: get better fertility and mortality rates stratified by race
+# TODO: develop group exogamy terms by birthplace (and birthplace ancestry? generation?)
+# TODO: add religion as a group and give it exogamy terms
+
+model <- hammel_model() |>
+  set_fertility(usa_2000_fertility) |>
+  set_mortality(usa_2000_mortality) |>
+  set_union_formation(
+    "on_demand",
+    matching = age_gap_matching_model(
+      3, 5,
+      group_exogamy = list(
+        race = c("White:Black" = -10)
+      )
+    )
+  ) |>
+  set_immigration(
+    irish = stream_irish,
+    nw_europe = stream_nw_europe,
+    east_europe = stream_east_europe,
+    south_europe = stream_south_europe,
+    birthplace_ancestry = TRUE
+  ) |>
+  set_population(pop_usa1880)
+
+pop_end <- run_simulation(model, 79.5, 42)
+
+
+```
+
+```{r}
+
+pop_end |> calculate_immigration_rates(time_breaks = 1881:1960, streams = TRUE, conf_level = 0.95) |>
+  filter(birthplace != "other") |>
+  ggplot(aes(x = time_start, y = rate_immigration, color = birthplace)) +
+  geom_ribbon(aes(ymin = conf_low, ymax = conf_high, fill = birthplace), color = NA, alpha = 0.2) +
+  geom_point() +
+  geom_line(
+    data = usa_historical_migration |> 
+      filter(time_start >= 1881 & time_start <= 1960, stream != "other"),
+    aes(y = rate, color = stream),
+    linetype = 2
+  )
+```
+
+
+```{r}
+
+diversity <- pop_end$ancestry$birthplace |>
+  mutate(
+    diversity = 1 - (native^2 + irish^2 + nw_europe^2 + east_europe^2 + south_europe^2)
+  ) |>
+  left_join(pop_end$persons |> select(person_id, birth_time, race)) |>
+  select(person_id, race, birth_time, diversity)
+
+# diversity |>
+#   filter(birth_time >= 1880) |>
+#   ggplot(aes(x = factor(5 * floor(birth_time / 5)), y = diversity))+
+#   geom_boxplot() +
+#   #geom_jitter(alpha = 0.02)+
+#   facet_wrap(~race)
+
+diversity |>
+  filter(birth_time >= 1800) |>
+  mutate(year = floor(birth_time)) |>
+  group_by(year, race) |>
+  summarize(mean = mean(diversity), .groups = "drop") |>
+  ggplot(aes(x = year, y = mean, color = race))+
+  geom_line()
+
+```
+
 
 
 

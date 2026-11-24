@@ -10,8 +10,6 @@
 # These data are generated for demonstration purposes only and should not be
 # directly used for research purposes.
 
-# TODO: create custom generation inheritance
-
 # Loab libraries --------------------------------------------------------------
 
 library(here)
@@ -170,6 +168,46 @@ pop <- pop |>
   left_join(dad_lookup, by = c("SERIAL", "POPLOC")) |>
   left_join(partner_lookup, by = c("SERIAL", "SPLOC"))
 
+# Determine ancestry shares ---------------------------------------------------
+
+# individuals with no parent ids, are 100% their own birthplace
+# then solve iteratively for other cases, until everyone has shares
+
+ancestry <- pop |>
+  filter(is.na(mother_id), is.na(father_id)) |>
+  mutate(share = 1) |>
+  select(person_id, birthplace, share) |>
+  pivot_wider(names_from = birthplace, values_from = share, values_fill = 0) |>
+  mutate(unknown = 0)
+
+pending <- pop |>
+  filter(!(person_id %in% ancestry$person_id))
+
+while(nrow(pending) > 0) {
+
+  ancestry <- pending |>
+    select(person_id, father_id, mother_id) |>
+    #  filter(father_id %in% ancestry$person_id | mother_id %in% ancestry$person_id) |>
+    filter(
+      is.na(father_id) | father_id %in% ancestry$person_id,
+      is.na(mother_id) | mother_id %in% ancestry$person_id
+    )|>
+    left_join(ancestry, by = join_by(father_id == person_id)) |>
+    left_join(ancestry, by = join_by(mother_id == person_id)) |>
+    pivot_longer(
+      cols = matches("\\.[xy]$"),
+      names_to = c("origin", ".value"),
+      names_pattern = "^(.*)\\.([xy])$"
+    ) |>
+    mutate(share = rowMeans(pick(x, y), na.rm = TRUE)) |>
+    select(person_id, origin, share) |>
+    pivot_wider(names_from = origin, values_from  = share) |>
+    bind_rows(ancestry)
+
+  pending <- pop |>
+    filter(!(person_id %in% ancestry$person_id))
+}
+
 # Determine arrival time for non-natives --------------------------------------
 
 # determine arrival time by runif between last non-native
@@ -316,8 +354,17 @@ pop_usa1880$groups <- list(
   generation = hammel::group(
     categories = c("1", "1.5", "2", "2.5", "3+"),
     inheritance = group_inheritance("custom", fun = gen_inheritance)
+  ),
+  birthplace = hammel::group(
+    categories = c("native", "irish", "nw_europe", "east_europe",
+                   "south_europe", "other"),
+    ancestry = TRUE,
+    inheritance = group_inheritance("fixed", fixed_value = "native")
+
   )
 )
+# assign ancestry
+pop_usa1880$ancestry$birthplace <- ancestry
 
 pop_usa1880 <- do.call(hammel::hammel_population, pop_usa1880)
 summary(pop_usa1880)

@@ -217,6 +217,8 @@
 #'   \item{unions}{Spouse IDs, imputed start times, missing end times and
 #'     end reasons. The `pre_migration` flags unions that began before either 
 #'     spouse's inferred arrival.}
+#'   item{ancestry}{ancestry share by birthplace. Individuals with no parent
+#'     are treated as having 100% ancestry from birthplace group.}
 #'   \item{groups, transitions}{Group declarations for race and generation,
 #'     including newborn inheritance rules, and an empty transition history.}
 #' }
@@ -260,3 +262,41 @@
 #' summary(pop_usa1880)
 #' model <- set_population(hammel_model(), pop_usa1880)
 "pop_usa1880"
+
+#' Historical U.S. immigration rates, 1820 to 1970
+#'
+#' Annual crude immigration rates for five origin streams. Each rate is the
+#' reported immigration count for that stream and year divided by the
+#' estimated U.S. resident population on July 1 of the same year.
+#'
+#' @md
+#' @format A tibble with 755 rows and four columns.
+#' \describe{
+#'   \item{stream}{Origin stream: `irish`, `nw_europe` (including Germany),
+#'     `south_europe`, `east_europe`, or `other`. The `other` stream is the
+#'     published total minus the four named regional counts.}
+#'   \item{time_start, time_end}{Bounds of the half-open annual modeling
+#'     interval, from the reported year to that year plus one.}
+#'   \item{rate}{Immigrants per U.S. resident per year.}
+#' }
+#' @details
+#' The time bounds use the reported year as a model input. The historical
+#' reporting periods vary, including years ending June 30 from 1880 to
+#' 1960. The origin series refer to the country from which immigrants came
+#' before 1906 and to last permanent residence from 1906 onward. The
+#' preparation script treats missing Poland counts as zero when constructing
+#' the eastern European stream.
+#'
+#' `usa_hist_migration` contains the same data.
+#' @source U.S. Bureau of the Census. *Historical Statistics of the United
+#'   States, Colonial Times to 1970*, part 1 (1975). Immigration counts are
+#'   from series C89-C119, pp. 105-109. Resident population estimates are from
+#'   series A7, p. 8.
+#'   \url{https://cdn.www.census.gov/library/publications/1975/compendia/hist_stats_colonial-1970.html}
+#'   Preparation notes and code are in `data-raw/usa_historical_migration/`.
+#' @seealso [immigration()]
+#' @aliases usa_hist_migration
+#' @keywords datasets
+#' @examples
+#' subset(usa_historical_migration, stream == "irish" & time_start >= 1880)
+"usa_historical_migration"

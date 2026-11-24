@@ -16,6 +16,8 @@ U.S.-born people.}
 \item{unions}{Spouse IDs, imputed start times, missing end times and
 end reasons. The \code{pre_migration} flags unions that began before either
 spouse's inferred arrival.}
+item{ancestry}{ancestry share by birthplace. Individuals with no parent
+are treated as having 100\% ancestry from birthplace group.}
 \item{groups, transitions}{Group declarations for race and generation,
 including newborn inheritance rules, and an empty transition history.}
 }
