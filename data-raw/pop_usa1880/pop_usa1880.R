@@ -2,7 +2,7 @@
 # from IPUMS. The script includes only the white and black population and
 # collapses immigrant origins into NW Europe (including Germany), Irish,
 # South Europe, East Europe, and Other. Arrival times for immigrants are
-# sampled from a uniform distribution from the earliest non-native birth
+# sampled from a uniform distribution from the lastest non-native birth
 # time for the family unit. Union start times are sampled from a uniform
 # distribution from when the younger member was 15 or first birth time
 # for the union.
@@ -112,11 +112,16 @@ pop <- pop |>
     birthplace = code_bpl(BPL),
     birthplace_mom = code_bpl(MBPL),
     birthplace_dad = code_bpl(FBPL),
+    mom_native = birthplace_mom == "native",
+    dad_native = birthplace_dad == "native",
     generation = case_when(
       birthplace != "native" ~ "1",
-      birthplace_mom == "native" & birthplace_dad == "native" ~ "3+",
-      birthplace_mom == "native" | birthplace_dad == "native" ~ "2.5",
-      TRUE ~ "2"
+      coalesce(mom_native, dad_native) &
+        coalesce(dad_native, mom_native) ~ "3+",
+      coalesce(mom_native, dad_native) |
+        coalesce(dad_native, mom_native) ~ "2.5",
+      !is.na(mom_native) | !is.na(dad_native) ~ "2",
+      TRUE ~ NA_character_
     )
   )
 
