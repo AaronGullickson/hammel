@@ -340,12 +340,21 @@ Profiles that first appear during a run extend the tables.
 ### Cost, solver and diagnostics
 
 Exploratory count (November 24, 2026; external-migration branch at
-`c775be1`; stylized 1880–1960 run with four immigration streams, no
-ancestry endogamy, founders pure in their birthplace; scripts not
-archived): unpartnered people aged 15–59 numbered about 19,000 in 1960,
-with 264 occupied birthplace profiles at r = 1/8 (316 at 1/16; 78 at 1/4)
-and 352 race-by-generation-by-profile combinations. Endogamy would reduce
-mixing; supplied founder shares would increase it.
+`751e66b`, whose `pop_usa1880` supplies birthplace ancestry with 21
+distinct founder profiles; stylized 1880–1960 run with four immigration
+streams and no ancestry endogamy; one seed; scripts not archived).
+Unpartnered people aged 15–59 numbered about 19,000 throughout. Occupied
+birthplace profiles among them:
+
+| Year | r = 1/4 | r = 1/8 | r = 1/16 |
+| --- | ---: | ---: | ---: |
+| 1880 | 15 | 15 | 15 |
+| 1920 | 70 | 105 | 105 |
+| 1960 | 96 | 413 | 857 |
+
+Combined with race and generation, 1960 had 558 types at 1/8 and 1,023 at
+1/16. Profiles keep diversifying over generations, so longer runs have
+more types; endogamy would slow this.
 
 - **Solver.** The dense Newton solve costs about T^3 per iteration, too
   slow at a few hundred types with one solve per search. Models with an

@@ -1012,3 +1012,116 @@ resolve_matching_models <- function(
   }
   list(process = process, dims = used, values = labels)
 }
+
+# Check every matching model's ancestry endogamy (D199) against the dimensions
+# that track ancestry. Returns whether any model uses it.
+check_matching_ancestry <- function(
+  process,
+  declaration,
+  population,
+  registries,
+  call = rlang::caller_env()
+) {
+  tracked <- tracked_ancestry(declaration)
+  categories <- lapply(
+    stats::setNames(tracked, tracked), function(d) {
+      columns <- names(population$ancestry[[d]])
+      union(
+        as.character(registries[[d]]),
+        setdiff(columns, c("person_id", "unknown"))
+      )
+    }
+  )
+  used <- FALSE
+  for (f in c("matching", "father_matching", "cohab_matching")) {
+    for (model in model_entries(process[[f]])) {
+      weights <- with_error_context(
+        resolve_ancestry_endogamy(model, tracked, categories, call = call),
+        paste0("In the ", f, " model.")
+      )
+      used <- used || length(weights) > 0L
+    }
+  }
+  used
+}
+
+# A model's ancestry endogamy weights as a list keyed by dimension: a bare
+# vector names the only dimension that tracks ancestry, and weights name that
+# dimension's categories or `unknown`.
+resolve_ancestry_endogamy <- function(
+  model,
+  tracked,
+  categories,
+  call = rlang::caller_env()
+) {
+  x <- model$ancestry_endogamy
+  if (is.null(x)) {
+    return(list())
+  }
+  if (!is_dimension_list(x)) {
+    if (!length(tracked)) {
+      abort_hammel(
+        c(
+          "{.arg ancestry_endogamy} needs a dimension that tracks ancestry.",
+          "i" = "Track ancestry with {.code group(ancestry = TRUE)}."
+        ),
+        "groups",
+        call = call
+      )
+    }
+    if (length(tracked) > 1L) {
+      abort_hammel(
+        c(
+          "{.arg ancestry_endogamy} must name its dimension.",
+          "x" = "Several dimensions track ancestry: {.val {tracked}}.",
+          "i" = paste0(
+            "Give it as a list by dimension, such as ",
+            "{.code ancestry_endogamy = list(", tracked[1], " = ...)}."
+          )
+        ),
+        "groups",
+        call = call
+      )
+    }
+    x <- stats::setNames(list(x), tracked)
+  }
+  untracked <- setdiff(names(x), tracked)
+  if (length(untracked)) {
+    abort_hammel(
+      c(
+        paste(
+          "{.arg ancestry_endogamy} names {.field {untracked}}, which",
+          "{?doesn't/don't} track ancestry."
+        ),
+        "i" = if (length(tracked)) {
+          "Dimensions tracking ancestry: {.val {tracked}}."
+        } else {
+          "Track ancestry with {.code group(ancestry = TRUE)}."
+        }
+      ),
+      "groups",
+      group = untracked,
+      call = call
+    )
+  }
+  for (d in names(x)) {
+    allowed <- c(categories[[d]], "unknown")
+    unknown <- setdiff(names(x[[d]]), allowed)
+    if (length(unknown)) {
+      abort_hammel(
+        c(
+          paste(
+            "{.arg ancestry_endogamy} names categories {.field {d}} doesn't",
+            "have."
+          ),
+          "x" = "Unknown: {.val {unknown}}.",
+          "i" = "Ancestry categories: {.val {allowed}}."
+        ),
+        "groups",
+        group = d,
+        call = call
+      )
+    }
+  }
+  x
+}

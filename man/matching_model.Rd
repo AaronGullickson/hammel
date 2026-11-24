@@ -4,7 +4,14 @@
 \alias{matching_model}
 \title{Specify a conditional-logit matching model}
 \usage{
-matching_model(formula, coefficients, group_exogamy = NULL, delta = NULL)
+matching_model(
+  formula,
+  coefficients,
+  group_exogamy = NULL,
+  delta = NULL,
+  ancestry_endogamy = NULL,
+  ancestry_resolution = 1/8
+)
 }
 \arguments{
 \item{formula}{A one-sided R formula using \code{age_difference} and group
@@ -19,6 +26,16 @@ group exogamous pairings. See details for syntax.}
 \item{delta}{Optional male-target adjustments, as a named list keyed by
 dimension or a bare value for the only declared dimension: a finite numeric
 vector with unique category names.}
+
+\item{ancestry_endogamy}{Optional ancestry endogamy weights, as a named list
+keyed by dimension or a bare value for the only dimension that tracks
+ancestry: a finite numeric vector named by ancestry categories or
+\code{unknown}. See details.}
+
+\item{ancestry_resolution}{The resolution to which ancestry shares are
+rounded for matching, a single number such as \code{1/8} (default), \code{1/16} or
+\code{0.1} whose reciprocal is a whole number. Used only with
+\code{ancestry_endogamy}.}
 }
 \value{
 An inspectable \code{hammel_matching_model} list containing \code{formula} and
@@ -97,6 +114,17 @@ log odds of zero.
 
 Users may find \code{\link[=age_gap_matching_model]{age_gap_matching_model()}} more intuitive than specifying
 a direct formula.
+
+The \code{ancestry_endogamy} argument favors partners with similar ancestry in a
+dimension that tracks ancestry. For each named ancestry category \eqn{k}
+with weight \eqn{\lambda_k}, the term
+\eqn{-\sum_k \lambda_k |p_{ik} - p_{jk}|} is added to the utility, where
+\eqn{p_{ik}} and \eqn{p_{jk}} are the woman's and man's ancestry shares.
+Positive weights favor similar shares; identical profiles contribute zero.
+Categories left out contribute nothing, and \code{unknown} may be named. Shares
+are rounded to multiples of \code{ancestry_resolution}, keeping each profile's
+total at one, and calibrated weights are computed separately for each
+rounded ancestry profile.
 }
 \examples{
 # maximize age difference utility when husband is 5 years older. Double

@@ -30,8 +30,8 @@ for the user's review.
 gradients; category-only models keep the dense solve. The
 `.log_weight_<group>` diagnostics are removed; a clogit-data helper may
 follow separately. The name `ancestry_resolution` is confirmed.
-`pop_usa1880` has no supplied birthplace ancestry shares yet; the user
-planned to add them on the external-migration branch.
+`pop_usa1880` gained birthplace ancestry on the external-migration branch
+(`751e66b`); type counts from it are in the weighted-choice spec.
 
 ## Accepted milestones and active render
 

@@ -8,7 +8,9 @@ age_gap_matching_model(
   preferred_age_gap,
   half_weight_distance,
   group_exogamy = NULL,
-  delta = NULL
+  delta = NULL,
+  ancestry_endogamy = NULL,
+  ancestry_resolution = 1/8
 )
 }
 \arguments{
@@ -25,6 +27,16 @@ preferred age gap at which utility is halved.}
 \item{delta}{Optional male-target adjustments, as a named list keyed by
 dimension or a bare value for the only declared dimension: a finite numeric
 vector with unique category names.}
+
+\item{ancestry_endogamy}{Optional ancestry endogamy weights, as a named list
+keyed by dimension or a bare value for the only dimension that tracks
+ancestry: a finite numeric vector named by ancestry categories or
+\code{unknown}. See details.}
+
+\item{ancestry_resolution}{The resolution to which ancestry shares are
+rounded for matching, a single number such as \code{1/8} (default), \code{1/16} or
+\code{0.1} whose reciprocal is a whole number. Used only with
+\code{ancestry_endogamy}.}
 }
 \value{
 A \code{hammel_matching_model} with linear and quadratic age-difference

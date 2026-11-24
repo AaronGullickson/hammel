@@ -150,8 +150,11 @@ effects in both the formula and pair table intentionally add together.
 
 ## Ancestry endogamy
 
-*Specified, not implemented (D199, November 24, 2026).* The user selected
-the interface, argument names, rounding and calibration described here.
+*Specified (D199, November 24, 2026); being implemented in stages.* The
+user selected the interface, argument names, rounding and calibration
+described here. The arguments and their checks are implemented; the engine
+does not apply the term yet, so `run_simulation()` refuses models that use
+it.
 Calibration by ancestry type is specified in
 [weighted-choice matching](weighted-choice-matching.md#ancestry-types).
 
@@ -179,9 +182,12 @@ age_gap_matching_model(
   vector of finite weights, one per ancestry category. A bare named vector
   applies to the only dimension that tracks ancestry, as for
   `group_exogamy`.
-- Names are categories of that dimension or `unknown`. Unknown names,
-  repeated names, NA and non-finite values are errors. The dimension must
-  track ancestry.
+- Names are categories of that dimension (declared categories or
+  ancestry columns) or `unknown`. Unknown names, repeated names, NA and
+  non-finite values are errors. The dimension must track ancestry. Shapes
+  are checked by the constructor; dimensions and categories when the
+  simulation starts, for general, father and cohabitation models and each
+  schedule entry.
 - Positive weights favor partners with similar shares of that category.
   Categories left out contribute nothing; `unknown` contributes only when
   named.

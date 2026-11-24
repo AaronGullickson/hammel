@@ -382,6 +382,22 @@ run_simulation <- function(
   registries <- group_registries(
     population, lapply(transition_list, `[[`, "rates")
   )
+  # Ancestry endogamy (D199) is checked against the tracked dimensions before
+  # the models are translated. TODO(D199 stage 2): remove this guard when the
+  # engine applies the term.
+  uses_ancestry <- check_matching_ancestry(
+    union_process, declaration, population, registries
+  )
+  if (uses_ancestry) {
+    abort_hammel(
+      c(
+        "Ancestry endogamy isn't available in simulations yet.",
+        "i" = "Remove {.arg ancestry_endogamy} from the matching models."
+      ),
+      "specification",
+      argument = "ancestry_endogamy"
+    )
+  }
   resolved <- resolve_matching_models(union_process, declaration, registries)
   union_process <- resolved$process
   match_dims <- if (length(resolved$dims)) {
