@@ -156,8 +156,22 @@ test_that("zero or absent pair effects preserve histories and RNG consumption", 
   state <- .Random.seed
   model$processes$union_formation$matching$group_exogamy <- c("A:B" = 0, "absent:C" = 5)
   set.seed(654)
-  expect_identical(run_simulation(model, 1), original)
+  expect_identical(suppressWarnings(run_simulation(model, 1)), original)
   expect_identical(.Random.seed, state)
+})
+
+test_that("unknown exogamy labels warn without rejecting declared unused ones", {
+  matching <- matching_model(
+    ~ 1,
+    numeric(),
+    group_exogamy = c("A:C" = 0.5, "A:typo" = -1, "B:mistyped" = NA)
+  )
+  model <- group_choice_model(matching = matching)
+  model <- set_groups(model, group = group(categories = c("A", "B", "C")))
+  expect_warning(
+    run_simulation(model, 0),
+    class = "hammel_warning_no_effect"
+  )
 })
 
 test_that("custom group comparisons work with absent candidate levels", {

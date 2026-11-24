@@ -1015,9 +1015,17 @@ test_that("group_exogamy tables are validated", {
   expect_error(run_simulation(matching_pair_model(age_gap_matching_model(0, 5,
     group_exogamy = data.frame(caste_x = "A", caste_y = "B", log_odds = -1))), 0),
     "caste, which isn't declared", class = "hammel_error_groups")
-  # Rows naming absent categories are unused.
-  x <- step2_tables(age_gap_matching_model(0, 5,
-    group_exogamy = data.frame(race_x = c("A", "Z"), race_y = c("B", "A"), log_odds = c(-1, -9))))
+  # Undeclared category rows are unused and warn.
+  table <- data.frame(
+    race_x = c("A", "Z"), race_y = c("B", "A"),
+    log_odds = c(-1, -9)
+  )
+  matching <- age_gap_matching_model(0, 5, group_exogamy = table)
+  expect_warning(
+    step2_tables(matching),
+    class = "hammel_warning_no_effect"
+  )
+  x <- suppressWarnings(step2_tables(matching))
   expect_equal(x$prepared$pair_offsets[1, ], c(0, -1))
 })
 

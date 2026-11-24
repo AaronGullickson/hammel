@@ -124,8 +124,9 @@ woman W|S choosing among men W|S 0, B|S -5, W|NE prohibited, B|NE 0
 (unlisted); a woman W|NE: W|S prohibited, B|NE -4, others 0.
 `age_gap_matching_model(..., group_exogamy = NULL)` also accepts effects.
 Pair effects require population group identities; missing group data errors
-at execution, including zero-duration calls. Extra pair labels do not create
-population groups and are harmless when absent from the population.
+at execution, including zero-duration calls. Pair labels in the declared
+category set remain valid when absent from the current population. Labels
+outside that set are ignored with a warning; they do not create categories.
 
 ## Formula predictors
 

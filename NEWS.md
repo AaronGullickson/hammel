@@ -1,5 +1,6 @@
 # hammel (development version)
 
+- Warn when group exogamy terms name undeclared categories.
 - Set progress bar to TRUE in interactive sessions and FALSE in non-interactive sessions. Users can override with option `hammel.progress`.
 
 # hammel 0.2.0

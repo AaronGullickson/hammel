@@ -657,6 +657,32 @@ abort_matching_coefficients <- function(
   )
 }
 
+# Warn when pair effects refer to labels outside a dimension's declaration.
+warn_unknown_exogamy <- function(pairs, categories, dim) {
+  if (is.null(pairs) || !nrow(pairs)) {
+    return(invisible(NULL))
+  }
+  labels <- as.character(categories)
+  unknown <- !pairs$female_group %in% labels |
+    !pairs$male_group %in% labels
+  if (any(unknown)) {
+    terms <- paste0(
+      pairs$female_group[unknown], ":", pairs$male_group[unknown]
+    )
+    warn_hammel(
+      c(
+        "Some {.arg group_exogamy} terms use undeclared categories.",
+        "x" = "These terms have no effect: {.val {terms}}.",
+        "i" = "Use category labels declared with {.fn set_groups}."
+      ),
+      "no_effect",
+      group = dim,
+      terms = terms
+    )
+  }
+  invisible(NULL)
+}
+
 # The internal model for dimension `dim` (NULL: no group effects), with
 # categories as `group_levels`.
 internal_matching_model <- function(
@@ -745,6 +771,12 @@ internal_matching_model <- function(
   } else {
     split_group_exogamy(pick(model$group_exogamy), call = call)
   }
+  pairs <- expand_group_exogamy(exogamy$effects, call = call)
+  check <- pairs[c("female_group", "male_group")]
+  if (is.data.frame(exogamy$prevent)) {
+    check <- rbind(check, exogamy$prevent)
+  }
+  warn_unknown_exogamy(check, categories, dim)
   internal <- structure(
     list(
       formula = renamed,
@@ -798,6 +830,32 @@ combined_matching_model <- function(
     # does not name do not matter. Rows naming absent categories are unused.
     table <- model$group_exogamy
     table_dims <- exogamy_table_dimensions(table)
+    unknown <- rep(FALSE, nrow(table))
+    for (d in table_dims) {
+      values <- as.character(categories[[d]])
+      unknown <- unknown |
+        !as.character(table[[paste0(d, "_x")]]) %in% values |
+        !as.character(table[[paste0(d, "_y")]]) %in% values
+    }
+    if (any(unknown)) {
+      terms <- vapply(which(unknown), function(r) {
+        paste(vapply(table_dims, function(d) {
+          paste0(
+            d, "=", table[[paste0(d, "_x")]][r], ":",
+            table[[paste0(d, "_y")]][r]
+          )
+        }, character(1)), collapse = ", ")
+      }, character(1))
+      warn_hammel(
+        c(
+          "Some {.arg group_exogamy} rows use undeclared categories.",
+          "x" = "These rows have no effect: {.val {terms}}.",
+          "i" = "Use category labels declared with {.fn set_groups}."
+        ),
+        "no_effect",
+        terms = terms
+      )
+    }
     for (r in seq_len(nrow(table))) {
       f <- m <- rep(TRUE, k)
       for (d in table_dims) {
@@ -821,6 +879,11 @@ combined_matching_model <- function(
   for (d in if (is.data.frame(model$group_exogamy)) character() else own) {
     exogamy <- split_group_exogamy(pick(model$group_exogamy, d), call = call)
     pairs <- expand_group_exogamy(exogamy$effects, call = call)
+    check <- pairs[c("female_group", "male_group")]
+    if (is.data.frame(exogamy$prevent)) {
+      check <- rbind(check, exogamy$prevent)
+    }
+    warn_unknown_exogamy(check, categories[[d]], d)
     for (r in seq_len(nrow(pairs))) {
       f <- decode[[d]] == as.character(pairs$female_group[r])
       m <- decode[[d]] == as.character(pairs$male_group[r])
