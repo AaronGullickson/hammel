@@ -11,7 +11,9 @@ age_gap_matching_model(
   preferred_age_gap,
   half_weight_distance,
   group_exogamy = NULL,
-  delta = NULL
+  delta = NULL,
+  ancestry_endogamy = NULL,
+  ancestry_resolution = 1/8
 )
 ```
 
@@ -38,6 +40,20 @@ age_gap_matching_model(
   Optional male-target adjustments, as a named list keyed by dimension
   or a bare value for the only declared dimension: a finite numeric
   vector with unique category names.
+
+- ancestry_endogamy:
+
+  A named list indicating endogamy weights for shared ancestry within a
+  named group dimension. Each element of the list should be a named
+  vector where the names correspond to the group dimension's categories
+  and the values correspond to an endogamy weight. See details for
+  further information.
+
+- ancestry_resolution:
+
+  The resolution to which ancestry shares are rounded for matching, a
+  single number such as `1/8` (default), `1/16` or `0.1` whose
+  reciprocal is a whole number. Used only with `ancestry_endogamy`.
 
 ## Value
 

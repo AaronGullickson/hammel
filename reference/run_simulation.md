@@ -10,7 +10,8 @@ run_simulation(
   model,
   years,
   seed = NULL,
-  progress = getOption("hammel.progress", interactive())
+  progress = getOption("hammel.progress", interactive()),
+  union_weight_sample = 0
 )
 ```
 
@@ -34,14 +35,25 @@ run_simulation(
 - progress:
 
   Show a console progress bar based on elapsed simulation years.
-  Defaults to ``` TRUE`` in interactive environments and  ```FALSE“ in
+  Defaults to `TRUE` in interactive environments and `FALSE` in
   non-interactive environments. Users can set the `hammel.progress`
   option to control its use.
+
+- union_weight_sample:
+
+  The fraction of unions in this run whose matching weights are kept,
+  from 0 (default, none) to 1. Kept weights let
+  [`extract_choice_sets()`](https://aarongullickson.github.io/hammel/reference/extract_choice_sets.md)
+  build conditional-logit choice sets with each man's log weight as an
+  offset.
 
 ## Value
 
 A `hammel_population` with updated histories and endpoint, plus a
-`simulation` component recording selected settings.
+`simulation` component recording selected settings. With
+`union_weight_sample` above 0, it also has a `matching_weights`
+component for
+[`extract_choice_sets()`](https://aarongullickson.github.io/hammel/reference/extract_choice_sets.md).
 
 ## Details
 

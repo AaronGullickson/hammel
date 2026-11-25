@@ -56,6 +56,14 @@ class `summary.hammel_matching_model` containing:
 
   The `delta` specification, or `NULL`.
 
+- ancestry_endogamy:
+
+  The `ancestry_endogamy` specification, or `NULL`.
+
+- ancestry_resolution:
+
+  The ancestry rounding resolution.
+
 ## Details
 
 When the formula is exactly `~ age_difference + I(age_difference^2)`

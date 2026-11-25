@@ -21,8 +21,7 @@ union_formation(
   min_male_age = 15,
   kinship_generations = 2,
   cancel_birth_if_no_match = TRUE,
-  cohab_as_previous_union = FALSE,
-  diagnostics = FALSE
+  cohab_as_previous_union = FALSE
 )
 
 set_union_formation(
@@ -39,8 +38,7 @@ set_union_formation(
   min_male_age = 15,
   kinship_generations = 2,
   cancel_birth_if_no_match = TRUE,
-  cohab_as_previous_union = FALSE,
-  diagnostics = FALSE
+  cohab_as_previous_union = FALSE
 )
 ```
 
@@ -134,11 +132,6 @@ set_union_formation(
   Logical, default FALSE. FALSE only marriage defines the
   `previous_union` value; TRUE cohabitation or marriage define the
   `previous_union` value.
-
-- diagnostics:
-
-  Logical, default `FALSE`. When `TRUE`, adds additional technical
-  variables from matching model to each union record.
 
 - model:
 

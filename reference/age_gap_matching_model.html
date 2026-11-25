@@ -61,7 +61,9 @@ Provides an intuitive front-end for <code><a href="matching_model.html">matching
 <span>  <span class="va">preferred_age_gap</span>,</span>
 <span>  <span class="va">half_weight_distance</span>,</span>
 <span>  group_exogamy <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  delta <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  delta <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  ancestry_endogamy <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  ancestry_resolution <span class="op">=</span> <span class="fl">1</span><span class="op">/</span><span class="fl">8</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -89,6 +91,21 @@ preferred age gap at which utility is halved.</p></dd>
 <dd><p>Optional male-target adjustments, as a named list keyed by
 dimension or a bare value for the only declared dimension: a finite numeric
 vector with unique category names.</p></dd>
+
+
+<dt id="arg-ancestry-endogamy">ancestry_endogamy<a class="anchor" aria-label="anchor" href="#arg-ancestry-endogamy"></a></dt>
+<dd><p>A named list indicating endogamy weights for
+shared ancestry within a named group dimension. Each element of the list
+should be a named vector where the names correspond to the group dimension's
+categories and the values correspond to an endogamy weight. See details for
+further information.</p></dd>
+
+
+<dt id="arg-ancestry-resolution">ancestry_resolution<a class="anchor" aria-label="anchor" href="#arg-ancestry-resolution"></a></dt>
+<dd><p>The resolution to which ancestry shares are
+rounded for matching, a single number such as <code>1/8</code> (default), <code>1/16</code> or
+<code>0.1</code> whose reciprocal is a whole number. Used only with
+<code>ancestry_endogamy</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

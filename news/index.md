@@ -2,6 +2,10 @@
 
 ## hammel (development version)
 
+- Add an option to define intergroup partnering by an
+  `ancestry_endogamy` argument to the provided matching model. This
+  approach compares the group ancestry shares of potential matches and
+  gives them more weight where similar.
 - Set progress bar to TRUE in interactive sessions and FALSE in
   non-interactive sessions. Users can override with option
   `hammel.progress`.

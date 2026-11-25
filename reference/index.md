@@ -154,6 +154,8 @@ histories.
   : Extract union data from simulation results with additional detail
 - [`extract_unpartnered_births()`](https://aarongullickson.github.io/hammel/reference/extract_unpartnered_births.md)
   : Extract births with known parents to unpartnered mothers
+- [`extract_choice_sets()`](https://aarongullickson.github.io/hammel/reference/extract_choice_sets.md)
+  : Extract matching choice sets from simulation results
 
 ## Example data
 
