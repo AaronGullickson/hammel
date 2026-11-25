@@ -10,6 +10,8 @@ execute:
 
 ```{r}
 #| label: setup
+# TODO: add religion as a group and give it exogamy terms
+# TODO: add German as a separate stream
 
 library(hammel)
 library(dplyr)
@@ -17,6 +19,7 @@ library(tidyr)
 library(stringr)
 library(readr)
 library(ggplot2)
+library(survival)
 ```
 
 ```{r}
@@ -108,7 +111,6 @@ summary(pop_template)
 ```
 
 ```{r}
-fertility_rates <- get_fertility_hfd("USA", 1933:1960)
 
 # we can't use canned HFD values because we need something
 # that matches Haines 15-49 five year age groups
@@ -406,9 +408,6 @@ stream_other <- immigration_stream(
 
 
 ```{r}
-# TODO: get better fertility and mortality rates stratified by race
-# TODO: develop group exogamy terms by birthplace (and birthplace ancestry? generation?)
-# TODO: add religion as a group and give it exogamy terms
 
 model <- hammel_model() |>
   set_fertility(fertility_1880_1960) |>
@@ -419,6 +418,19 @@ model <- hammel_model() |>
       3, 5,
       group_exogamy = list(
         race = c("White:Black" = -7, "White:Other" = -4, "Black:Other" = -7)
+      ),
+      # the full endogamy for full ancestry individuals adds these together
+      # start by assuming equal endogamy across groups
+      # TODO: get reasonable estimates based on prior work
+      ancestry_endogamy = list(
+        birthplace = c(
+          native = 1,
+          irish = 1,
+          nw_europe = 1,
+          south_europe = 1,
+          east_europe = 1,
+          other = 1
+        )
       )
     )
   ) |>
@@ -432,9 +444,8 @@ model <- hammel_model() |>
   ) |>
   set_population(pop_usa1880)
 
-pop_end <- run_simulation(model, 79.5, 42)
+pop_end <- run_simulation(model, 79.5, 42, union_weight_sample = 0.3)
 summary(pop_end)
-
 ```
 
 ```{r}
@@ -442,7 +453,7 @@ summary(pop_end)
 pop_end |> calculate_immigration_rates(time_breaks = 1881:1960, streams = TRUE, conf_level = 0.95) |>
   ggplot(aes(x = time_start, y = rate_immigration, color = birthplace)) +
   geom_ribbon(aes(ymin = conf_low, ymax = conf_high, fill = birthplace), color = NA, alpha = 0.2) +
-  geom_point() +
+  geom_point(size = 0.5) +
   geom_line(
     data = usa_historical_migration |> 
       filter(time_start >= 1881 & time_start <= 1960),
@@ -460,10 +471,6 @@ calculate_mortality_rates(
   by = "race"
 ) |>
   calculate_life_expectancy() |>
-  print(n = 100)
-
-
-|>
   ggplot(aes(x = (time_start + time_end) / 2, y = ex, color = race))+
   geom_line()+
   facet_wrap(~sex)
@@ -539,6 +546,31 @@ pop_end |>
 ```
 
 
+```{r}
+choice_sets <- extract_choice_sets(pop_end, 10000, 50)
+
+choice_sets <- choice_sets |>
+  mutate(,
+    age_diff = birth_time_w - birth_time_h,
+    d_native = abs(birthplace_native_h - birthplace_native_w),
+    d_irish = abs(birthplace_irish_w - birthplace_irish_h),
+    d_nw_europe = abs(birthplace_nw_europe_h - birthplace_nw_europe_w),
+    d_east_europe = abs(birthplace_east_europe_h - birthplace_east_europe_w),
+    d_south_europe = abs(birthplace_south_europe_h - birthplace_south_europe_w),
+    d_other = abs(birthplace_other_h - birthplace_other_w),
+    race_bw = (race_w == "Black" & race_h == "White") | (race_w == "White" & race_h == "Black"),
+    race_bo = (race_w == "Black" & race_h == "Other") | (race_w == "Other" & race_h == "Black"),
+    race_wo = (race_w == "Other" & race_h == "White") | (race_w == "White" & race_h == "Other")
+  )
+
+model <- clogit(chosen ~ age_diff + I(age_diff^2) +
+  d_native + d_irish + d_nw_europe + d_east_europe + d_south_europe + d_other +
+  race_bw + race_bo + race_wo +
+  offset(log_weight) + strata(choice_id), 
+  data = choice_sets)
+summary(model)
+modelsummary::modelsummary(model)
+```
 
 
 
