@@ -76,7 +76,7 @@ union_formation(
   initiation, matching = age_gap_matching_model(0, 5),
   rates = NULL, min_male_age = 15,
   kinship_generations = 2, father_matching = NULL,
-  cancel_birth_if_no_match = TRUE, diagnostics = FALSE
+  cancel_birth_if_no_match = TRUE
 )
 ```
 

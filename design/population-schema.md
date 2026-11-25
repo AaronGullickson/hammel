@@ -153,3 +153,14 @@ the known endpoint, and chronological chaining to the current category in each
 dimension. `hammel_population(..., transitions = ...)` accepts
 base data frames. See [group transitions](group-transitions.md) for event and
 observation semantics. Ancestry proportions are unaffected by moves.
+
+## Sampled matching weights (D200)
+
+A run with `union_weight_sample` above 0 returns `matching_weights`, which
+describes that run only: a later run replaces or drops it. Its tibbles are
+`types` (`type_id`, each matching dimension's category and, with ancestry
+endogamy, rounded shares named `<dimension>_<category>`), `unions`
+(`union_id`, `union_type`, `time`, `calibration_id`, `NA` without calibrated
+weights) and `weights` (`calibration_id`, `type_id`, `log_weight`), plus
+`min_male_age` and internal keys used by `extract_choice_sets()`. See
+[weighted-choice matching](weighted-choice-matching.md#choice-set-reconstruction-d200).

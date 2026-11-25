@@ -221,8 +221,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // simulate_cpp
-List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, NumericMatrix initial_ancestry, List inheritance, double ffab, DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates, List cohab_matching, bool counts_cohab, bool check_cells, Nullable<List> hetfert, Nullable<List> transition_input, Nullable<List> model_schedule_input, Nullable<List> weight_input, Nullable<List> group_input, Nullable<Function> progress);
-RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP initial_ancestrySEXP, SEXP inheritanceSEXP, SEXP ffabSEXP, SEXP dissolution_ratesSEXP, SEXP cohab_probSEXP, SEXP conversion_ratesSEXP, SEXP cohab_matchingSEXP, SEXP counts_cohabSEXP, SEXP check_cellsSEXP, SEXP hetfertSEXP, SEXP transition_inputSEXP, SEXP model_schedule_inputSEXP, SEXP weight_inputSEXP, SEXP group_inputSEXP, SEXP progressSEXP) {
+List simulate_cpp(DataFrame persons, DataFrame mortality_rates, DataFrame fertility_rates, double start, double years, double birth_interval, DataFrame unions, List matching, double min_male_age, int kinship_generations, bool rate_initiation, DataFrame union_rates, List father_matching, bool cancel_birth_if_no_match, NumericMatrix initial_ancestry, List inheritance, double ffab, DataFrame dissolution_rates, DataFrame cohab_prob, DataFrame conversion_rates, List cohab_matching, bool counts_cohab, bool check_cells, Nullable<List> hetfert, Nullable<List> transition_input, Nullable<List> model_schedule_input, Nullable<List> weight_input, Nullable<List> group_input, double union_weight_sample, Nullable<Function> progress);
+RcppExport SEXP _hammel_simulate_cpp(SEXP personsSEXP, SEXP mortality_ratesSEXP, SEXP fertility_ratesSEXP, SEXP startSEXP, SEXP yearsSEXP, SEXP birth_intervalSEXP, SEXP unionsSEXP, SEXP matchingSEXP, SEXP min_male_ageSEXP, SEXP kinship_generationsSEXP, SEXP rate_initiationSEXP, SEXP union_ratesSEXP, SEXP father_matchingSEXP, SEXP cancel_birth_if_no_matchSEXP, SEXP initial_ancestrySEXP, SEXP inheritanceSEXP, SEXP ffabSEXP, SEXP dissolution_ratesSEXP, SEXP cohab_probSEXP, SEXP conversion_ratesSEXP, SEXP cohab_matchingSEXP, SEXP counts_cohabSEXP, SEXP check_cellsSEXP, SEXP hetfertSEXP, SEXP transition_inputSEXP, SEXP model_schedule_inputSEXP, SEXP weight_inputSEXP, SEXP group_inputSEXP, SEXP union_weight_sampleSEXP, SEXP progressSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -254,8 +254,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Nullable<List> >::type model_schedule_input(model_schedule_inputSEXP);
     Rcpp::traits::input_parameter< Nullable<List> >::type weight_input(weight_inputSEXP);
     Rcpp::traits::input_parameter< Nullable<List> >::type group_input(group_inputSEXP);
+    Rcpp::traits::input_parameter< double >::type union_weight_sample(union_weight_sampleSEXP);
     Rcpp::traits::input_parameter< Nullable<Function> >::type progress(progressSEXP);
-    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab, check_cells, hetfert, transition_input, model_schedule_input, weight_input, group_input, progress));
+    rcpp_result_gen = Rcpp::wrap(simulate_cpp(persons, mortality_rates, fertility_rates, start, years, birth_interval, unions, matching, min_male_age, kinship_generations, rate_initiation, union_rates, father_matching, cancel_birth_if_no_match, initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates, cohab_matching, counts_cohab, check_cells, hetfert, transition_input, model_schedule_input, weight_input, group_input, union_weight_sample, progress));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -323,7 +324,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_hammel_inspect_round_profile_cpp", (DL_FUNC) &_hammel_inspect_round_profile_cpp, 2},
     {"_hammel_person_lexis_cpp", (DL_FUNC) &_hammel_person_lexis_cpp, 8},
     {"_hammel_person_snapshot_cpp", (DL_FUNC) &_hammel_person_snapshot_cpp, 6},
-    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 29},
+    {"_hammel_simulate_cpp", (DL_FUNC) &_hammel_simulate_cpp, 30},
     {"_hammel_inspect_weighted_calibration_cpp", (DL_FUNC) &_hammel_inspect_weighted_calibration_cpp, 17},
     {"_hammel_inspect_weighted_incremental_cpp", (DL_FUNC) &_hammel_inspect_weighted_incremental_cpp, 11},
     {NULL, NULL, 0}

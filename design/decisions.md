@@ -3785,12 +3785,47 @@ for those models only; the interval is fixed and not a user argument
 (user decision, November 24, 2026, after per-search calibration took 609 s
 against 3.5 s for an 80-year 1880 run).
 The `.log_weight_<group>` union diagnostics are
-removed (supersedes the recording part of D070); a helper that builds
-wife-side conditional-logit data with weight offsets may follow as a
-separate feature. The user confirmed the argument name
+removed (supersedes the recording part of D070); D200 replaces them with
+sampled weight records and a choice-set helper. The user confirmed the
+argument name
 `ancestry_resolution`.
 
 **Consequences:** Differences in ancestry smaller than the resolution do
 not affect matching. Calibration no longer reduces to unit weights or
 skips strict endogamy when a model has an ancestry term. Seeded histories
 of models without the term are unchanged.
+
+## D200 — Sampled weight records and choice-set reconstruction (November 24, 2026)
+
+**Status:** User decisions, November 24, 2026, on the
+`ancestry-share-matching` branch. Implemented. The number follows D199;
+renumber at merge if needed.
+
+**Decision (user, November 24, 2026):** Replace the removed
+`.log_weight_<group>` diagnostics in the same PR. Choice sets are
+reconstructed after the run from the histories, not built during it;
+known-kin exclusions are ignored in the reconstruction. The helper is
+`extract_choice_sets()` in a new `R/choice_sets.R`, and covers marriage
+or marriage and cohabitation unions as the analyst chooses. Because
+recording must be requested anyway, a run keeps the weights of a sample of
+its searches rather than of every calibration.
+
+**Details (agent proposal, accepted by the user):** A `run_simulation()`
+fraction, `union_weight_sample` (name chosen by the user; default 0),
+selects unions by a fixed hash of the union ID, consuming no random draws,
+and the result gains `matching_weights` (types, unions, weights). Hard
+group restrictions are not applied in the reconstruction. See
+[weighted-choice matching](weighted-choice-matching.md#choice-set-reconstruction-d200).
+
+**Rationale:** The engine alone knows the calibrated weights at each
+search; eligibility apart from kinship and hard restrictions can be rebuilt
+from the histories. One weight per type and search does not scale to
+ancestry types (about 600 types and 1,000 held calibrations in an 80-year
+1880 run), so only sampled searches are kept.
+
+**Unselected options:** Building choice sets in the engine during the run;
+recording every calibration; recomputing weights in R; drawing the sample
+with the run's random numbers.
+
+**Consequences:** Results without recording are unchanged. Recovery checks
+like milestone 3's become possible again for runs with ancestry types.

@@ -461,8 +461,72 @@ Consequences:
 
 Weights consume no random draws and are not recorded on unions. The
 `.log_weight_<group>` diagnostics that recorded them (D070) were removed by
-D199; a helper that builds wife-side choice sets with each alternative's
-log weight as an offset may follow as a separate feature.
+D199. Instead, a run can keep the weights of a sample of its searches (D200), and `extract_choice_sets()`
+builds wife-side choice sets from the histories with each alternative's log
+weight as an offset.
+
+### Choice-set reconstruction (D200)
+
+*Implemented (D200, November 24, 2026).*
+
+**Recording.** The `run_simulation()` argument `union_weight_sample`
+(default 0) gives the fraction of unions formed by marriage and cohabitation
+searches in this run whose search weights are kept. A union is kept when a
+fixed hash of its union ID falls below the fraction, so recording consumes no
+random draws and the histories are identical with recording on or off. The
+result gains `matching_weights`, a list of three tibbles:
+
+- `types`: `type_id`, the man's matching categories (one column per matching
+  dimension) and, with an ancestry term, his rounded ancestry shares.
+- `unions`: `union_id`, `union_type` (`"marriage"` or `"cohabitation"`),
+  `time` and `calibration_id`; `calibration_id` is `NA` when the model has no
+  calibrated weights (all offsets 0).
+- `weights`: `calibration_id`, `type_id` and `log_weight`, for the types with
+  men in the pool at that search. Unions that share held weights (D199) share
+  one calibration.
+
+Father matching for nonmarital births forms no union and is not recorded.
+Unions in the starting population and, with immigration, unions that arrive
+formed are never searches, so they are never kept. A later run on the result
+replaces the record; it covers one run.
+
+**Reconstruction.** `extract_choice_sets(population, unions = 1000,
+alternatives = 50, union_types = c("marriage", "cohabitation"))` samples
+`unions` recorded unions of the requested types (all of them if fewer) and,
+for each, `alternatives` other men (all if fewer) uniformly without
+replacement from the men eligible at its start time `t`: male, alive at `t`,
+`t - birth_time >= min_male_age` and in no union live at `t` (a union ending
+at `t` has ended, since dissolution and death precede searches). The chosen
+husband is excluded from the alternatives. Known-kin exclusions are not
+applied (user decision), and nor are hard group restrictions (`NA` in
+`group_exogamy`); analysts can drop restricted pairs using the category
+columns. Sampling uses R's random-number generator.
+
+Each candidate's type is his matching categories at `t` (from the transition
+history) with his rounded profile, and his `log_weight` is that type's entry
+for the union's calibration, 0 for a type with no entry. The result has one
+row per candidate: `choice_id` (the union ID), `union_type`, `time`,
+`chosen`, `wife_id`, `man_id`, both birth times, both persons' categories at
+`t` (`_w`, `_h` suffixes), their rounded ancestry shares when recorded, and
+`log_weight`.
+
+**Use and limits.** With uniform sampling of alternatives, a conditional logit
+such as `clogit(chosen ~ age_diff + I(age_diff^2) + <pair indicators> +
+<ancestry distances> + offset(log_weight) + strata(choice_id))` estimates the
+matching model's coefficients consistently. Kinship and hard restrictions
+remove alternatives in the engine but not here, so estimates near those
+boundaries can differ. `min_male_age` is recorded with the weights.
+
+**Validation.** A run without groups has all offsets 0. Seeded histories are
+identical with `union_weight_sample` 0, 0.3 and 1; at 1 every union formed in
+the run is kept, a fraction keeps about that share, and two histories keep the
+same union IDs. Each set holds one chosen husband and distinct eligible men,
+and no chosen husband carries the zero-target weight -1000. Recovery: in a
+40-year run with two race groups (`A:B` -2) and three ancestry categories
+(lambda 1, 0.5 and 1.5), a conditional logit on 3,000 sets with offsets
+recovers the age, race and ancestry inputs within 4 standard errors; an
+exploratory fit on all unions gave -1.99 to -2.01 for race and 0.91, 0.61
+and 1.51 for lambda (standard errors about 0.05).
 
 A conditional logit fitted to reconstructed wife-side choice sets is exact
 with the applied log weights as offsets. A male-group main effect

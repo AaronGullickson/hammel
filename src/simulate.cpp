@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <map>
@@ -320,6 +321,11 @@ class Simulation {
     Nullable<List> group_input
   );
   Simulation(const Simulation&) = delete;
+  // Keep the search weights of this fraction of the unions formed by
+  // marriage and cohabitation searches (D200).
+  void set_union_weight_sample(double fraction) {
+    union_weight_sample = fraction;
+  }
   Simulation& operator=(const Simulation&) = delete;
   List run(SEXP progress);
 
@@ -565,9 +571,23 @@ class Simulation {
   struct HeldWeights {
     double time = R_NegInf;
     int types = -1;
+    int calibration = -1;
     std::vector<double> log_weights;
   };
   HeldWeights union_held, father_held, cohab_held;
+  // Sampled weight records (D200). Each solve is numbered; held weights keep
+  // their solve's number. A kept union records the number its search used and
+  // the log weights of the types with men in the pool, added per solve as
+  // later kept unions find types not yet stored.
+  double union_weight_sample = 0;
+  int calibration_count = 0, last_calibration = -1;
+  std::vector<double> last_log_weights;
+  std::vector<double> record_union, record_time;
+  std::vector<int> record_cohab, record_calibration;
+  std::map<int, std::vector<char>> record_stored;
+  std::vector<int> record_solve, record_type;
+  std::vector<double> record_log_weight;
+  void record_union_weights(double union_id, double now, bool cohab);
   double typed_interval = 0;
   std::map<SEXP, std::vector<double>> deltas;  // target log shifts by model
   double weighted_infeasible = 0;
@@ -1848,8 +1868,10 @@ int Simulation::find_candidate(
       held.types = types.count();
     }
   }
+  int calibration = -1;
   if (hold) {
     log_weights = held.log_weights;
+    calibration = held.calibration;
   } else if (calibrator && weighted) {
     if (probability_tracker) {
       probability_tracker->advance(now);
@@ -1919,10 +1941,18 @@ int Simulation::find_candidate(
       ++weighted_infeasible;
     }
     log_weights = weights.log_weights;
+    calibration = calibration_count++;
     if (draw.ancestry.active()) {
       held.time = now;
       held.types = types.count();
+      held.calibration = calibration;
       held.log_weights = log_weights;
+    }
+  }
+  if (union_weight_sample > 0 && !father) {
+    last_calibration = calibration;
+    if (calibration >= 0) {
+      last_log_weights = log_weights;
     }
   }
   return draw_partner(
@@ -1956,6 +1986,10 @@ int Simulation::form_union(int woman, double now) {
   const int u = static_cast<int>(union_history.size());
   union_history.push_back({++next_union_id, now, NA_REAL, woman, partner});
   union_history.back().cohab = is_cohab;
+  if (union_weight_sample > 0) {
+    // Before the husband leaves the pool, so his type is among those stored.
+    record_union_weights(union_history.back().id, now, is_cohab);
+  }
   person_unions[woman].push_back(u);
   person_unions[partner].push_back(u);
   current_partner[woman] = partner;
@@ -1963,6 +1997,46 @@ int Simulation::form_union(int woman, double now) {
   remove_male(partner);
   remove_counted_woman(woman);
   return partner;
+}
+
+// A union is kept when a fixed hash of its ID falls below the sample
+// fraction, so recording consumes no random draws (D200).
+bool kept_union(double union_id, double fraction) {
+  uint64_t z = static_cast<uint64_t>(union_id) + 0x9E3779B97F4A7C15ULL;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+  z ^= z >> 31;
+  return static_cast<double>(z >> 11) * 0x1.0p-53 < fraction;
+}
+
+void Simulation::record_union_weights(double union_id, double now, bool cohab) {
+  if (!kept_union(union_id, union_weight_sample)) {
+    return;
+  }
+  record_union.push_back(union_id);
+  record_time.push_back(now);
+  record_cohab.push_back(cohab);
+  record_calibration.push_back(last_calibration);
+  if (last_calibration < 0) {
+    return;
+  }
+  std::vector<char>& stored = record_stored[last_calibration];
+  stored.resize(last_log_weights.size(), 0);
+  const int last = pool.last_bin(now, min_male_age);
+  for (int t = 0; t < static_cast<int>(last_log_weights.size()); ++t) {
+    if (stored[t] || t >= pool.groups()) {
+      continue;
+    }
+    for (int k = 0; k <= last; ++k) {
+      if (!pool.members(t, k).empty()) {
+        stored[t] = 1;
+        record_solve.push_back(last_calibration);
+        record_type.push_back(t);
+        record_log_weight.push_back(last_log_weights[t]);
+        break;
+      }
+    }
+  }
 }
 
 void Simulation::check_union_capacity() const {
@@ -3418,6 +3492,48 @@ List Simulation::results() {
           _["end_time"] = out_end, _["end_reason"] = out_reason
         );
 
+  // Sampled weight records (D200): kept unions, stored log weights by solve,
+  // and each type's matching-dimension codes and rounded profile units.
+  List weight_record;
+  if (union_weight_sample > 0) {
+    const int n_types = types.count();
+    IntegerMatrix type_codes(n_types, matching_spec.dims.size());
+    int components = 0;
+    for (int t = 0; t < n_types && types.active(); ++t) {
+      components = types.profile_units(types.profile(t)).size();
+      break;
+    }
+    IntegerMatrix type_units(n_types, components);
+    for (int t = 0; t < n_types; ++t) {
+      const int c = types.category(t);
+      for (size_t j = 0; j < matching_spec.dims.size(); ++j) {
+        const int size = dim_labels[matching_spec.dims[j]].size();
+        type_codes(t, j) = (c / matching_spec.strides[j]) % size;
+      }
+      if (components) {
+        const std::vector<int>& units = types.profile_units(types.profile(t));
+        for (int g = 0; g < components; ++g) {
+          type_units(t, g) = units[g];
+        }
+      }
+    }
+    IntegerVector calibration = wrap(record_calibration);
+    for (int k = 0; k < calibration.size(); ++k) {
+      if (calibration[k] < 0) {
+        calibration[k] = NA_INTEGER;
+      }
+    }
+    weight_record = List::create(
+      _["union_id"] = wrap(record_union), _["time"] = wrap(record_time),
+      _["cohab"] = wrap(record_cohab), _["calibration_id"] = calibration,
+      _["weight_calibration"] = wrap(record_solve),
+      _["weight_type"] = wrap(record_type),
+      _["log_weight"] = wrap(record_log_weight),
+      _["type_dims"] = wrap(matching_spec.dims), _["type_codes"] = type_codes,
+      _["type_units"] = type_units
+    );
+  }
+
   return List::create(
     _["persons"] = DataFrame::create(
       _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
@@ -3437,7 +3553,7 @@ List Simulation::results() {
     _["weighted_infeasible"] = weighted_infeasible,
     _["draw_approximate"] = draw_approximate, _["unrealized"] = unrealized,
     _["cells_consistent"] = cells_consistent,
-    _["hetfert"] = wrap(fertility_weights)
+    _["hetfert"] = wrap(fertility_weights), _["weight_record"] = weight_record
   );
 }
 
@@ -3477,6 +3593,7 @@ List simulate_cpp(
   Nullable<List> model_schedule_input = R_NilValue,
   Nullable<List> weight_input = R_NilValue,
   Nullable<List> group_input = R_NilValue,
+  double union_weight_sample = 0,
   Nullable<Function> progress = R_NilValue
 ) {
   Simulation simulation(
@@ -3487,5 +3604,6 @@ List simulate_cpp(
     cohab_matching, counts_cohab, check_cells, hetfert, transition_input,
     model_schedule_input, weight_input, group_input
   );
+  simulation.set_union_weight_sample(union_weight_sample);
   return simulation.run(progress);
 }

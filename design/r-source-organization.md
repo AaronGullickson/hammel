@@ -112,7 +112,13 @@ Calculate TFR and PATFR from rate schedules.
 
 Small, general checks for table columns and numeric/time values.
 
-- Functions: `check_time()`, `check_columns()`, `check_numeric_column()`, `check_nonnegative()`, `check_labels()`, `check_flag()`.
+- Functions: `check_time()`, `check_columns()`, `check_numeric_column()`, `check_nonnegative()`, `check_count()`, `check_labels()`, `check_flag()`.
+
+### `R/choice_sets.R`
+
+Reconstruct wife-side matching choice sets with recorded weight offsets (D200).
+
+- Functions: **`extract_choice_sets()`**, `format_matching_weights()`.
 
 ### `R/cohabitation.R`
 

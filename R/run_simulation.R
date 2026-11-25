@@ -36,8 +36,16 @@
 #'   years. Defaults to `TRUE` in interactive environments and `FALSE` in
 #'   non-interactive environments. Users can set the `hammel.progress` option
 #'   to control its use.
+#' @param union_weight_sample The fraction of unions formed by marriage and
+#'   cohabitation searches in this run whose matching weights are kept, from
+#'   0 (default, none) to 1. Kept weights let [extract_choice_sets()] build
+#'   conditional-logit choice sets with each man's log weight as an offset.
+#'   Unions are selected by their IDs, so recording does not change the
+#'   simulation.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
-#'   `simulation` component recording selected settings.
+#'   `simulation` component recording selected settings. With
+#'   `union_weight_sample` above 0, it also has a `matching_weights`
+#'   component for [extract_choice_sets()].
 #' @export
 #' @examples
 #' population <- generate_uniform_population(1000)
@@ -54,7 +62,8 @@ run_simulation <- function(
   model,
   years,
   seed = NULL,
-  progress = getOption("hammel.progress", interactive())
+  progress = getOption("hammel.progress", interactive()),
+  union_weight_sample = 0
 ) {
   # Errors raised by helpers called from local functions name this function.
   run_call <- rlang::current_env()
@@ -77,6 +86,18 @@ run_simulation <- function(
       ),
       "argument",
       argument = "progress"
+    )
+  }
+  if (!is.numeric(union_weight_sample) || length(union_weight_sample) != 1L ||
+        is.na(union_weight_sample) || union_weight_sample < 0 ||
+        union_weight_sample > 1) {
+    abort_hammel(
+      c(
+        "{.arg union_weight_sample} must be a single number from 0 to 1.",
+        "x" = "It is {describe_value(union_weight_sample)}."
+      ),
+      "argument",
+      argument = "union_weight_sample"
     )
   }
   missing_elements <- missing_model_elements(model)
@@ -790,6 +811,7 @@ run_simulation <- function(
         transition_rates,
         if (scheduled_models) model_context$config else NULL,
         weight_input, group_input,
+        union_weight_sample = as.numeric(union_weight_sample),
         progress = progress_callback
       )
     )
@@ -903,6 +925,16 @@ run_simulation <- function(
   )
   if (!is.null(hetfert)) {
     result$simulation$hetfert <- hetfert
+  }
+  # Sampled matching weights cover this run only (D200).
+  result$matching_weights <- if (years > 0 && union_weight_sample > 0) {
+    format_matching_weights(
+      native$weight_record,
+      dimensions,
+      registries,
+      ancestry_layout,
+      union_process$min_male_age
+    )
   }
   # Unrealized births are part of the population's history: append this run's
   # records to any earlier ones. `unrealized_since` is when the record starts.
