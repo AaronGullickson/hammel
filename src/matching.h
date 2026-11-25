@@ -6,6 +6,8 @@
 #include <Rcpp.h>
 
 #include <functional>
+#include <map>
+#include <utility>
 #include <vector>
 
 namespace hammel {
@@ -29,6 +31,72 @@ NumericVector matching_utilities(
   IntegerVector female_groups = IntegerVector()
 );
 
+// Matching types (D199): a person's matching category combined with their
+// ancestry profile rounded to a whole number of `units` per dimension. The
+// profile covers every ancestry component of the dimensions that ancestry
+// endogamy names. Without ancestry endogamy each category is its own type
+// (one empty profile), so type indices equal category indices.
+class MatchingTypes {
+  int categories_ = 1, units_ = 0;
+  std::vector<int> offsets_, sizes_;  // named dimensions' components
+  std::map<std::vector<int>, int> profile_ids_;
+  std::vector<std::vector<int>> profiles_;
+  std::map<std::pair<int, int>, int> type_ids_;
+  std::vector<int> category_, profile_;
+
+ public:
+  MatchingTypes() : MatchingTypes(1) {}
+  explicit MatchingTypes(
+    int categories,
+    std::vector<int> offsets = {},
+    std::vector<int> sizes = {},
+    int units = 0
+  );
+  bool active() const { return units_ > 0; }
+  int count() const { return static_cast<int>(category_.size()); }
+  int categories() const { return categories_; }
+  int units() const { return units_; }
+  int category(int type) const { return category_[type]; }
+  int profile(int type) const { return profile_[type]; }
+  const std::vector<int>& profile_units(int profile) const {
+    return profiles_[profile];
+  }
+  // The rounded profile of one person's ancestry shares (registering it).
+  int profile_of(const double* shares);
+  // The type of a category and profile (registering it).
+  int type(int category, int profile);
+};
+
+// Round each named dimension's shares jointly to whole units: integer parts,
+// then the remaining units to the largest remainders, ties to the earlier
+// component (D199).
+std::vector<int> round_profile(const double* shares, int size, int units);
+
+// A matching model's ancestry endogamy term (D199): lambda per profile
+// component (empty: no term), giving -sum lambda |u_f - u_m| / units between
+// two rounded profiles. `factor` caches exp(value) by profile pair.
+struct AncestryTerm {
+  std::vector<double> lambda;
+  mutable std::vector<std::vector<double>> cache;
+  bool active() const { return !lambda.empty(); }
+  double value(const MatchingTypes& types, int female, int male) const;
+  double factor(const MatchingTypes& types, int female, int male) const;
+};
+AncestryTerm read_ancestry_term(const List& model);
+
+// Matching types for an internal entry point: categories only, or with an
+// ancestry layout list(offsets, sizes, units) for profile components.
+inline MatchingTypes inspect_types(int groups, const Nullable<List>& layout) {
+  if (layout.isNull()) {
+    return MatchingTypes(groups);
+  }
+  const List x(layout.get());
+  return MatchingTypes(
+    groups, as<std::vector<int>>(x["offsets"]),
+    as<std::vector<int>>(x["sizes"]), as<int>(x["units"])
+  );
+}
+
 // Pair utilities on the fixed grid of bin-centre lags. Lag (female bin - male
 // bin) * width is male age minus female age, so the grid never changes during
 // a run and custom R formulas are evaluated once. Excluded pairs are -Inf.
@@ -42,6 +110,7 @@ struct LagTable {
   std::vector<char> allowed;
   std::vector<int> block;
   int blocks = 1;
+  AncestryTerm ancestry;  // added to the lag utility by profile pair
   size_t index(int female, int male, int lag) const {
     return (static_cast<size_t>(female) * groups + male) * span + lag;
   }
@@ -80,6 +149,13 @@ class MalePool {
     cells_.assign(static_cast<size_t>(groups) * bins_, std::vector<int>());
   }
   int groups() const { return groups_; }
+  // Add cells for types registered since construction (group-major layout).
+  void grow(int groups) {
+    if (groups > groups_) {
+      groups_ = groups;
+      cells_.resize(static_cast<size_t>(groups) * bins_);
+    }
+  }
   long long first() const { return first_; }
   double width() const { return width_; }
   bool empty() const { return size_ == 0; }
@@ -138,6 +214,7 @@ class MalePool {
 // counted so simulation can report approximate draws.
 struct DrawModel {
   List model;
+  AncestryTerm ancestry;
   bool native = false;
   double linear = 0, quadratic = 0;
   NumericMatrix offsets;
@@ -221,13 +298,15 @@ struct DrawWorkspace {
   std::vector<double> top, cumulative;
 };
 
-// Draw one partner for a woman of group `female_group` born `female_born`.
-// Returns a person index, or -1 when no eligible man exists. `log_weights`
-// holds one log group weight per group (zeros for female choice).
+// Draw one partner for a woman of matching type `female_type` born
+// `female_born`. Pool cells are indexed by type. Returns a person index, or
+// -1 when no eligible man exists. `log_weights` holds one log weight per type
+// (zeros for female choice).
 int draw_partner(
   const MalePool& pool,
   const DrawModel& draw,
-  int female_group,
+  const MatchingTypes& types,
+  int female_type,
   double female_born,
   double now,
   double cutoff,

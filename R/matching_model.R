@@ -28,7 +28,8 @@
 #'make the choice:
 #'
 #' \deqn{
-#'  P(j\mid i)= \frac{\omega_{g(j)}\exp(U_{ij})}{\sum_k\omega_{g(k)}\exp(U_{ik})}
+#'  P(j\mid i)= \frac{\omega_{g(j)}\exp(U_{ij})}
+#'  {\sum_k\omega_{g(k)}\exp(U_{ik})}
 #' }
 #'
 #'where \eqn{\omega_g} is a group-specific weight to adjust for male group
@@ -77,6 +78,32 @@
 #'applied in both directions; NA prohibits it; unlisted pairs have an implicit
 #'log odds of zero.
 #'
+#'The `ancestry_endogamy` argument is another approach to simulating endogamy
+#'between group categories. Tracking of ancestry must be enabled in the group
+#'declaration to use it for a group dimension. For each ancestry category
+#'\eqn{k} with weight \eqn{\lambda_k}, the term
+#'\eqn{-\sum_k \lambda_k |p_{ik} - p_{jk}|} is added to the utility, where
+#'\eqn{p_{ik}} and \eqn{p_{jk}} are the woman's and man's ancestry shares.
+#'When the two potential partners have unmixed ancestry from two completely
+#'different categories, the utility penalty will be equal to the sum of their
+#'full \eqn{\lambda} values. When they have unmixed ancestry from the same
+#'category, they will suffer no penalty. Penalties will be reduced for
+#'similarity in ancestry between these extremes.
+#'
+#'The `ancestry_endogamy` argument is specified as a named list similar to the
+#'list form option for `group_exogamy`. Each name in the list corresponds to a
+#'group dimension and each element is a named vector of weights where the names
+#'correspond to group categories, such as `list(race = c(A = 1.5, B = 0.8))`.
+#'To generate more endogamy, the values should be positive, but negative weights
+#'are allowed. Left out categories implicitly receive a weight of zero. The
+#'"unknown" category can also be given a weight.
+#'
+#'For estimation of weights applied to potential men, ancestry is coarsened
+#'into bins. The `ancestry_resolution` argument specifies the width of those
+#'bins. Because initial mixing will halve ancestry components, specifying
+#'values in such terms (e.g. 1/4, 1/8, 1/16) works well. Smaller values
+#'provide more precision, but slower runs.
+#'
 #'Users may find [age_gap_matching_model()] more intuitive than specifying
 #'a direct formula.
 #'
@@ -89,6 +116,15 @@
 #'@param delta Optional male-target adjustments, as a named list keyed by
 #'  dimension or a bare value for the only declared dimension: a finite numeric
 #'  vector with unique category names.
+#'@param ancestry_endogamy A named list indicating endogamy weights for
+#'  shared ancestry within a named group dimension. Each element of the list
+#'  should be a named vector where the names correspond to the group dimension's
+#'  categories and the values correspond to an endogamy weight. See details for
+#'  further information.
+#'@param ancestry_resolution The resolution to which ancestry shares are
+#'  rounded for matching, a single number such as `1/8` (default), `1/16` or
+#'  `0.1` whose reciprocal is a whole number. Used only with
+#'  `ancestry_endogamy`.
 #'@return An inspectable `hammel_matching_model` list containing `formula` and
 #'  `coefficients`.
 #'@export
@@ -107,14 +143,18 @@ matching_model <- function(
   formula,
   coefficients,
   group_exogamy = NULL,
-  delta = NULL
+  delta = NULL,
+  ancestry_endogamy = NULL,
+  ancestry_resolution = 1 / 8
 ) {
   model <- structure(
     list(
       formula = formula,
       coefficients = coefficients,
       group_exogamy = group_exogamy,
-      delta = delta
+      delta = delta,
+      ancestry_endogamy = ancestry_endogamy,
+      ancestry_resolution = ancestry_resolution
     ),
     class = "hammel_matching_model"
   )
@@ -191,7 +231,9 @@ age_gap_matching_model <- function(
   preferred_age_gap,
   half_weight_distance,
   group_exogamy = NULL,
-  delta = NULL
+  delta = NULL,
+  ancestry_endogamy = NULL,
+  ancestry_resolution = 1 / 8
 ) {
   for (name in c("preferred_age_gap", "half_weight_distance")) {
     value <- get(name)
@@ -240,7 +282,9 @@ age_gap_matching_model <- function(
       "I(age_difference^2)" = unname(quadratic)
     ),
     group_exogamy = group_exogamy,
-    delta = delta
+    delta = delta,
+    ancestry_endogamy = ancestry_endogamy,
+    ancestry_resolution = ancestry_resolution
   )
 }
 
@@ -273,6 +317,9 @@ age_gap_matching_model <- function(
 #'     and `half_weight_distance`, in years, of a quadratic age-gap model.}
 #'   \item{group_exogamy}{The `group_exogamy` specification, or `NULL`.}
 #'   \item{delta}{The `delta` specification, or `NULL`.}
+#'   \item{ancestry_endogamy}{The `ancestry_endogamy` specification, or
+#'     `NULL`.}
+#'   \item{ancestry_resolution}{The ancestry rounding resolution.}
 #' }
 #'
 #' @seealso [matching_model()], [age_gap_matching_model()]
@@ -291,7 +338,9 @@ summary.hammel_matching_model <- function(object, ...) {
       coefficients = object$coefficients,
       age_gap = implied_age_gap(object),
       group_exogamy = object$group_exogamy,
-      delta = object$delta
+      delta = object$delta,
+      ancestry_endogamy = object$ancestry_endogamy,
+      ancestry_resolution = object$ancestry_resolution
     ),
     class = "summary.hammel_matching_model"
   )
@@ -342,6 +391,18 @@ matching_summary_lines <- function(x) {
       signif(x$age_gap$half_weight_distance, 4), "years"
     )
   }
+  ancestry <- format_dimension_values(
+    "Ancestry endogamy",
+    x$ancestry_endogamy,
+    format_named_values
+  )
+  if (length(ancestry)) {
+    resolution <- x$ancestry_resolution
+    if (is.null(resolution)) {
+      resolution <- 1 / 8
+    }
+    ancestry[["Ancestry resolution"]] <- format_resolution(resolution)
+  }
   c(
     lines,
     format_dimension_values(
@@ -349,8 +410,14 @@ matching_summary_lines <- function(x) {
       x$group_exogamy,
       format_exogamy_values
     ),
-    format_dimension_values("Delta", x$delta, format_named_values)
+    format_dimension_values("Delta", x$delta, format_named_values),
+    ancestry
   )
+}
+
+# A resolution such as 0.125 as "1/8".
+format_resolution <- function(x) {
+  paste0("1/", round(1 / x))
 }
 
 # Lines for a setting given as a bare value (the only dimension) or a list
@@ -442,6 +509,102 @@ validate_delta <- function(x, call = rlang::caller_env()) {
       ),
       "specification",
       argument = "delta",
+      call = call
+    )
+  }
+  invisible(x)
+}
+
+# Ancestry endogamy (D199): a bare named weight vector or a list of them keyed
+# by dimension. Dimensions and categories are checked at simulation.
+validate_ancestry_endogamy <- function(x, call = rlang::caller_env()) {
+  if (is.null(x)) {
+    return(invisible(x))
+  }
+  if (!is_dimension_list(x)) {
+    check_ancestry_weights(x, call = call)
+    return(invisible(x))
+  }
+  if (!length(x) || is.null(names(x)) || anyNA(names(x)) ||
+        any(!nzchar(names(x))) || anyDuplicated(names(x))) {
+    abort_hammel(
+      c(
+        paste(
+          "A list {.arg ancestry_endogamy} must be named by group dimension,",
+          "once each."
+        ),
+        "x" = "Its names are {.val {names(x)}}."
+      ),
+      "specification",
+      argument = "ancestry_endogamy",
+      call = call
+    )
+  }
+  for (weights in x) {
+    check_ancestry_weights(weights, call = call)
+  }
+  invisible(x)
+}
+
+# One dimension's ancestry endogamy weights.
+check_ancestry_weights <- function(x, call = rlang::caller_env()) {
+  if (!is.numeric(x) || is.complex(x) || !is.null(dim(x)) || !length(x) ||
+        any(!is.finite(x)) || is.null(names(x)) || anyNA(names(x)) ||
+        any(!nzchar(trimws(names(x)))) || anyDuplicated(names(x))) {
+    abort_hammel(
+      c(
+        paste(
+          "{.arg ancestry_endogamy} weights must be finite numbers named by",
+          "unique ancestry categories."
+        ),
+        "x" = "It is {describe_value(x)}.",
+        "i" = paste(
+          "For example,",
+          "{.code ancestry_endogamy = c(irish = 2, nw_europe = 2)}."
+        )
+      ),
+      "specification",
+      argument = "ancestry_endogamy",
+      call = call
+    )
+  }
+  invisible(x)
+}
+
+# The ancestry rounding resolution: r in (0, 1] with 1/r a whole number.
+# NULL, as in models saved before D199, means the default.
+validate_ancestry_resolution <- function(x, call = rlang::caller_env()) {
+  if (is.null(x)) {
+    return(invisible(x))
+  }
+  if (!is.numeric(x) || is.complex(x) || length(x) != 1L ||
+        !is.null(dim(x)) || !is.finite(x) || x <= 0 || x > 1 ||
+        abs(1 / x - round(1 / x)) > 1e-8 / x) {
+    abort_hammel(
+      c(
+        "{.arg ancestry_resolution} must be 1 divided by a whole number.",
+        "x" = "It is {describe_value(x)}.",
+        "i" = "For example, {.code 1/8}, {.code 1/16} or {.code 0.1}."
+      ),
+      "argument",
+      argument = "ancestry_resolution",
+      call = call
+    )
+  }
+  # The engine counts shares in whole units of the resolution.
+  limit <- .Machine$integer.max
+  if (round(1 / x) > limit) {
+    abort_hammel(
+      c(
+        "{.arg ancestry_resolution} is too small.",
+        "x" = "It is {describe_value(x)}.",
+        "i" = paste(
+          "Use 1 divided by a whole number up to {limit},",
+          "such as {.code 1/16}."
+        )
+      ),
+      "argument",
+      argument = "ancestry_resolution",
       call = call
     )
   }
@@ -570,6 +733,8 @@ validate_matching_model <- function(model, call = rlang::caller_env()) {
       )
     }
   }
+  validate_ancestry_endogamy(model$ancestry_endogamy, call = call)
+  validate_ancestry_resolution(model$ancestry_resolution, call = call)
   # Without group predictors, coefficient names can be checked now.
   if (!any(grepl("^(female|male|same)_.+", vars))) {
     design <- matching_design_matrix(
@@ -799,6 +964,7 @@ calculate_matching_probabilities <- function(
 prepare_matching_model <- function(
   matching,
   population_groups = NULL,
+  ancestry = NULL,
   call = rlang::caller_env()
 ) {
   validate_matching_groups(matching, population_groups, call = call)
@@ -858,6 +1024,7 @@ prepare_matching_model <- function(
     group_formula = group_formula,
     needs_groups = group_formula || nrow(pairs) > 0,
     pair_offsets = offsets,
+    ancestry_lambda = ancestry_lambda(matching, ancestry),
     evaluate = function(
       age_difference, female_group = NULL,
       male_group = NULL

@@ -60,6 +60,105 @@ bool solve_linear(
   return true;
 }
 
+// Newton step for typed models (D199), by preconditioned conjugate gradients
+// without forming the Hessian. With phi the expected flow shares, p_r each
+// row's choice probabilities and w_r its share of intensity, the Hessian is
+// diag(phi) - sum_r w_r p_r p_r', so a product costs one pass over the rows.
+// The first unit is the reference (fixed at zero); `step` covers the rest.
+// The step is inexact, with relative residual min(0.1, sqrt(|g|)); the outer
+// iteration still converges to the same tolerance as the dense solve.
+void newton_cg_step(
+  const std::vector<double>& phi,
+  const std::vector<double>& tau,
+  const std::vector<double>& probs,
+  const std::vector<double>& row_weight,
+  int n,
+  std::vector<double>& step
+) {
+  const size_t rows = row_weight.size();
+  auto times = [&](const std::vector<double>& v, std::vector<double>& out) {
+    for (int j = 0; j < n; ++j) {
+      out[j] = (phi[j] + 1e-14) * v[j];
+    }
+    for (size_t r = 0; r < rows; ++r) {
+      const double* p = &probs[r * n];
+      double dot = 0;
+      for (int j = 1; j < n; ++j) {
+        dot += p[j] * v[j];
+      }
+      const double c = row_weight[r] * dot;
+      for (int j = 1; j < n; ++j) {
+        out[j] -= c * p[j];
+      }
+    }
+    out[0] = 0;
+  };
+  // Jacobi preconditioner: the Hessian's diagonal.
+  std::vector<double> diagonal(n, 1.0);
+  for (int j = 1; j < n; ++j) {
+    double d = phi[j] + 1e-14;
+    for (size_t r = 0; r < rows; ++r) {
+      const double p = probs[r * n + j];
+      d -= row_weight[r] * p * p;
+    }
+    diagonal[j] = d > 0 ? d : 1.0;
+  }
+  std::vector<double> x(n, 0), residual(n, 0), z(n, 0), direction(n, 0),
+    product(n, 0);
+  double norm = 0;
+  for (int j = 1; j < n; ++j) {
+    residual[j] = -(phi[j] - tau[j]);
+    norm += residual[j] * residual[j];
+  }
+  norm = std::sqrt(norm);
+  const double tolerance = std::min(0.1, std::sqrt(norm)) * norm;
+  double rz = 0;
+  for (int j = 1; j < n; ++j) {
+    z[j] = residual[j] / diagonal[j];
+    direction[j] = z[j];
+    rz += residual[j] * z[j];
+  }
+  const int limit = std::max(10, 2 * n);
+  for (int iteration = 0; iteration < limit && norm > tolerance; ++iteration) {
+    times(direction, product);
+    double curvature = 0;
+    for (int j = 1; j < n; ++j) {
+      curvature += direction[j] * product[j];
+    }
+    if (!(curvature > 0)) {
+      break;
+    }
+    const double alpha = rz / curvature;
+    norm = 0;
+    for (int j = 1; j < n; ++j) {
+      x[j] += alpha * direction[j];
+      residual[j] -= alpha * product[j];
+      norm += residual[j] * residual[j];
+    }
+    norm = std::sqrt(norm);
+    double next = 0;
+    for (int j = 1; j < n; ++j) {
+      z[j] = residual[j] / diagonal[j];
+      next += residual[j] * z[j];
+    }
+    const double beta = next / rz;
+    rz = next;
+    for (int j = 1; j < n; ++j) {
+      direction[j] = z[j] + beta * direction[j];
+    }
+  }
+  // No progress (for example, zero curvature at once): take the
+  // preconditioned gradient step; the line search then scales it.
+  bool moved = false;
+  for (int j = 1; j < n; ++j) {
+    moved = moved || x[j] != 0;
+  }
+  step.assign(n - 1, 0);
+  for (int j = 1; j < n; ++j) {
+    step[j - 1] = moved ? x[j] : -(phi[j] - tau[j]) / diagonal[j];
+  }
+}
+
 WeightSolution WeightCalibrator::solve(
   double now,
   int channel,
@@ -70,19 +169,31 @@ WeightSolution WeightCalibrator::solve(
   advance(now);
   const LagTable& table = *tables_[table_id];
   const std::vector<double>& sums = sums_[table_id];
-  const int G = groups_;
+  const int T = groups_, C = categories_;
+  // Weighted units (D199): each type for a model with ancestry endogamy,
+  // otherwise each category, whose types share one weight. Without ancestry
+  // endogamy types are categories and both coincide.
+  const bool typed = table.ancestry.active();
+  const int G = typed ? T : C;
+  std::vector<int> unit(T), unit_group(G);
+  for (int t = 0; t < T; ++t) {
+    unit[t] = typed ? t : types_->category(t);
+    unit_group[unit[t]] = types_->category(t);
+  }
   WeightSolution s;
-  s.log_weights.assign(G, 0.0);
+  std::vector<double> x_unit(G, 0.0);
+  s.log_weights.assign(T, 0.0);
   s.target.assign(G, 0.0);
   s.flow.assign(G, 0.0);
   std::vector<double> women_count(G, 0), men_count(G, 0), intensity(G, 0);
-  std::vector<std::vector<std::pair<int, double>>> men(G);
+  // Included male bins by type: (bin, count).
+  std::vector<std::vector<std::pair<int, double>>> men(T);
   struct Row {
-    int group, bin;
+    int group, bin, type;
     double lambda;
   };
   std::vector<Row> rows;
-  for (int g = 0; g < G; ++g) {
+  for (int g = 0; g < T; ++g) {
     for (int k = 0; k < bins_; ++k) {
       const double age = now - centre(k);
       if (age < cutoff_) {
@@ -91,14 +202,14 @@ WeightSolution WeightCalibrator::solve(
       const size_t i = static_cast<size_t>(g) * bins_ + k;
       if (men_[i] > 0) {
         men[g].push_back({k, men_[i]});
-        men_count[g] += men_[i];
+        men_count[unit[g]] += men_[i];
       }
       if (women_[i] > 0) {
-        women_count[g] += women_[i];
+        women_count[unit[g]] += women_[i];
         const double lambda = std::max(0.0, intensities_[i][channel]);
         if (lambda > 0) {
-          rows.push_back({g, k, lambda});
-          intensity[g] += lambda;
+          rows.push_back({types_->category(g), k, g, lambda});
+          intensity[unit[g]] += lambda;
         }
       }
     }
@@ -109,10 +220,10 @@ WeightSolution WeightCalibrator::solve(
     total_intensity += intensity[g];
   }
   if (rows.empty() || !(total_women > 0) || !(total_intensity > 0)) {
-    warm = s.log_weights;
+    warm = x_unit;
     return s;
   }
-  // Mirror: men of group g get the per-capita intensity of group-g women
+  // Mirror: men of unit g get the per-capita intensity of unit-g women
   // (population-wide rate if none are present), then apply target deltas.
   const double overall = total_intensity / total_women;
   std::vector<double> mirror(G, 0);
@@ -123,77 +234,122 @@ WeightSolution WeightCalibrator::solve(
     mirror_sum += mirror[g];
   }
   if (!(mirror_sum > 0)) {
-    warm = s.log_weights;
+    warm = x_unit;
     return s;
   }
   // Normalize log mirrored flows plus delta, preserving zero baseline
-  // targets.
+  // targets. Without matching categories `delta` is empty (zero).
+  auto delta_of = [&](int g) {
+    return delta.empty() ? 0.0 : delta[unit_group[g]];
+  };
   double largest = -std::numeric_limits<double>::infinity();
   for (int g = 0; g < G; ++g) {
     if (mirror[g] > 0) {
-      largest = std::max(largest, std::log(mirror[g]) + delta[g]);
+      largest = std::max(largest, std::log(mirror[g]) + delta_of(g));
     }
   }
   double adjusted_sum = 0;
   for (int g = 0; g < G; ++g) {
     s.target[g] =
-      mirror[g] > 0 ? std::exp(std::log(mirror[g]) + delta[g] - largest) : 0;
+      mirror[g] > 0 ? std::exp(std::log(mirror[g]) + delta_of(g) - largest) : 0;
     adjusted_sum += s.target[g];
   }
   for (int g = 0; g < G; ++g) {
     s.target[g] /= adjusted_sum;
   }
-  // Pool sums S[row, male group] come from the maintained sums. Entries below
-  // the floor are recomputed exactly; a row that underflows is rescaled in
-  // log space.
+  // Pool sums S[row, unit] come from the maintained sums by male type, times
+  // the ancestry factor of the row's and type's profiles. Entries below the
+  // floor are recomputed exactly; a row that underflows or overflows (large
+  // ancestry factors) is rescaled in log space.
   const int R = static_cast<int>(rows.size());
   std::vector<double> S(static_cast<size_t>(R) * G, 0);
-  // S[r, m], and the lag-table entry of row r against men of group m in bin.
   auto pool = [&](int r, int m) -> double& {
     return S[static_cast<size_t>(r) * G + m];
   };
-  auto lag = [&](int r, int m, int bin) {
-    return table.index(rows[r].group, m, rows[r].bin - bin + bins_ - 1);
+  auto lag = [&](int r, int male_type, int bin) {
+    return table.index(
+      rows[r].group, types_->category(male_type), rows[r].bin - bin + bins_ - 1
+    );
   };
+  auto allowed = [&](int r, int male_type) {
+    return table.allowed
+      [static_cast<size_t>(rows[r].group) * C + types_->category(male_type)];
+  };
+  // With ancestry types, male types without eligible men are skipped (their
+  // sums are zero) and each female profile's factors are found once.
+  std::vector<int> present;
+  for (int m = 0; m < T; ++m) {
+    if (!types_->active() || !men[m].empty()) {
+      present.push_back(m);
+    }
+  }
+  std::map<int, std::vector<double>> factors;
+  if (table.ancestry.active()) {
+    for (const Row& row : rows) {
+      const int fp = types_->profile(row.type);
+      if (factors.count(fp)) {
+        continue;
+      }
+      std::vector<double>& out = factors[fp];
+      out.resize(T, 0.0);
+      for (int m : present) {
+        out[m] = table.ancestry.factor(*types_, fp, types_->profile(m));
+      }
+    }
+  }
   for (int r = 0; r < R; ++r) {
     double total = 0;
-    for (int m = 0; m < G; ++m) {
+    const std::vector<double>* factor =
+      factors.empty() ? nullptr : &factors[types_->profile(rows[r].type)];
+    for (int m : present) {
       // Prohibited pairs contribute exactly zero.
-      if (!table.allowed[static_cast<size_t>(rows[r].group) * G + m]) {
+      if (!allowed(r, m)) {
         continue;
       }
       double sum = sums
-        [(static_cast<size_t>(rows[r].group) * G + m) * bins_ + rows[r].bin];
+        [(static_cast<size_t>(m) * C + rows[r].group) * bins_ + rows[r].bin];
       if (!(sum >= kPoolSumFloor)) {
         sum = 0;
         for (const auto& bin : men[m]) {
           sum += bin.second * table.weight[lag(r, m, bin.first)];
         }
       }
-      pool(r, m) = sum;
-      total += sum;
+      const double value = factor ? (*factor)[m] * sum : sum;
+      pool(r, unit[m]) += value;
+      total += value;
     }
-    if (total > 0) {
+    if (total > 0 && R_finite(total)) {
       continue;
     }
+    auto log_ancestry = [&](int male_type) {
+      return table.ancestry.value(
+        *types_, types_->profile(rows[r].type), types_->profile(male_type)
+      );
+    };
     double maximum = R_NegInf;
-    for (int m = 0; m < G; ++m) {
+    for (int m = 0; m < T; ++m) {
       for (const auto& bin : men[m]) {
-        maximum = std::max(maximum, table.utility[lag(r, m, bin.first)]);
+        const double u = table.utility[lag(r, m, bin.first)];
+        if (u != R_NegInf) {
+          maximum = std::max(maximum, u + log_ancestry(m));
+        }
       }
     }
     if (maximum == R_NegInf) {
       continue;
     }
     for (int m = 0; m < G; ++m) {
+      pool(r, m) = 0;
+    }
+    for (int m = 0; m < T; ++m) {
       double sum = 0;
       for (const auto& bin : men[m]) {
         const double u = table.utility[lag(r, m, bin.first)];
         if (u != R_NegInf) {
-          sum += bin.second * std::exp(u - maximum);
+          sum += bin.second * std::exp(u + log_ancestry(m) - maximum);
         }
       }
-      pool(r, m) = sum;
+      pool(r, unit[m]) += sum;
     }
   }
   std::vector<double> demand(G, 0);
@@ -209,12 +365,12 @@ WeightSolution WeightCalibrator::solve(
     block_rows(table.blocks);
   for (int g = 0; g < G; ++g) {
     if (!(s.target[g] > 0)) {
-      s.log_weights[g] = kZeroTargetLogWeight;
+      x_unit[g] = kZeroTargetLogWeight;
     } else if (!(demand[g] > 0)) {
-      s.log_weights[g] = kMaxLogWeight;
+      x_unit[g] = kMaxLogWeight;
       s.infeasible = true;
     } else {
-      block_groups[table.block[g]].push_back(g);
+      block_groups[table.block[unit_group[g]]].push_back(g);
     }
   }
   for (int r = 0; r < R; ++r) {
@@ -233,6 +389,10 @@ WeightSolution WeightCalibrator::solve(
       for (int j = 0; j < n; ++j) {
         tau[j] = s.target[free_groups[j]] / target_sum;
       }
+      // Types registered since the last solve start from zero.
+      if (static_cast<int>(warm.size()) < G && !warm.empty()) {
+        warm.resize(G, 0.0);
+      }
       if (static_cast<int>(warm.size()) == G) {
         for (int j = 0; j < n; ++j) {
           const double start = warm[free_groups[j]] - warm[free_groups[0]];
@@ -243,65 +403,98 @@ WeightSolution WeightCalibrator::solve(
       }
       x[0] = 0;
       std::vector<double> share(n), phi, hess, weights(n);
-      // Objective, gradient (phi) and, when `with_hess`, the Hessian. Line
-      // search trials need only the objective and gradient.
-      auto evaluate = [&](
-                        const std::vector<double>& point,
-                        std::vector<double>& out_phi,
-                        std::vector<double>& out_hess, bool with_hess
-                      ) {
-        out_phi.assign(n, 0);
-        if (with_hess) {
-          out_hess.assign(static_cast<size_t>(n) * n, 0);
-        }
-        double objective = 0, lambda_total = 0;
+      // The block's pool sums as one contiguous rows-by-units matrix.
+      const size_t block_size = block_row_ids.size();
+      std::vector<double> block_pool(block_size * n);
+      for (size_t i = 0; i < block_size; ++i) {
         for (int j = 0; j < n; ++j) {
-          weights[j] = std::exp(point[j]);
+          block_pool[i * n + j] = pool(block_row_ids[i], free_groups[j]);
         }
-        for (int r : block_row_ids) {
-          double denominator = 0;
-          for (int j = 0; j < n; ++j) {
-            share[j] = weights[j] * pool(r, free_groups[j]);
-            denominator += share[j];
+      }
+      // Row choice probabilities and intensity shares, kept for the
+      // conjugate-gradient Hessian products of typed models.
+      std::vector<double> probs, row_weight;
+      // Objective, gradient (phi) and, when `with_hess`, the Hessian. Line
+      // search trials need only the objective and gradient. With `keep`,
+      // each row's probabilities are stored instead of the Hessian.
+      auto evaluate =
+        [&](
+          const std::vector<double>& point, std::vector<double>& out_phi,
+          std::vector<double>& out_hess, bool with_hess, bool keep = false
+        ) {
+          out_phi.assign(n, 0);
+          if (with_hess) {
+            out_hess.assign(static_cast<size_t>(n) * n, 0);
           }
-          if (!(denominator > 0)) {
-            continue;
+          if (keep) {
+            probs.clear();
+            row_weight.clear();
           }
-          const double lambda = rows[r].lambda;
-          lambda_total += lambda;
-          objective += lambda * std::log(denominator);
+          double objective = 0, lambda_total = 0;
           for (int j = 0; j < n; ++j) {
-            const double p = share[j] / denominator;
-            out_phi[j] += lambda * p;
-            if (with_hess) {
-              for (int k = 0; k < n; ++k) {
-                out_hess[static_cast<size_t>(j) * n + k] +=
-                  lambda * ((j == k ? p : 0) - p * share[k] / denominator);
+            weights[j] = std::exp(point[j]);
+          }
+          for (size_t i = 0; i < block_size; ++i) {
+            const double* row = &block_pool[i * n];
+            double denominator = 0;
+            for (int j = 0; j < n; ++j) {
+              share[j] = weights[j] * row[j];
+              denominator += share[j];
+            }
+            if (!(denominator > 0)) {
+              continue;
+            }
+            const double lambda = rows[block_row_ids[i]].lambda;
+            lambda_total += lambda;
+            objective += lambda * std::log(denominator);
+            if (keep) {
+              row_weight.push_back(lambda);
+            }
+            for (int j = 0; j < n; ++j) {
+              const double p = share[j] / denominator;
+              out_phi[j] += lambda * p;
+              if (keep) {
+                probs.push_back(p);
+              }
+              if (with_hess) {
+                for (int k = 0; k < n; ++k) {
+                  out_hess[static_cast<size_t>(j) * n + k] +=
+                    lambda * ((j == k ? p : 0) - p * share[k] / denominator);
+                }
               }
             }
           }
-        }
-        for (double& value : out_phi) {
-          value /= lambda_total;
-        }
-        if (with_hess) {
-          for (double& value : out_hess) {
+          for (double& value : out_phi) {
             value /= lambda_total;
           }
-        }
-        objective /= lambda_total;
-        for (int j = 0; j < n; ++j) {
-          objective -= tau[j] * point[j];
-        }
-        return objective;
-      };
+          if (with_hess) {
+            for (double& value : out_hess) {
+              value /= lambda_total;
+            }
+          }
+          for (double& value : row_weight) {
+            value /= lambda_total;
+          }
+          objective /= lambda_total;
+          for (int j = 0; j < n; ++j) {
+            objective -= tau[j] * point[j];
+          }
+          return objective;
+        };
       bool converged = false;
       std::vector<double> trial(n), trial_phi, trial_hess, step;
+      // Typed models reuse the accepted line-search evaluation, which kept
+      // the row probabilities the next conjugate-gradient step needs.
+      bool cached = false;
+      double cached_objective = 0;
       for (int iteration = 0; iteration < 100; ++iteration) {
-        const double objective = evaluate(x, phi, hess, true);
+        const double objective =
+          cached ? cached_objective : evaluate(x, phi, hess, !typed, typed);
+        cached = false;
         double error = 0;
         for (int j = 0; j < n; ++j) {
-          error = std::max(error, std::abs(phi[j] - tau[j]));
+          const double gap = std::abs(phi[j] - tau[j]);
+          error = R_finite(gap) ? std::max(error, gap) : R_PosInf;
         }
         if (error < 1e-10) {
           converged = true;
@@ -309,17 +502,21 @@ WeightSolution WeightCalibrator::solve(
         }
         // Newton step over the free log weights (the first is the reference).
         const int m = n - 1;
-        std::vector<double> a(static_cast<size_t>(m) * m), b(m);
-        for (int j = 0; j < m; ++j) {
-          b[j] = -(phi[j + 1] - tau[j + 1]);
-          for (int k = 0; k < m; ++k) {
-            a[static_cast<size_t>(j) * m + k] =
-              hess[static_cast<size_t>(j + 1) * n + k + 1];
+        if (typed) {
+          newton_cg_step(phi, tau, probs, row_weight, n, step);
+        } else {
+          std::vector<double> a(static_cast<size_t>(m) * m), b(m);
+          for (int j = 0; j < m; ++j) {
+            b[j] = -(phi[j + 1] - tau[j + 1]);
+            for (int k = 0; k < m; ++k) {
+              a[static_cast<size_t>(j) * m + k] =
+                hess[static_cast<size_t>(j + 1) * n + k + 1];
+            }
+            a[static_cast<size_t>(j) * m + j] += 1e-14;
           }
-          a[static_cast<size_t>(j) * m + j] += 1e-14;
-        }
-        if (!solve_linear(a, b, m, step)) {
-          break;
+          if (!solve_linear(a, b, m, step)) {
+            break;
+          }
         }
         // Accept a step that lowers the convex objective or the target
         // mismatch; near the solution, roundoff can hide the objective's
@@ -335,14 +532,19 @@ WeightSolution WeightCalibrator::solve(
             );
           }
           const double trial_objective =
-            evaluate(trial, trial_phi, trial_hess, false);
+            evaluate(trial, trial_phi, trial_hess, false, typed);
           double trial_error = 0;
           for (int j = 0; j < n; ++j) {
-            trial_error =
-              std::max(trial_error, std::abs(trial_phi[j] - tau[j]));
+            const double gap = std::abs(trial_phi[j] - tau[j]);
+            trial_error = R_finite(gap) ? std::max(trial_error, gap) : R_PosInf;
           }
           if (trial_objective < objective || trial_error < error) {
             moved = true;
+            if (typed) {
+              phi = trial_phi;
+              cached_objective = trial_objective;
+              cached = true;
+            }
             break;
           }
           length /= 2;
@@ -356,7 +558,7 @@ WeightSolution WeightCalibrator::solve(
         s.infeasible = true;
       }
       for (int j = 0; j < n; ++j) {
-        s.log_weights[free_groups[j]] = x[j];
+        x_unit[free_groups[j]] = x[j];
       }
     }
   }
@@ -371,7 +573,7 @@ WeightSolution WeightCalibrator::solve(
     for (int m = 0; m < G; ++m) {
       const double men_sum = pool(r, m);
       if (men_sum > 0) {
-        top = std::max(top, s.log_weights[m] + std::log(men_sum));
+        top = std::max(top, x_unit[m] + std::log(men_sum));
       }
     }
     if (top == R_NegInf) {
@@ -381,7 +583,7 @@ WeightSolution WeightCalibrator::solve(
     for (int m = 0; m < G; ++m) {
       const double men_sum = pool(r, m);
       share[m] =
-        men_sum > 0 ? std::exp(s.log_weights[m] + std::log(men_sum) - top) : 0;
+        men_sum > 0 ? std::exp(x_unit[m] + std::log(men_sum) - top) : 0;
       denominator += share[m];
     }
     flow_total += rows[r].lambda;
@@ -399,25 +601,30 @@ WeightSolution WeightCalibrator::solve(
       std::vector<double> block_flow(table.blocks, 0),
         block_target(table.blocks, 0);
       for (int m = 0; m < G; ++m) {
-        block_flow[table.block[m]] += s.flow[m];
-        block_target[table.block[m]] += s.target[m];
+        block_flow[table.block[unit_group[m]]] += s.flow[m];
+        block_target[table.block[unit_group[m]]] += s.target[m];
       }
       for (int m = 0; m < G; ++m) {
-        const int b = table.block[m];
+        const int b = table.block[unit_group[m]];
         s.target[m] = block_target[b] > 0
                         ? s.target[m] * block_flow[b] / block_target[b]
                         : 0;
       }
     }
+    // Non-finite flows (a failed solve) count as a miss.
     double miss = 0;
     for (int m = 0; m < G; ++m) {
-      miss = std::max(miss, std::abs(s.flow[m] - s.target[m]));
+      const double gap = std::abs(s.flow[m] - s.target[m]);
+      miss = R_finite(gap) ? std::max(miss, gap) : R_PosInf;
     }
     if (miss > 1e-8) {
       s.infeasible = true;
     }
   }
-  warm = s.log_weights;
+  for (int t = 0; t < T; ++t) {
+    s.log_weights[t] = x_unit[unit[t]];
+  }
+  warm = x_unit;
   return s;
 }
 
@@ -441,7 +648,10 @@ List inspect_weighted_calibration_cpp(
   double width,
   bool fertility,
   Nullable<IntegerVector> female_previous = R_NilValue,
-  Nullable<NumericVector> female_previous_ends = R_NilValue
+  Nullable<NumericVector> female_previous_ends = R_NilValue,
+  Nullable<List> ancestry_layout = R_NilValue,
+  Nullable<NumericMatrix> female_shares = R_NilValue,
+  Nullable<NumericMatrix> male_shares = R_NilValue
 ) {
   if (female_groups.size() != female_born.size() ||
       female_fertile.size() != female_born.size() ||
@@ -471,15 +681,32 @@ List inspect_weighted_calibration_cpp(
       stop("Invalid previous-union calibration category.");
     }
   }
-  WeightCalibrator calibrator(lo, hi, group_count, width, cutoff);
+  // With an ancestry layout, each person's type combines group and profile.
+  MatchingTypes types = inspect_types(group_count, ancestry_layout);
+  auto type_of =
+    [&](const Nullable<NumericMatrix>& shares, R_xlen_t i, int group) {
+      if (!types.active()) {
+        return group;
+      }
+      const NumericVector row = NumericMatrix(shares.get())(i, _);
+      return types.type(group, types.profile_of(row.begin()));
+    };
+  std::vector<int> female_type(female_born.size()), male_type(male_born.size());
+  for (R_xlen_t i = 0; i < female_born.size(); ++i) {
+    female_type[i] = type_of(female_shares, i, female_groups[i]);
+  }
+  for (R_xlen_t i = 0; i < male_born.size(); ++i) {
+    male_type[i] = type_of(male_shares, i, male_groups[i]);
+  }
+  WeightCalibrator calibrator(lo, hi, &types, width, cutoff);
   const LagTable table =
     build_lag_table(matching, group_count, calibrator.bins(), width);
   calibrator.add_table(&table);
   for (R_xlen_t i = 0; i < male_born.size(); ++i) {
-    calibrator.add_man(male_groups[i], male_born[i], 1);
+    calibrator.add_man(male_type[i], male_born[i], 1);
   }
   for (R_xlen_t i = 0; i < female_born.size(); ++i) {
-    calibrator.add_woman(female_groups[i], female_born[i], 1);
+    calibrator.add_woman(female_type[i], female_born[i], 1);
   }
   NumericVector previous_ends(female_born.size(), NA_REAL);
   if (female_previous_ends.isNotNull()) {
@@ -514,7 +741,7 @@ List inspect_weighted_calibration_cpp(
     }
     const double value = current_hazard(hazards[schedule], origin, now).first;
     calibrator.replace_intensity(
-      female_groups[i], female_born[i], {0, 0},
+      female_type[i], female_born[i], {0, 0},
       {value, female_fertile[i] ? value : 0}
     );
   }
@@ -522,9 +749,17 @@ List inspect_weighted_calibration_cpp(
   const WeightSolution s = calibrator.solve(
     now, fertility, 0, as<std::vector<double>>(matching["delta"]), warm
   );
+  // Each type's category and profile (one-based profiles for R).
+  IntegerVector type_group(types.count()), type_profile(types.count());
+  for (int t = 0; t < types.count(); ++t) {
+    type_group[t] = types.category(t);
+    type_profile[t] = types.profile(t) + 1;
+  }
   return List::create(
     _["log_weights"] = wrap(s.log_weights), _["target"] = wrap(s.target),
-    _["flow"] = wrap(s.flow), _["infeasible"] = s.infeasible
+    _["flow"] = wrap(s.flow), _["infeasible"] = s.infeasible,
+    _["female_type"] = wrap(female_type), _["male_type"] = wrap(male_type),
+    _["type_group"] = type_group, _["type_profile"] = type_profile
   );
 }
 
@@ -557,7 +792,8 @@ List inspect_weighted_incremental_cpp(
     lo = std::min(lo, born);
     hi = std::max(hi, born);
   }
-  WeightCalibrator incremental(lo, hi, group_count, kWeightBinWidth, cutoff);
+  MatchingTypes types(group_count);
+  WeightCalibrator incremental(lo, hi, &types, kWeightBinWidth, cutoff);
   const LagTable table =
     build_lag_table(matching, group_count, incremental.bins(), kWeightBinWidth);
   incremental.add_table(&table);

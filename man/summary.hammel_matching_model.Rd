@@ -28,6 +28,9 @@ containing:
 and \code{half_weight_distance}, in years, of a quadratic age-gap model.}
 \item{group_exogamy}{The \code{group_exogamy} specification, or \code{NULL}.}
 \item{delta}{The \code{delta} specification, or \code{NULL}.}
+\item{ancestry_endogamy}{The \code{ancestry_endogamy} specification, or
+\code{NULL}.}
+\item{ancestry_resolution}{The ancestry rounding resolution.}
 }
 }
 \description{

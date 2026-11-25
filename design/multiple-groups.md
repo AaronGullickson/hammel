@@ -217,9 +217,6 @@ contributions before the age terms and calibration weights):
    the combination is race x region; the general model's effects ignore
    region, and the father model's ignore race.
 
-**Diagnostics.** Matching diagnostics name combinations by their categories
-joined with `|` (`.log_weight_A|N`); with one dimension, names are unchanged.
-
 **Validation.** One-dimension runs bit-identical to the current version;
 pair tables for the worked examples; simulated unions with a race effect and
 a region prohibition (no cross-region unions, race effect present); sex
@@ -251,8 +248,7 @@ inferring them again; explicit `categories` still replace them.
   dimensions, recomputed when a person's category in any of them changes
   (transitions) and at birth. Pools, pair tables and calibration are
   unchanged and simply see more categories.
-- Combination labels join categories with `|` (`A|N`), as in diagnostics
-  columns `.log_weight_A|N`.
+- Combination labels join categories with `|` (`A|N`).
 - Tests check the worked examples' tables exactly, simulated unions under a
   race effect with a region prohibition, models (general, father,
   cohabitation, schedule entries) naming different dimensions, and moves that

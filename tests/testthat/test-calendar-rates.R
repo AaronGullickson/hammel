@@ -311,7 +311,7 @@ test_that("asynchronous changes retain parity/type/group accounting and calibrat
     enable_het_fert(het_fert(.5, .5))
   m <- set_union_formation(m, "rate", rates = calendar_epochs(
     data.frame(age_start = 15, age_end = Inf, rate = 0), c(.5, .9), c(0, .7, Inf)),
-    diagnostics = TRUE, cancel_birth_if_no_match = FALSE)
+    cancel_birth_if_no_match = FALSE)
   m <- set_mortality(m, calendar_epochs(m$processes$mortality$rates,
     c(0, .1), c(0, .9, Inf)))
   m <- set_union_dissolution(m, calendar_epochs(data.frame(dur_start = 0,
@@ -325,7 +325,6 @@ test_that("asynchronous changes retain parity/type/group accounting and calibrat
   expect_gt(count_run_events(out, "transitions"), 0)
   expect_gt(count_run_events(out, "dissolutions"), 0)
   expect_true(all(is.finite(out$persons$hetfert[out$persons$sex == "f"])))
-  expect_true(all(c(".log_weight_A", ".log_weight_B") %in% names(out$unions)))
   expect_identical(run_simulation(m, 1.5, seed = 13), out)
 })
 

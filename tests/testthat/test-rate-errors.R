@@ -207,11 +207,6 @@ test_that("union formation errors name the constructor or setter", {
     "union_formation"
   )
   expect_hammel_error(
-    union_formation("on_demand", diagnostics = NA),
-    "argument",
-    "union_formation"
-  )
-  expect_hammel_error(
     union_formation("on_demand", kinship_generations = 1.5),
     "argument",
     "union_formation"

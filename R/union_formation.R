@@ -96,8 +96,6 @@
 #'   schedules. Must contain at least numeric `age_start`, `age_end`, and
 #'   `rate`. See details for description of stratification variables that can be
 #'   applied.
-#' @param diagnostics Logical, default `FALSE`. When `TRUE`, adds additional
-#'   technical variables from matching model to each union record.
 #' @param cohab_prob Optional age-specific probability table defining the
 #'   probability that a union is a cohabitation. See details for specification.
 #' @param cohab_matching Optional matching model or whole-model schedule for
@@ -143,8 +141,7 @@ union_formation <- function(
   min_male_age = 15,
   kinship_generations = 2,
   cancel_birth_if_no_match = TRUE,
-  cohab_as_previous_union = FALSE,
-  diagnostics = FALSE
+  cohab_as_previous_union = FALSE
 ) {
   new_union_formation(
     initiation = initiation,
@@ -159,8 +156,7 @@ union_formation <- function(
     min_male_age = min_male_age,
     kinship_generations = kinship_generations,
     cancel_birth_if_no_match = cancel_birth_if_no_match,
-    cohab_as_previous_union = cohab_as_previous_union,
-    diagnostics = diagnostics
+    cohab_as_previous_union = cohab_as_previous_union
   )
 }
 
@@ -180,8 +176,7 @@ set_union_formation <- function(
   min_male_age = 15,
   kinship_generations = 2,
   cancel_birth_if_no_match = TRUE,
-  cohab_as_previous_union = FALSE,
-  diagnostics = FALSE
+  cohab_as_previous_union = FALSE
 ) {
   attach_process(
     model, new_union_formation(
@@ -197,8 +192,7 @@ set_union_formation <- function(
       min_male_age = min_male_age,
       kinship_generations = kinship_generations,
       cancel_birth_if_no_match = cancel_birth_if_no_match,
-      cohab_as_previous_union = cohab_as_previous_union,
-      diagnostics = diagnostics
+      cohab_as_previous_union = cohab_as_previous_union
     )
   )
 }
@@ -380,7 +374,6 @@ new_union_formation <- function(
   kinship_generations,
   cancel_birth_if_no_match,
   cohab_as_previous_union,
-  diagnostics,
   call = rlang::caller_env()
 ) {
   process <- structure(
@@ -392,7 +385,6 @@ new_union_formation <- function(
       kinship_generations = kinship_generations,
       father_matching = father_matching,
       cancel_birth_if_no_match = cancel_birth_if_no_match,
-      diagnostics = diagnostics,
       rates = rates,
       cohab_prob = cohab_prob,
       cohab_matching = cohab_matching,
@@ -488,7 +480,6 @@ validate_union_formation <- function(process, call = rlang::caller_env()) {
       call = call
     )
   }
-  check_flag(process$diagnostics, "diagnostics", call = call)
   check_flag(
     process$cancel_birth_if_no_match, "cancel_birth_if_no_match",
     call = call

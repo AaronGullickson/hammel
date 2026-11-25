@@ -131,7 +131,6 @@ test_that("probability changes refresh weighted matching contributions immediate
   m$population$persons$sex <- rep(c("f", "m"), each = n / 2)
   m$population$persons$group <- rep(c("A", "B"), n / 2)
   m$population$groups <- list(group = group())
-  m$processes$union_formation$diagnostics <- TRUE
   reference <- m
   reference$processes$union_formation$cohab_prob <- data.frame(
     age_start = 0, age_end = Inf, group = c("A", "B"), prob = c(.2, .8))
@@ -142,7 +141,6 @@ test_that("probability changes refresh weighted matching contributions immediate
   actual <- run_simulation(m, .5, seed = 921)
   expect_equal(actual$unions, expected$unions, tolerance = 1e-10)
   expect_equal(actual$persons, expected$persons)
-  expect_true(all(c(".log_weight_A", ".log_weight_B") %in% names(actual$unions)))
 })
 
 test_that("active age and previous-union strata apply after a calendar change", {

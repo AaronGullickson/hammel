@@ -78,12 +78,6 @@ required schema. Existing tables must be mapped by sex, not blindly renamed
 by column position. For example, an old row with male partner 1 and female
 partner 2 must place partner 2 in `wife_id` and partner 1 in `husband_id`. `unions = NULL` on person-table input denotes no supplied unions, as already accepted. NULL unions and zero-row, zero-column data frames are normalized to a typed empty union table. Other inputs must supply every schema column; extra columns and data-frame subclasses are preserved.
 
-Optional union diagnostics `.log_weight_<group>` are populated for new unions
-when the process sets `diagnostics = TRUE` and weighted choice runs in a
-grouped population; they are not required core columns. Historical unknowns
-remain NA. See
-[diagnostic semantics](union-formation-models.md#optional-union-diagnostics).
-
 ## Time representation
 
 Dates are numeric years, including fractions, with a user-supplied common
@@ -159,3 +153,14 @@ the known endpoint, and chronological chaining to the current category in each
 dimension. `hammel_population(..., transitions = ...)` accepts
 base data frames. See [group transitions](group-transitions.md) for event and
 observation semantics. Ancestry proportions are unaffected by moves.
+
+## Sampled matching weights (D200)
+
+A run with `union_weight_sample` above 0 returns `matching_weights`, which
+describes that run only: a later run replaces or drops it. Its tibbles are
+`types` (`type_id`, each matching dimension's category and, with ancestry
+endogamy, rounded shares named `<dimension>_<category>`), `unions`
+(`union_id`, `union_type`, `time`, `calibration_id`, `NA` without calibrated
+weights) and `weights` (`calibration_id`, `type_id`, `log_weight`), plus
+`min_male_age` and internal keys used by `extract_choice_sets()`. See
+[weighted-choice matching](weighted-choice-matching.md#choice-set-reconstruction-d200).

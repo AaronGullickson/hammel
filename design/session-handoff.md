@@ -5,6 +5,48 @@ unspecified features or a standing pause instruction. The current user request
 controls work. Start with [the documentation index](README.md),
 [scientific contract](scientific-contract.md) and [decisions](decisions.md).
 
+## Ancestry endogamy in matching (November 24, 2026)
+
+The user wants this work in a separate PR on `ancestry-share-matching`,
+branched at `6b12c31`, before the external-migration tip `c775be1`.
+Recheck the branch base when resuming. The implementation is on the
+branch (D199).
+
+**Merging with external-migration.** Whichever branch merges second needs
+an edit that Git does not flag as a conflict: `Simulation::on_arrival` in
+`src/simulate.cpp` must give each arriving person a rounded ancestry
+profile and set the group through `set_group()`, replacing the direct
+`people[i].group = person_stratum(matching_spec, i);`. Without it every
+immigrant keeps type 0 and the pools and calibrator never see arrival
+types. The textual conflicts (`Person` fields, `simulate_cpp` arguments,
+the removed `diagnostic_log_weights` output, RcppExports and D198/D199
+ordering) were resolved on the throwaway `trial/ancestry-migration`
+branch, with resolutions recorded by `git rerere`. `extract_choice_sets()`
+(D200) already requires that alternatives had arrived, when the persons
+table has `arrival_time`.
+
+**Agreed (D199).** The earlier plan to put raw shares in the matching
+formula was replaced. Matching models get `ancestry_endogamy`, a named
+weight vector per ancestry category (list form keyed by dimension;
+`unknown` allowed), adding `-sum(lambda[k] * |q_i[k] - q_j[k]|)` to pair
+utility. The term is additive, with no age interactions and no ancestry
+formula for now. Profiles are rounded jointly by largest remainder at a
+resolution argument on the matching model (default 1/8), used in both
+calibration and draws. Calibrated weights are per male type (category x
+rounded profile), so ancestry intermarriage is balanced by sex under
+symmetric preferences. Father and cohabitation models follow the existing
+inheritance rules. The specification is drafted in
+[group matching](group-matching.md#ancestry-endogamy) and
+[weighted-choice matching](weighted-choice-matching.md#ancestry-types)
+for the user's review.
+
+**Also decided.** Typed models solve weights by Newton with conjugate
+gradients; category-only models keep the dense solve. The
+`.log_weight_<group>` diagnostics are removed; a clogit-data helper may
+follow separately. The name `ancestry_resolution` is confirmed.
+`pop_usa1880` gained birthplace ancestry on the external-migration branch
+(`751e66b`); type counts from it are in the weighted-choice spec.
+
 ## Accepted milestones and active render
 
 Milestones 1–8 are complete by user acceptance: mortality/fertility (D029,

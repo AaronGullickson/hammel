@@ -261,6 +261,146 @@ target receives log weight -1000. If no women have positive intensity, all
 weights are 1. As selected by the user, `run_simulation()` warns once, reporting the
 number of searches that used approximate weights.
 
+## Ancestry types
+
+*Implemented (D199, November 24, 2026).* This extends calibration to the
+ancestry term of
+[group matching](group-matching.md#ancestry-endogamy).
+
+### Types replace groups
+
+For a model with `ancestry_endogamy`, the weighted unit is a man's type:
+his matching category combined with his rounded profile in each dimension
+the model names. Selection becomes
+
+    P(j | i, C) = b[t(j)] exp(U[i,j]) / sum over k in C of b[t(k)] exp(U[i,k])
+
+and every rule above applies with type in place of group:
+
+- **Targets.** Each type of man gets the per-capita search intensity of
+  unpartnered women of the same type. Types with men but no counted women
+  use the per-capita intensity of their block. `delta` stays keyed by
+  category and applies to every type in that category.
+- **Blocks.** Ancestry terms are finite and never split markets; each type
+  belongs to its category's block (D138).
+- **Shortcuts.** Unit weights apply only when a block has a single
+  occupied type. The strict-endogamy shortcut no longer applies to a model
+  with an ancestry term, since a woman's allowed men can then differ in
+  type.
+- **Absorption.** A term depending only on the man's profile would be
+  absorbed by the weights, as a `male_group` main effect is. The symmetric
+  absolute-difference term is not absorbed.
+- Models without an ancestry term keep category weights.
+- **Held weights.** A model with the term recalibrates at most every 1/12
+  year and uses its latest weights for searches in between, instead of
+  recalibrating at every search (user decision, November 24, 2026). It
+  recalibrates sooner when a model schedule switches, or when a type that
+  had no eligible men at the last calibration gains one: a new type, or an
+  existing one whose first man reaches the age cutoff, rejoins the pool,
+  changes categories or arrives. Until then such a type's men cannot be
+  chosen, so newborn types wait. Eligibility follows the calibration's
+  birth-time bins. The interval is fixed, not a user argument.
+  Draws remain exact given the held weights. Models without the term still
+  recalibrate at every search.
+
+The purpose is the user's: under symmetric preferences and sex-balanced
+types, ancestry intermarriage should not be unbalanced by sex, just as for
+categorical groups.
+
+### Ancestry-type examples
+
+Static, no ages, equal per-woman intensity, zero delta, women and men with
+the same type shares. Profiles are pure Irish (I), pure Northwestern
+European (N) and half each (H), with `c(irish = 1.5, nw_europe = 1.5)`, so
+I–N pairs score -3 and I–H and N–H pairs -1.5.
+
+- **Two pure profiles, 75/25.** The term equals `group_exogamy` with
+  `"I:N" = -3`, and the expectations match the table below: b_N = 1.683,
+  IN = NI = 0.02038.
+- **Three profiles, shares 0.5 / 0.3 / 0.2.** Weights b = 1, 1.2556,
+  1.2767 give
+
+  | Woman \ man | I | N | H |
+  | --- | ---: | ---: | ---: |
+  | I | .43423 | .01629 | .04948 |
+  | N | .01629 | .24644 | .03728 |
+  | H | .04948 | .03728 | .11324 |
+
+  Female choice (b = 1) gives I men 0.526 and H men 0.182 of unions,
+  against women's 0.5 and 0.2, and IH = 0.0399 against HI = 0.0590.
+
+The table is symmetric, not only balanced in its margins. In this static
+case, with symmetric utilities, no prohibitions and matching sex
+compositions, expected flows are a diagonal scaling of a symmetric
+positive matrix with equal row and column totals. That scaling is unique,
+so the table equals its transpose for any number of types. Ages and
+differing sex compositions break this; directional balance should then be
+assessed as for groups.
+
+### Ancestry-type representation
+
+Because the ancestry term is additive, the pool sum for a female cell and
+male type factors as exp(A[female profile, male profile]) times the
+age/group sum. The age/group sums are maintained per male type with the
+existing incremental updates, so the cost of a man joining or leaving the
+pool does not grow with the number of female profiles. The ancestry factor
+is applied at each search. Draws use male cells of type and birth bin; the
+ancestry term is constant within a cell, so native bounds stay exact.
+Profiles that first appear during a run extend the tables.
+
+### Cost, solver and diagnostics
+
+Exploratory count (November 24, 2026; external-migration branch at
+`751e66b`, whose `pop_usa1880` supplies birthplace ancestry with 21
+distinct founder profiles; stylized 1880–1960 run with four immigration
+streams and no ancestry endogamy; one seed; scripts not archived).
+Unpartnered people aged 15–59 numbered about 19,000 throughout. Occupied
+birthplace profiles among them:
+
+| Year | r = 1/4 | r = 1/8 | r = 1/16 |
+| --- | ---: | ---: | ---: |
+| 1880 | 15 | 15 | 15 |
+| 1920 | 70 | 105 | 105 |
+| 1960 | 96 | 413 | 857 |
+
+Combined with race and generation, 1960 had 558 types at 1/8 and 1,023 at
+1/16. Profiles keep diversifying over generations, so longer runs have
+more types; endogamy would slow this.
+
+- **Solver.** Models with an ancestry term solve the same objective, to
+  the same tolerance and warm-started from their previous solve, by Newton
+  steps found with Jacobi-preconditioned conjugate gradients. Hessian-vector
+  products use the Hessian's form, a diagonal minus per-row rank-one terms,
+  so it is never formed. Models without an ancestry term keep the dense
+  solve, and their seeded histories are unchanged.
+- **Measured cost** (November 24, 2026; optimized build, one seed; the
+  `pop_usa1880` object from external-migration `751e66b` rebuilt without
+  immigration, birthplace endogamy with `native = 1` and other origins 2,
+  r = 1/8). Without the term, 20 years took 1.0 s and 80 years 3.5 s.
+  Recalibrating at every search took 23.8 s for 20 years with dense
+  Newton, 10.4 s with conjugate gradients and contiguous sums, and 609 s
+  for 80 years (190 s at r = 1/4); a solve costs about occupied female
+  cells times types, and both grow as profiles diversify. With weights
+  held for 1/12 year, 20 years took 1.2 s and 80 years 26.5 s. Over 10
+  seeds of 20 years, held and per-search weights gave union counts, mean
+  partner ancestry distance and husband-minus-wife shares by origin that
+  agreed within about 1.5 standard errors (exploratory; scripts not
+  archived).
+- **Diagnostics.** The user chose to remove the `.log_weight_<group>`
+  union columns and the `diagnostics` they provide, since one column per
+  type does not scale. A later helper that builds wife-side
+  conditional-logit data, with each alternative's log weight as an offset,
+  is a possible separate feature, not yet specified.
+
+### Ancestry-type validation
+
+Tests should cover the analytical examples above, equivalence with
+category weights when every profile is pure, symmetry of the static table,
+binned calibration against an exact person-level R reference with ancestry
+types, delta by category, blocks, profiles appearing mid-run, restarts and
+reproducibility. A long-form report should compare directional ancestry
+flows with and without the term.
+
 ## Worked examples
 
 Unweighted female choice below is a mathematical comparison, not an API option.
@@ -322,17 +462,77 @@ Consequences:
 
 ## Diagnostics and interpreting estimates
 
-Weights consume no random draws. In a grouped population, `diagnostics = TRUE` records `.log_weight_<group>` on each new union: the log group weights applied
-at the search that formed it (October 23, 2026, D070). One group is the
-reference with log weight 0; only differences between groups matter, and
-searches where calibration cannot affect choice record 0 for every group. Earlier unions and new groups'
-columns for earlier rows are NA. In a wife-side choice set, using the column
-for each alternative's group as an offset gives the exact benchmark, in place
-of approximating the weights with a male-group main effect. Nonmarital father
-selections form no union and are not recorded.
+Weights consume no random draws and are not recorded on unions. The
+`.log_weight_<group>` diagnostics that recorded them (D070) were removed by
+D199. Instead, a run can keep the weights of a sample of its searches (D200), and `extract_choice_sets()`
+builds wife-side choice sets from the histories with each alternative's log
+weight as an offset.
 
-A conditional logit fitted to reconstructed wife-side choice sets should
-include the recorded log group weights as offsets. A male-group main effect
+### Choice-set reconstruction (D200)
+
+*Implemented (D200, November 24, 2026).*
+
+**Recording.** The `run_simulation()` argument `union_weight_sample`
+(default 0) gives the fraction of unions formed by marriage and cohabitation
+searches in this run whose search weights are kept. A union is kept when a
+fixed hash of its union ID falls below the fraction, so recording consumes no
+random draws and the histories are identical with recording on or off. The
+result gains `matching_weights`, a list of three tibbles:
+
+- `types`: `type_id`, the man's matching categories (one column per matching
+  dimension) and, with an ancestry term, his rounded ancestry shares.
+- `unions`: `union_id`, `union_type` (`"marriage"` or `"cohabitation"`),
+  `time` and `calibration_id`; `calibration_id` is `NA` when the model has no
+  calibrated weights (all offsets 0).
+- `weights`: `calibration_id`, `type_id` and `log_weight`, for the types with
+  men in the pool at that search. Unions that share held weights (D199) share
+  one calibration.
+
+Father matching for nonmarital births forms no union and is not recorded.
+Unions in the starting population and, with immigration, unions that arrive
+formed are never searches, so they are never kept. A later run on the result
+replaces the record; it covers one run.
+
+**Reconstruction.** `extract_choice_sets(population, unions = 1000,
+alternatives = 50, union_types = c("marriage", "cohabitation"))` samples
+`unions` recorded unions of the requested types (all of them if fewer) and,
+for each, `alternatives` other men (all if fewer) uniformly without
+replacement from the men eligible at its start time `t`: male, alive at `t`,
+`t - birth_time >= min_male_age` and in no union live at `t` (a union ending
+at `t` has ended, since dissolution and death precede searches). The chosen
+husband is excluded from the alternatives. Known-kin exclusions are not
+applied (user decision), and nor are hard group restrictions (`NA` in
+`group_exogamy`); analysts can drop restricted pairs using the category
+columns. Sampling uses R's random-number generator.
+
+Each candidate's type is his matching categories at `t` (from the transition
+history) with his rounded profile, and his `log_weight` is that type's entry
+for the union's calibration, 0 for a type with no entry. The result has one
+row per candidate: `choice_id` (the union ID), `union_type`, `time`,
+`chosen`, `wife_id`, `man_id`, both birth times, both persons' categories at
+`t` (`_w`, `_h` suffixes), their rounded ancestry shares when recorded, and
+`log_weight`.
+
+**Use and limits.** With uniform sampling of alternatives, a conditional logit
+such as `clogit(chosen ~ age_diff + I(age_diff^2) + <pair indicators> +
+<ancestry distances> + offset(log_weight) + strata(choice_id))` estimates the
+matching model's coefficients consistently. Kinship and hard restrictions
+remove alternatives in the engine but not here, so estimates near those
+boundaries can differ. `min_male_age` is recorded with the weights.
+
+**Validation.** A run without groups has all offsets 0. Seeded histories are
+identical with `union_weight_sample` 0, 0.3 and 1; at 1 every union formed in
+the run is kept, a fraction keeps about that share, and two histories keep the
+same union IDs. Each set holds one chosen husband and distinct eligible men,
+and no chosen husband carries the zero-target weight -1000. Recovery: in a
+40-year run with two race groups (`A:B` -2) and three ancestry categories
+(lambda 1, 0.5 and 1.5), a conditional logit on 3,000 sets with offsets
+recovers the age, race and ancestry inputs within 4 standard errors; an
+exploratory fit on all unions gave -1.99 to -2.01 for race and 0.91, 0.61
+and 1.51 for lambda (standard errors about 0.05).
+
+A conditional logit fitted to reconstructed wife-side choice sets is exact
+with the applied log weights as offsets. A male-group main effect
 can approximate varying calibration weights but cannot reproduce each search
 exactly. In the static analysis, calibrated weights left the age
 term (-0.0278 against -0.0277) and symmetric group term (-2.87 to -2.91,
@@ -415,9 +615,9 @@ binned calibration against an exact individual-level R reference for native
 and custom formulas in both intensity types, three-group convergence, zero and
 unattainable targets, a male group with no counted women, identities created
 during a run (custom AB inheritance) and restarts with them, strict endogamy
-with unit weights, recorded log weights across restarts, one/no-group
+with unit weights, one/no-group
 unit-weight shortcuts in both initiation modes, reproducibility, restarts, separate father models,
-diagnostics without changed histories, the single warning, and input
+the single warning, and input
 validation, and incremental pool sums against a full rebuild after thousands
 of pool changes and cutoff crossings.
 
