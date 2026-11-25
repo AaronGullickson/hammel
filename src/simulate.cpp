@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <map>
@@ -49,6 +50,7 @@ struct Person {
   double id, born, died, mother, father, last_birth;
   bool female;
   int group;
+  int type = 0;  // matching type: group and ancestry profile (D199)
 };
 
 // Event processes, in their same-time priority order.
@@ -246,8 +248,11 @@ bool has_cohab_fertility(DataFrame rates) {
 
 // Whether group weights can change a model's choices. When a model prevents
 // all exogamy, every woman sees only her own group's men.
+// Strict endogamy leaves weights no effect, unless ancestry endogamy splits a
+// woman's allowed men into several types (D199).
 bool applies_weights(const List& model) {
-  return !as<bool>(model["prevent_exogamy_all"]);
+  return !as<bool>(model["prevent_exogamy_all"]) ||
+         read_ancestry_term(model).active();
 }
 
 // An Exp(1) cumulative-hazard threshold from R's RNG, which shares the seed
@@ -300,7 +305,6 @@ class Simulation {
     DataFrame union_rates,
     List father_matching,
     bool cancel_birth_if_no_match,
-    bool diagnostics,
     NumericMatrix initial_ancestry,
     List inheritance,
     double ffab,
@@ -317,6 +321,11 @@ class Simulation {
     Nullable<List> group_input
   );
   Simulation(const Simulation&) = delete;
+  // Keep the search weights of this fraction of the unions formed by
+  // marriage and cohabitation searches (D200).
+  void set_union_weight_sample(double fraction) {
+    union_weight_sample = fraction;
+  }
   Simulation& operator=(const Simulation&) = delete;
   List run(SEXP progress);
 
@@ -371,7 +380,6 @@ class Simulation {
     const List& choice_model,
     const DrawModel& draw,
     bool father,
-    std::vector<double>* applied,
     bool cohab_role = false
   );
   int form_union(int woman, double now);
@@ -479,8 +487,7 @@ class Simulation {
     all_conversion, all_probability;
   List matching, father_matching, cohab_matching;
   double start, years, end, birth_interval, min_male_age, ffab;
-  bool rate_initiation, cancel_birth_if_no_match, diagnostics, counts_cohab,
-    check_cells;
+  bool rate_initiation, cancel_birth_if_no_match, counts_cohab, check_cells;
   std::set<double> calendar_boundaries;
 
   // Calendar schedules of matching and inheritance models (D123).
@@ -529,10 +536,14 @@ class Simulation {
   std::vector<int> previous_union, legal_previous;
   std::vector<double> previous_union_end;
   double next_union_id = 0;
-  // Log group weights applied at each union-forming search (empty = unit).
-  std::vector<std::vector<double>> diagnostic_log_weights;
 
-  // Exact partner draws (D072): living, unpartnered men by group and bin.
+  // Matching types (D199) and each person's ancestry profile.
+  MatchingTypes types;
+  std::vector<int> profile;
+  void set_group(int person, int group);
+  void grow_types();
+
+  // Exact partner draws (D072): living, unpartnered men by type and bin.
   MalePool pool;
   DrawModel union_draw, father_draw_storage, cohab_draw_storage;
   const DrawModel* union_draw_current = &union_draw;
@@ -554,6 +565,34 @@ class Simulation {
   bool union_weighted = false, father_weighted = false, cohab_weighted = false;
   std::map<int, LagTable> scheduled_lags;
   std::vector<double> union_warm, father_warm, cohab_warm;
+  // Models with ancestry endogamy reuse their last weights for up to
+  // `typed_interval` years (D199), recalibrating sooner when a type with
+  // drawable men appears or a model schedule switches.
+  struct HeldWeights {
+    double time = R_NegInf;
+    int types = -1;
+    int calibration = -1;
+    std::vector<double> log_weights;
+    // Types with eligible men at the solve, and the calibrator's eligibility
+    // event count when they were last checked.
+    std::vector<char> drawable;
+    unsigned long long checked = 0;
+  };
+  HeldWeights union_held, father_held, cohab_held;
+  // Sampled weight records (D200). Each solve is numbered; held weights keep
+  // their solve's number. A kept union records the number its search used and
+  // the log weights of the types with men in the pool, added per solve as
+  // later kept unions find types not yet stored.
+  double union_weight_sample = 0;
+  int calibration_count = 0, last_calibration = -1;
+  std::vector<double> last_log_weights;
+  std::vector<double> record_union, record_time;
+  std::vector<int> record_cohab, record_calibration;
+  std::map<int, std::vector<char>> record_stored;
+  std::vector<int> record_solve, record_type;
+  std::vector<double> record_log_weight;
+  void record_union_weights(double union_id, double now, bool cohab);
+  double typed_interval = 0;
   std::map<SEXP, std::vector<double>> deltas;  // target log shifts by model
   double weighted_infeasible = 0;
 
@@ -630,7 +669,6 @@ Simulation::Simulation(
   DataFrame union_rates,
   List father_matching,
   bool cancel_birth_if_no_match,
-  bool diagnostics,
   NumericMatrix initial_ancestry,
   List inheritance,
   double ffab,
@@ -664,7 +702,6 @@ Simulation::Simulation(
       ffab(ffab),
       rate_initiation(rate_initiation),
       cancel_birth_if_no_match(cancel_birth_if_no_match),
-      diagnostics(diagnostics),
       counts_cohab(counts_cohab),
       check_cells(check_cells) {
   // R performs input validation and seed handling.
@@ -865,6 +902,18 @@ void Simulation::read_groups(Nullable<List> group_input, int persons) {
   }
   matching_spec = read_spec("matching");
   group_count = matching_spec.count;
+  // Ancestry endogamy (D199): components of the named dimensions and units.
+  types = MatchingTypes(group_count);
+  if (groups.size() && groups.containsElementNamed("ancestry_matching")) {
+    const List layout = groups["ancestry_matching"];
+    types = MatchingTypes(
+      group_count, as<std::vector<int>>(layout["offsets"]),
+      as<std::vector<int>>(layout["sizes"]), as<int>(layout["units"])
+    );
+    if (layout.containsElementNamed("interval")) {
+      typed_interval = as<double>(layout["interval"]);
+    }
+  }
   matching_dim.assign(dimensions, 0);
   for (int d : matching_spec.dims) {
     matching_dim[d] = 1;
@@ -941,10 +990,17 @@ Simulation::read_people(DataFrame persons, NumericMatrix initial_ancestry) {
       ++parity[m];
     }
   }
-  pool = MalePool(min_birth, end, group_count, kWeightBinWidth);
+  profile.assign(people.size(), 0);
+  for (int i = 0; i < static_cast<int>(people.size()); ++i) {
+    profile[i] = types.profile_of(
+      ancestry.data() + static_cast<size_t>(i) * ancestry_components
+    );
+    people[i].type = types.type(people[i].group, profile[i]);
+  }
+  pool = MalePool(min_birth, end, types.count(), kWeightBinWidth);
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
     if (!people[i].female && NumericVector::is_na(people[i].died)) {
-      pool.add(i, people[i].group, people[i].born);
+      pool.add(i, people[i].type, people[i].born);
     }
   }
   return index;
@@ -1012,12 +1068,12 @@ void Simulation::setup_calibration() {
       any_weighted = any_weighted || applies_weights(as<List>(model));
     }
   }
-  if (!any_weighted || group_count <= 1) {
+  if (!any_weighted || (group_count <= 1 && !types.active())) {
     return;
   }
-  calibrator.reset(new WeightCalibrator(
-    min_birth, end, group_count, kWeightBinWidth, min_male_age
-  ));
+  calibrator.reset(
+    new WeightCalibrator(min_birth, end, &types, kWeightBinWidth, min_male_age)
+  );
   if (scheduled_models) {
     union_table_id = calibrator->add_table(get_scheduled_lag(general_id));
     father_table_id = calibrator->add_table(get_scheduled_lag(father_id));
@@ -1060,7 +1116,7 @@ void Simulation::setup_calibration() {
   }
   for (int man = 0; man < static_cast<int>(people.size()); ++man) {
     if (pool.contains(man)) {
-      calibrator->add_man(people[man].group, people[man].born, 1);
+      calibrator->add_man(people[man].type, people[man].born, 1);
     }
   }
   for (int woman = 0; woman < static_cast<int>(people.size()); ++woman) {
@@ -1484,7 +1540,7 @@ void Simulation::load_processes(double now) {
         }
         search_calibration.update(
           woman, cell,
-          calibrator->bin_index(people[woman].group, people[woman].born), w
+          calibrator->bin_index(people[woman].type, people[woman].born), w
         );
       });
     } else if (search_weights_spec) {
@@ -1583,6 +1639,7 @@ bool Simulation::update_models(double now) {
     union_warm.clear();
     father_warm.clear();
     cohab_warm.clear();
+    union_held = father_held = cohab_held = HeldWeights();
     if (calibrator) {
       calibrator->set_table(union_table_id, get_scheduled_lag(general_id));
       calibrator->set_table(father_table_id, get_scheduled_lag(father_id));
@@ -1689,7 +1746,7 @@ void Simulation::remove_male(int man) {
   }
   pool.remove(man);
   if (calibrator) {
-    calibrator->add_man(people[man].group, people[man].born, -1);
+    calibrator->add_man(people[man].type, people[man].born, -1);
   }
 }
 
@@ -1698,9 +1755,9 @@ void Simulation::add_male(int man) {
       current_partner[man] >= 0 || pool.contains(man)) {
     return;
   }
-  pool.add(man, people[man].group, people[man].born);
+  pool.add(man, people[man].type, people[man].born);
   if (calibrator) {
-    calibrator->add_man(people[man].group, people[man].born, 1);
+    calibrator->add_man(people[man].type, people[man].born, 1);
   }
 }
 
@@ -1714,7 +1771,7 @@ void Simulation::add_counted_woman(int woman, double now) {
     return;
   }
   counted_woman[woman] = 1;
-  calibrator->add_woman(people[woman].group, people[woman].born, 1);
+  calibrator->add_woman(people[woman].type, people[woman].born, 1);
   if (probability_tracker) {
     probability_tracker->activate(
       woman, people[woman].born, probability_schedule(woman), now
@@ -1730,7 +1787,7 @@ void Simulation::remove_counted_woman(int woman) {
   if (probability_tracker) {
     probability_tracker->remove(woman);
   }
-  calibrator->add_woman(people[woman].group, people[woman].born, -1);
+  calibrator->add_woman(people[woman].type, people[woman].born, -1);
 }
 
 // Draw models and lag tables of scheduled matching models, built on first
@@ -1785,16 +1842,60 @@ int Simulation::find_candidate(
   const List& choice_model,
   const DrawModel& draw,
   bool father,
-  std::vector<double>* applied,
   bool cohab_role
 ) {
   if (pool.empty()) {
     return -1;
   }
-  std::vector<double> log_weights(group_count, 0.0);
+  std::vector<double> log_weights(types.count(), 0.0);
   const bool weighted =
     cohab_role ? cohab_weighted : (father ? father_weighted : union_weighted);
-  if (calibrator && weighted) {
+  HeldWeights& held =
+    cohab_role ? cohab_held : (father ? father_held : union_held);
+  bool hold = calibrator && weighted && draw.ancestry.active() &&
+              typed_interval > 0 && held.types >= 0 &&
+              now - held.time < typed_interval;
+  // Types registered since the weights were found hold zero log weights
+  // while none of their men can be drawn (all younger than the cutoff).
+  if (hold && held.types < types.count()) {
+    const int last = pool.last_bin(now, min_male_age);
+    for (int t = held.types; hold && t < types.count(); ++t) {
+      for (int k = 0; k <= last; ++k) {
+        if (!pool.members(t, k).empty()) {
+          hold = false;
+          break;
+        }
+      }
+    }
+    if (hold) {
+      held.log_weights.resize(types.count(), 0.0);
+      held.types = types.count();
+    }
+  }
+  // A type without eligible men at the solve holds a placeholder weight. Its
+  // first eligible man, by aging past the cutoff, rejoining the pool,
+  // changing categories or arriving, triggers a recalibration.
+  if (hold) {
+    calibrator->include_through(now);
+    const unsigned long long events = calibrator->eligibility_events();
+    if (events > held.checked) {
+      const int known = static_cast<int>(held.drawable.size());
+      for (int t = 0; hold && t < types.count(); ++t) {
+        if ((t >= known || !held.drawable[t]) &&
+            calibrator->eligible_since(t, held.checked)) {
+          hold = false;
+        }
+      }
+      if (hold) {
+        held.checked = events;
+      }
+    }
+  }
+  int calibration = -1;
+  if (hold) {
+    log_weights = held.log_weights;
+    calibration = held.calibration;
+  } else if (calibrator && weighted) {
     if (probability_tracker) {
       probability_tracker->advance(now);
     }
@@ -1805,7 +1906,7 @@ int Simulation::find_candidate(
         std::vector<double> scan(filled.size(), 0.0);
         for (int w = 0; w < static_cast<int>(counted_woman.size()); ++w) {
           if (counted_woman[w]) {
-            scan[calibrator->bin_index(people[w].group, people[w].born)] +=
+            scan[calibrator->bin_index(people[w].type, people[w].born)] +=
               cells->hazard(w);
           }
         }
@@ -1863,13 +1964,29 @@ int Simulation::find_candidate(
       ++weighted_infeasible;
     }
     log_weights = weights.log_weights;
+    calibration = calibration_count++;
+    if (draw.ancestry.active()) {
+      held.time = now;
+      held.types = types.count();
+      held.calibration = calibration;
+      held.log_weights = log_weights;
+      held.drawable.assign(types.count(), 0);
+      for (int t = 0; t < types.count(); ++t) {
+        held.drawable[t] = calibrator->has_eligible(t);
+      }
+      held.checked = calibrator->eligibility_events();
+    }
   }
-  if (applied) {
-    *applied = log_weights;
+  if (union_weight_sample > 0 && !father) {
+    last_calibration = calibration;
+    if (calibration >= 0) {
+      last_log_weights = log_weights;
+    }
   }
   return draw_partner(
-    pool, draw, people[woman].group, people[woman].born, now, min_male_age,
-    log_weights, [this](int person) { return people[person].born; },
+    pool, draw, types, people[woman].type, people[woman].born, now,
+    min_male_age, log_weights,
+    [this](int person) { return people[person].born; },
     [this, woman](int man) {
       return kinship->generations() > 0 && kinship->known_related(woman, man);
     },
@@ -1884,13 +2001,11 @@ int Simulation::form_union(int woman, double now) {
   if (partner >= 0) {
     return partner;
   }
-  std::vector<double> applied;
   const double p = cohab_probability(woman, now);
   const bool is_cohab = cohab_enabled && R::runif(0, 1) < p;
   partner = find_candidate(
     woman, now, is_cohab ? cohab_matching : matching,
-    is_cohab ? *cohab_draw : *union_draw_current, false,
-    diagnostics ? &applied : nullptr, is_cohab
+    is_cohab ? *cohab_draw : *union_draw_current, false, is_cohab
   );
   if (partner < 0) {
     return partner;
@@ -1899,8 +2014,9 @@ int Simulation::form_union(int woman, double now) {
   const int u = static_cast<int>(union_history.size());
   union_history.push_back({++next_union_id, now, NA_REAL, woman, partner});
   union_history.back().cohab = is_cohab;
-  if (diagnostics) {
-    diagnostic_log_weights.push_back(applied);
+  if (union_weight_sample > 0) {
+    // Before the husband leaves the pool, so his type is among those stored.
+    record_union_weights(union_history.back().id, now, is_cohab);
   }
   person_unions[woman].push_back(u);
   person_unions[partner].push_back(u);
@@ -1909,6 +2025,46 @@ int Simulation::form_union(int woman, double now) {
   remove_male(partner);
   remove_counted_woman(woman);
   return partner;
+}
+
+// A union is kept when a fixed hash of its ID falls below the sample
+// fraction, so recording consumes no random draws (D200).
+bool kept_union(double union_id, double fraction) {
+  uint64_t z = static_cast<uint64_t>(union_id) + 0x9E3779B97F4A7C15ULL;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+  z ^= z >> 31;
+  return static_cast<double>(z >> 11) * 0x1.0p-53 < fraction;
+}
+
+void Simulation::record_union_weights(double union_id, double now, bool cohab) {
+  if (!kept_union(union_id, union_weight_sample)) {
+    return;
+  }
+  record_union.push_back(union_id);
+  record_time.push_back(now);
+  record_cohab.push_back(cohab);
+  record_calibration.push_back(last_calibration);
+  if (last_calibration < 0) {
+    return;
+  }
+  std::vector<char>& stored = record_stored[last_calibration];
+  stored.resize(last_log_weights.size(), 0);
+  const int last = pool.last_bin(now, min_male_age);
+  for (int t = 0; t < static_cast<int>(last_log_weights.size()); ++t) {
+    if (stored[t] || t >= pool.groups()) {
+      continue;
+    }
+    for (int k = 0; k <= last; ++k) {
+      if (!pool.members(t, k).empty()) {
+        stored[t] = 1;
+        record_solve.push_back(last_calibration);
+        record_type.push_back(t);
+        record_log_weight.push_back(last_log_weights[t]);
+        break;
+      }
+    }
+  }
 }
 
 void Simulation::check_union_capacity() const {
@@ -2430,7 +2586,7 @@ FertilityCells::State Simulation::fertility_state(int w) {
   st.stratum = cells->stratum(
     person_stratum(fertility_spec, w), type, parity_specific ? parity[w] : 0
   );
-  st.group = p.group;
+  st.group = p.type;
   st.report = person_stratum(report_spec, w);
   if (st.stratum < 0) {
     stop(
@@ -2523,7 +2679,7 @@ void Simulation::refresh_person(int i, double now) {
           search->set_weight(i, w);
         }
         search_calibration.update(
-          i, cell, calibrator->bin_index(p.group, p.born), w
+          i, cell, calibrator->bin_index(p.type, p.born), w
         );
       }
     }
@@ -2658,7 +2814,7 @@ void Simulation::move_party(
     tx_initiator.push_back(initiator);
     cats[cell] = destination;
     if (matching_dim[tp.dim]) {
-      people[m].group = person_stratum(matching_spec, m);
+      set_group(m, person_stratum(matching_spec, m));
     }
     tp.entry[m] = now;
     if (people[m].female) {
@@ -3020,9 +3176,6 @@ void Simulation::on_conversion(int i, int unit, double now) {
   union_history.back().converted_from = prior_id;
   person_unions[i].push_back(next);
   person_unions[partner].push_back(next);
-  if (diagnostics) {
-    diagnostic_log_weights.emplace_back(group_count, NA_REAL);
-  }
   ++conversion_count;
   refresh_union(unit, now);  // the cohabitation closes; the marriage enters
   refresh_person(i, now);
@@ -3052,7 +3205,7 @@ void Simulation::on_birth(int i, double now) {
   int father_position = partner;
   if (partner < 0 && rate_initiation) {
     father_position =
-      find_candidate(i, now, father_matching, *father_draw, true, nullptr);
+      find_candidate(i, now, father_matching, *father_draw, true);
   }
   if (father_position < 0 && cancel_birth_if_no_match) {
     // No child was born: retain last_birth; her union state may have changed.
@@ -3102,13 +3255,15 @@ void Simulation::on_birth(int i, double now) {
     cats[static_cast<size_t>(child) * dimensions + d] =
       newborn_category(d, child, i, father_position, female, partner >= 0);
   }
-  const int child_group = person_stratum(matching_spec, child);
-  people[child].group = child_group;
+  profile.push_back(types.profile_of(
+    ancestry.data() + static_cast<size_t>(child) * ancestry_components
+  ));
+  set_group(child, person_stratum(matching_spec, child));
   kinship->append(i, father_position);
   if (!female) {
-    pool.add(child, child_group, now);
+    pool.add(child, people[child].type, now);
     if (calibrator) {
-      calibrator->add_man(child_group, now, 1);
+      calibrator->add_man(people[child].type, now, 1);
     }
   }
   person_unions.emplace_back();
@@ -3128,6 +3283,21 @@ void Simulation::on_birth(int i, double now) {
   // union state, in on-demand mode) has changed.
   refresh_person(child, now);
   refresh_person(i, now);
+}
+
+// A person's matching group and the type it gives with their ancestry
+// profile; new types extend the pool and calibration arrays.
+void Simulation::set_group(int person, int group) {
+  people[person].group = group;
+  people[person].type = types.type(group, profile[person]);
+  grow_types();
+}
+
+void Simulation::grow_types() {
+  pool.grow(types.count());
+  if (calibrator) {
+    calibrator->grow();
+  }
 }
 
 // A newborn's ancestry is the average of the parents'. A missing father
@@ -3350,17 +3520,48 @@ List Simulation::results() {
           _["end_time"] = out_end, _["end_reason"] = out_reason
         );
 
-  // Rows are new unions in order; columns are group indices. Unions formed
-  // without weights (unit weights) record zeros.
-  NumericMatrix log_weights(
-    static_cast<int>(diagnostic_log_weights.size()), group_count
-  );
-  for (size_t u = 0; u < diagnostic_log_weights.size(); ++u) {
-    for (int g = 0; g < group_count; ++g) {
-      log_weights(u, g) =
-        diagnostic_log_weights[u].empty() ? 0 : diagnostic_log_weights[u][g];
+  // Sampled weight records (D200): kept unions, stored log weights by solve,
+  // and each type's matching-dimension codes and rounded profile units.
+  List weight_record;
+  if (union_weight_sample > 0) {
+    const int n_types = types.count();
+    IntegerMatrix type_codes(n_types, matching_spec.dims.size());
+    int components = 0;
+    for (int t = 0; t < n_types && types.active(); ++t) {
+      components = types.profile_units(types.profile(t)).size();
+      break;
     }
+    IntegerMatrix type_units(n_types, components);
+    for (int t = 0; t < n_types; ++t) {
+      const int c = types.category(t);
+      for (size_t j = 0; j < matching_spec.dims.size(); ++j) {
+        const int size = dim_labels[matching_spec.dims[j]].size();
+        type_codes(t, j) = (c / matching_spec.strides[j]) % size;
+      }
+      if (components) {
+        const std::vector<int>& units = types.profile_units(types.profile(t));
+        for (int g = 0; g < components; ++g) {
+          type_units(t, g) = units[g];
+        }
+      }
+    }
+    IntegerVector calibration = wrap(record_calibration);
+    for (int k = 0; k < calibration.size(); ++k) {
+      if (calibration[k] < 0) {
+        calibration[k] = NA_INTEGER;
+      }
+    }
+    weight_record = List::create(
+      _["union_id"] = wrap(record_union), _["time"] = wrap(record_time),
+      _["cohab"] = wrap(record_cohab), _["calibration_id"] = calibration,
+      _["weight_calibration"] = wrap(record_solve),
+      _["weight_type"] = wrap(record_type),
+      _["log_weight"] = wrap(record_log_weight),
+      _["type_dims"] = wrap(matching_spec.dims), _["type_codes"] = type_codes,
+      _["type_units"] = type_units
+    );
   }
+
   return List::create(
     _["persons"] = DataFrame::create(
       _["person_id"] = out_id, _["sex"] = out_sex, _["birth_time"] = out_birth,
@@ -3380,8 +3581,7 @@ List Simulation::results() {
     _["weighted_infeasible"] = weighted_infeasible,
     _["draw_approximate"] = draw_approximate, _["unrealized"] = unrealized,
     _["cells_consistent"] = cells_consistent,
-    _["hetfert"] = wrap(fertility_weights),
-    _["diagnostic_log_weights"] = log_weights
+    _["hetfert"] = wrap(fertility_weights), _["weight_record"] = weight_record
   );
 }
 
@@ -3407,7 +3607,6 @@ List simulate_cpp(
   DataFrame union_rates,
   List father_matching,
   bool cancel_birth_if_no_match,
-  bool diagnostics,
   NumericMatrix initial_ancestry,
   List inheritance,
   double ffab,
@@ -3422,15 +3621,17 @@ List simulate_cpp(
   Nullable<List> model_schedule_input = R_NilValue,
   Nullable<List> weight_input = R_NilValue,
   Nullable<List> group_input = R_NilValue,
+  double union_weight_sample = 0,
   Nullable<Function> progress = R_NilValue
 ) {
   Simulation simulation(
     persons, mortality_rates, fertility_rates, start, years, birth_interval,
     unions, matching, min_male_age, kinship_generations, rate_initiation,
-    union_rates, father_matching, cancel_birth_if_no_match, diagnostics,
-    initial_ancestry, inheritance, ffab, dissolution_rates, cohab_prob,
-    conversion_rates, cohab_matching, counts_cohab, check_cells, hetfert,
-    transition_input, model_schedule_input, weight_input, group_input
+    union_rates, father_matching, cancel_birth_if_no_match, initial_ancestry,
+    inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates,
+    cohab_matching, counts_cohab, check_cells, hetfert, transition_input,
+    model_schedule_input, weight_input, group_input
   );
+  simulation.set_union_weight_sample(union_weight_sample);
   return simulation.run(progress);
 }

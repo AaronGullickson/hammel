@@ -384,10 +384,7 @@ active histories are rejected. Supplied ended histories remain unchanged.
 Death closes all affected ongoing unions and clears both partners' current
 partner immediately. Her next birth may trigger another search in on-demand mode. In that mode fertility and
 mortality remain independent of union status; union changes refresh the
-partners' cell memberships without random draws. Optional
-`diagnostics = TRUE` records only weighted choice's applied log group weights
-(`.log_weight_<group>`) on newly formed unions in grouped populations; it
-defaults off and consumes no additional random draws. See [union formation](union-formation-models.md)
+partners' cell memberships without random draws. See [union formation](union-formation-models.md)
 for worked examples and implemented milestone 2 rules.
 
 Update the mother's latest birth and refresh the newborn's and mother's cell

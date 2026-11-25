@@ -874,13 +874,6 @@ test_that("one matching model can combine a race effect with a region prohibitio
   region <- pair_categories(out, "region")
   expect_true(all(region$w == region$h))
   expect_true(all(race$w == race$h))
-  # Diagnostics name combinations.
-  diag <- run_simulation(set_union_formation(step2_model(age_gap_matching_model(
-    0, 5,
-    group_exogamy = list(race = c("A:B" = -1), region = c("N:S" = -1)))), "on_demand",
-    matching = age_gap_matching_model(0, 5, group_exogamy = list(race = c("A:B" = -1),
-      region = c("N:S" = -1))), kinship_generations = 0, diagnostics = TRUE), .5, seed = 72)
-  expect_true(all(paste0(".log_weight_", c("A|N", "B|N", "A|S", "B|S")) %in% names(diag$unions)))
 })
 
 test_that("models naming different dimensions share the combination", {

@@ -4,7 +4,14 @@
 \alias{matching_model}
 \title{Specify a conditional-logit matching model}
 \usage{
-matching_model(formula, coefficients, group_exogamy = NULL, delta = NULL)
+matching_model(
+  formula,
+  coefficients,
+  group_exogamy = NULL,
+  delta = NULL,
+  ancestry_endogamy = NULL,
+  ancestry_resolution = 1/8
+)
 }
 \arguments{
 \item{formula}{A one-sided R formula using \code{age_difference} and group
@@ -19,6 +26,17 @@ group exogamous pairings. See details for syntax.}
 \item{delta}{Optional male-target adjustments, as a named list keyed by
 dimension or a bare value for the only declared dimension: a finite numeric
 vector with unique category names.}
+
+\item{ancestry_endogamy}{A named list indicating endogamy weights for
+shared ancestry within a named group dimension. Each element of the list
+should be a named vector where the names correspond to the group dimension's
+categories and the values correspond to an endogamy weight. See details for
+further information.}
+
+\item{ancestry_resolution}{The resolution to which ancestry shares are
+rounded for matching, a single number such as \code{1/8} (default), \code{1/16} or
+\code{0.1} whose reciprocal is a whole number. Used only with
+\code{ancestry_endogamy}.}
 }
 \value{
 An inspectable \code{hammel_matching_model} list containing \code{formula} and
@@ -45,7 +63,8 @@ adjust for expected male group shares, because the model uses women only to
 make the choice:
 
 \deqn{
- P(j\mid i)= \frac{\omega_{g(j)}\exp(U_{ij})}{\sum_k\omega_{g(k)}\exp(U_{ik})}
+ P(j\mid i)= \frac{\omega_{g(j)}\exp(U_{ij})}
+ {\sum_k\omega_{g(k)}\exp(U_{ik})}
 }
 
 where \eqn{\omega_g} is a group-specific weight to adjust for male group
@@ -94,6 +113,32 @@ and \verb{<group>_y} columns for each dimension it uses and \code{log_odds}, suc
 applied in both directions; NA prohibits it; unlisted pairs have an implicit
 log odds of zero.
 }
+
+The \code{ancestry_endogamy} argument is another approach to simulating endogamy
+between group categories. Tracking of ancestry must be enabled in the group
+declaration to use it for a group dimension. For each ancestry category
+\eqn{k} with weight \eqn{\lambda_k}, the term
+\eqn{-\sum_k \lambda_k |p_{ik} - p_{jk}|} is added to the utility, where
+\eqn{p_{ik}} and \eqn{p_{jk}} are the woman's and man's ancestry shares.
+When the two potential partners have unmixed ancestry from two completely
+different categories, the utility penalty will be equal to the sum of their
+full \eqn{\lambda} values. When they have unmixed ancestry from the same
+category, they will suffer no penalty. Penalties will be reduced for
+similarity in ancestry between these extremes.
+
+The \code{ancestry_endogamy} argument is specified as a named list similar to the
+list form option for \code{group_exogamy}. Each name in the list corresponds to a
+group dimension and each element is a named vector of weights where the names
+correspond to group categories, such as \code{list(race = c(A = 1.5, B = 0.8))}.
+To generate more endogamy, the values should be positive, but negative weights
+are allowed. Left out categories implicitly receive a weight of zero. The
+"unknown" category can also be given a weight.
+
+For estimation of weights applied to potential men, ancestry is coarsened
+into bins. The \code{ancestry_resolution} argument specifies the width of those
+bins. Because initial mixing will halve ancestry components, specifying
+values in such terms (e.g. 1/4, 1/8, 1/16) works well. Smaller values
+provide more precision, but slower runs.
 
 Users may find \code{\link[=age_gap_matching_model]{age_gap_matching_model()}} more intuitive than specifying
 a direct formula.

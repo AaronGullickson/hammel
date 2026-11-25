@@ -979,18 +979,24 @@ resolve_matching_models <- function(
     )
     labels <- combination_labels(categories)
     convert <- function(model) {
-      combined_matching_model(model, categories, labels, call = call)
+      carry_ancestry(
+        combined_matching_model(model, categories, labels, call = call),
+        model
+      )
     }
   } else {
     dim <- if (length(used)) used else NULL
     categories <- if (is.null(dim)) NULL else registries[[dim]]
     labels <- categories
     convert <- function(model) {
-      internal_matching_model(
-        model,
-        if (length(matching_dimensions(model, dims, call = call))) dim,
-        categories,
-        call = call
+      carry_ancestry(
+        internal_matching_model(
+          model,
+          if (length(matching_dimensions(model, dims, call = call))) dim,
+          categories,
+          call = call
+        ),
+        model
       )
     }
   }
@@ -1011,4 +1017,198 @@ resolve_matching_models <- function(
     process[f] <- list(x)
   }
   list(process = process, dims = used, values = labels)
+}
+
+# Internal matching models keep the public ancestry endogamy settings.
+carry_ancestry <- function(internal, model) {
+  internal$ancestry_endogamy <- model$ancestry_endogamy
+  internal$ancestry_resolution <- model$ancestry_resolution
+  internal
+}
+
+# Check every matching model's ancestry endogamy (D199) against the dimensions
+# that track ancestry. Models with the term share one pool of matching types,
+# so they must name the same dimensions with the same resolution. Returns
+# NULL, or list(dims, resolution) for the run.
+check_matching_ancestry <- function(
+  process,
+  declaration,
+  population,
+  registries,
+  call = rlang::caller_env()
+) {
+  tracked <- tracked_ancestry(declaration)
+  categories <- lapply(
+    stats::setNames(tracked, tracked), function(d) {
+      columns <- names(population$ancestry[[d]])
+      union(
+        as.character(registries[[d]]),
+        setdiff(columns, c("person_id", "unknown"))
+      )
+    }
+  )
+  spec <- NULL
+  for (f in c("matching", "father_matching", "cohab_matching")) {
+    for (model in model_entries(process[[f]])) {
+      weights <- with_error_context(
+        resolve_ancestry_endogamy(model, tracked, categories, call = call),
+        paste0("In the ", f, " model.")
+      )
+      if (!length(weights)) {
+        next
+      }
+      resolution <- model$ancestry_resolution
+      if (is.null(resolution)) {
+        resolution <- 1 / 8
+      }
+      this <- list(
+        dims = tracked[tracked %in% names(weights)],
+        resolution = resolution
+      )
+      if (is.null(spec)) {
+        spec <- this
+      } else if (!identical(spec$dims, this$dims) ||
+                   round(1 / spec$resolution) != round(1 / this$resolution)) {
+        abort_hammel(
+          c(
+            paste(
+              "Matching models with {.arg ancestry_endogamy} must share its",
+              "dimensions and {.arg ancestry_resolution}."
+            ),
+            "x" = paste(
+              "One names {.field {spec$dims}} at",
+              "{format_resolution(spec$resolution)}; the {f} model names",
+              "{.field {this$dims}} at {format_resolution(this$resolution)}."
+            ),
+            "i" = "Their weights may differ."
+          ),
+          "specification",
+          argument = "ancestry_endogamy",
+          call = call
+        )
+      }
+    }
+  }
+  spec
+}
+
+# Where each named dimension's shares sit among the engine's ancestry
+# columns, for rounding profiles (D199). `components` lists each declared
+# dimension's ancestry columns and `offsets` their zero-based starts.
+matching_ancestry_layout <- function(spec, dimensions, components, offsets) {
+  if (is.null(spec)) {
+    return(NULL)
+  }
+  index <- match(spec$dims, dimensions)
+  list(
+    dims = spec$dims,
+    components = components[index],
+    offsets = as.integer(offsets[index]),
+    sizes = lengths(components[index]),
+    units = as.integer(round(1 / spec$resolution))
+  )
+}
+
+# A prepared model's ancestry weights over the layout's components, in order;
+# empty without the term.
+ancestry_lambda <- function(model, layout) {
+  x <- model$ancestry_endogamy
+  if (is.null(x) || is.null(layout)) {
+    return(numeric())
+  }
+  if (!is_dimension_list(x)) {
+    x <- stats::setNames(list(x), layout$dims)
+  }
+  unlist(
+    lapply(
+      seq_along(layout$dims), function(d) {
+        weights <- x[[layout$dims[d]]]
+        names <- layout$components[[d]]
+        out <- stats::setNames(numeric(length(names)), names)
+        out[names(weights)] <- weights
+        unname(out)
+      }
+    )
+  )
+}
+
+# A model's ancestry endogamy weights as a list keyed by dimension: a bare
+# vector names the only dimension that tracks ancestry, and weights name that
+# dimension's categories or `unknown`.
+resolve_ancestry_endogamy <- function(
+  model,
+  tracked,
+  categories,
+  call = rlang::caller_env()
+) {
+  x <- model$ancestry_endogamy
+  if (is.null(x)) {
+    return(list())
+  }
+  if (!is_dimension_list(x)) {
+    if (!length(tracked)) {
+      abort_hammel(
+        c(
+          "{.arg ancestry_endogamy} needs a dimension that tracks ancestry.",
+          "i" = "Track ancestry with {.code group(ancestry = TRUE)}."
+        ),
+        "groups",
+        call = call
+      )
+    }
+    if (length(tracked) > 1L) {
+      abort_hammel(
+        c(
+          "{.arg ancestry_endogamy} must name its dimension.",
+          "x" = "Several dimensions track ancestry: {.val {tracked}}.",
+          "i" = paste0(
+            "Give it as a list by dimension, such as ",
+            "{.code ancestry_endogamy = list(", tracked[1], " = ...)}."
+          )
+        ),
+        "groups",
+        call = call
+      )
+    }
+    x <- stats::setNames(list(x), tracked)
+  }
+  untracked <- setdiff(names(x), tracked)
+  if (length(untracked)) {
+    abort_hammel(
+      c(
+        paste(
+          "{.arg ancestry_endogamy} names {.field {untracked}}, which",
+          "{?doesn't/don't} track ancestry."
+        ),
+        "i" = if (length(tracked)) {
+          "Dimensions tracking ancestry: {.val {tracked}}."
+        } else {
+          "Track ancestry with {.code group(ancestry = TRUE)}."
+        }
+      ),
+      "groups",
+      group = untracked,
+      call = call
+    )
+  }
+  for (d in names(x)) {
+    allowed <- c(categories[[d]], "unknown")
+    unknown <- setdiff(names(x[[d]]), allowed)
+    if (length(unknown)) {
+      abort_hammel(
+        c(
+          paste(
+            "{.arg ancestry_endogamy} names categories {.field {d}} doesn't",
+            "have."
+          ),
+          "x" = "Unknown: {.val {unknown}}.",
+          "i" = "Ancestry categories: {.val {allowed}}."
+        ),
+        "groups",
+        group = d,
+        call = call
+      )
+    }
+  }
+  x
 }

@@ -148,6 +148,114 @@ as candidate data, never mutable state. Female-only terms are constant within a 
 weights depend only on the man's group. Group
 effects in both the formula and pair table intentionally add together.
 
+## Ancestry endogamy
+
+*Implemented (D199, November 24, 2026).* The user selected the interface,
+argument names, rounding and calibration described here.
+Calibration by ancestry type is specified in
+[weighted-choice matching](weighted-choice-matching.md#ancestry-types).
+
+### Interface
+
+`matching_model()` and `age_gap_matching_model()` gain two arguments:
+
+```r
+matching_model(
+  formula,
+  coefficients,
+  group_exogamy = NULL,
+  delta = NULL,
+  ancestry_endogamy = NULL,
+  ancestry_resolution = 1 / 8
+)
+
+age_gap_matching_model(
+  3, 5,
+  ancestry_endogamy = list(birthplace = c(irish = 2, nw_europe = 2))
+)
+```
+
+- `ancestry_endogamy` is a list keyed by dimension, each entry a named
+  vector of finite weights, one per ancestry category. A bare named vector
+  applies to the only dimension that tracks ancestry, as for
+  `group_exogamy`.
+- Names are categories of that dimension (declared categories or
+  ancestry columns) or `unknown`. Unknown names, repeated names, NA and
+  non-finite values are errors. The dimension must track ancestry. Shapes
+  are checked by the constructor; dimensions and categories when the
+  simulation starts, for general, father and cohabitation models and each
+  schedule entry.
+- Positive weights favor partners with similar shares of that category.
+  Categories left out contribute nothing; `unknown` contributes only when
+  named.
+- `ancestry_resolution` is a single number r with 1/r a positive integer,
+  such as 1/8 (default), 1/16 or 0.1. It applies to every dimension the
+  model names and is part of the model, not a numerical tolerance. It has
+  no effect without `ancestry_endogamy`.
+
+### Utility
+
+For woman i and man j, with rounded profiles q (below), the model adds
+
+    A[i,j] = - sum over named dimensions d and categories k of
+             lambda[d,k] * |q[i,d,k] - q[j,d,k]|
+
+to the pair utility after the formula, alongside `group_exogamy` offsets.
+The term is additive and symmetric in the partners: there are no
+interactions with age or with formula terms, and the matching formula's
+predictors do not include ancestry. Identical profiles contribute zero.
+Hard group restrictions still apply; ancestry never prohibits a pair.
+Father and cohabitation models follow the existing rules: NULL
+`father_matching` inherits the term and an explicit model has its own.
+Each entry of a matching-model schedule (D123) carries its own term.
+All models in a run share one pool of matching types, so every model with
+the term must name the same dimensions with the same resolution; their
+weights may differ. Models without the term may join such a run.
+
+### Rounded profiles
+
+Matching never uses raw shares; it uses each person's profile rounded to
+multiples of r. The public `ancestry` tibbles and inheritance are
+unchanged. For each dimension, all categories including `unknown` are
+rounded jointly so the profile still sums to 1:
+
+1. Express each share in units of r and keep the integer parts.
+2. Give each remaining unit to the categories with the largest remainders,
+   breaking ties by the dimension's category order (`unknown` last).
+
+Rounding uses no random numbers. Ancestry is fixed after birth, so a
+person's profile is computed once, when they enter the population.
+Rounding each share separately could break the total: at r = 0.1,
+0.35 / 0.35 / 0.30 would become 0.4 / 0.4 / 0.3; the joint rule gives
+0.4 / 0.3 / 0.3.
+
+### Worked examples
+
+With `c(irish = 2, nw_europe = 2)` and r = 1/8:
+
+| Woman (irish / nw_europe / unknown) | Man | Term |
+| --- | --- | ---: |
+| 1 / 0 / 0 | 1 / 0 / 0 | 0 |
+| 1 / 0 / 0 | 0 / 1 / 0 | -4 |
+| 1 / 0 / 0 | 0.5 / 0.5 / 0 | -2 |
+| 0.375 / 0.625 / 0 | 1 / 0 / 0 | -2.5 |
+| 0.5 / 0 / 0.5 (unknown father) | 1 / 0 / 0 | -1 |
+
+- At r = 1/8, 0.375 is on the grid and the term is exact. At r = 0.1 the
+  same woman rounds to 0.4 / 0.6 and the term is -2.4.
+- 0.3 / 0.7 rounds to 0.25 / 0.75 at r = 1/8; a 0.04 share rounds to 0.
+- Adding `unknown = 1` changes the last row to -1.5.
+- A power-of-two resolution matches halving at birth: descendants of
+  founders with on-grid profiles stay exact for log2(1/r) generations.
+
+### Validation
+
+Tests should cover the rows above, rounding totals and tie-breaking,
+equality of a pure-profile ancestry term with the equivalent
+`group_exogamy` effect (below), addition to formula and pair effects,
+father-model inheritance, schedules, restarts, reproducibility and input
+errors.
+
 ## Execution and validation
 
 Keep the native linear/quadratic age scorer; add compiled pair offsets afterward

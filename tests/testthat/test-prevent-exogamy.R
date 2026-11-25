@@ -3,11 +3,11 @@ exogamy_test_model <- function(group_exogamy = NULL) {
   model$population$persons$sex <- c("f", "m", "m")
   model$population$persons$group <- c("A", "A", "B")
   model$population$groups <- list(group = group())
-  identity(set_union_formation(model, "on_demand", diagnostics = TRUE,
+  identity(set_union_formation(model, "on_demand",
     matching = age_gap_matching_model(0, 5, group_exogamy = group_exogamy)))
 }
 
-test_that("NA prohibitions exclude candidates before scoring and diagnostics", {
+test_that("NA prohibitions exclude candidates before scoring", {
   # A whole-dimension NA, or the pair, prohibits the B man; each overrides any
   # preference (here a strong one for the other pair, A:A).
   for (prohibit in list(NA, c("A:B" = NA), list(group = NA), list(group = c("A:B" = NA, "A:A" = 1000)))) {
