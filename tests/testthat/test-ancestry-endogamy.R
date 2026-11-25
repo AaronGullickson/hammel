@@ -82,7 +82,8 @@ test_that("ancestry resolution must be one over a whole number", {
       ~ 1, numeric(), ancestry_endogamy = c(A = 1), ancestry_resolution = r
     ))
   }
-  for (r in list(0, -0.125, 0.3, 2, NA_real_, Inf, c(0.1, 0.2), "1/8")) {
+  bad <- list(0, -0.125, 0.3, 2, NA_real_, Inf, c(0.1, 0.2), "1/8", 2^-31)
+  for (r in bad) {
     error <- expect_hammel_error(
       matching_model(~ 1, numeric(), ancestry_resolution = r),
       "argument",
@@ -288,6 +289,18 @@ test_that("three-profile calibration gives the specification's table", {
   table <- shares * P / rowSums(P)
   expect_equal(table, t(table), tolerance = 1e-8)
   expect_equal(table[1, 3], 0.04948, tolerance = 1e-4)
+})
+
+test_that("overflowing ancestry factors give finite flows", {
+  # Cross-profile pairs score +720, beyond double range once exponentiated;
+  # the target needs a log weight past the cap, so it is infeasible.
+  people <- profile_people(c(I = 0.75, N = 0.25))
+  result <- typed_calibration(
+    people, people, prepared_endogamy(c(-360, -360, 0))
+  )
+  expect_true(all(is.finite(result$flow)))
+  expect_true(all(is.finite(result$log_weights)))
+  expect_true(result$infeasible)
 })
 
 test_that("typed calibration meets exact person-level targets", {
@@ -535,4 +548,47 @@ test_that("typed weights are held for a month unless set otherwise", {
   )
   expect_false(identical(every$unions, monthly$unions))
   expect_gt(nrow(every$unions), 100)
+})
+
+test_that("held weights refresh when a type gains its first eligible man", {
+  # Every nw man turns 15 within the first few months, after searches have
+  # begun, so the first solves find no eligible nw men.
+  set.seed(3)
+  persons <- data.frame(
+    person_id = seq_len(600),
+    sex = rep(c("f", "m"), each = 300),
+    birth_time = c(
+      -runif(300, 20, 30), -runif(150, 20, 35), -runif(150, 14.6, 14.95)
+    ),
+    death_time = NA_real_,
+    mother_id = NA_integer_,
+    father_id = NA_integer_,
+    heritage = c(
+      rep(c("irish", "nw"), 150), rep("irish", 150), rep("nw", 150)
+    )
+  )
+  population <- hammel_population(
+    persons, end_time = 0, groups = list(heritage = group(ancestry = TRUE))
+  )
+  model <- hammel_model() |>
+    set_population(population) |>
+    set_mortality(
+      data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0)
+    ) |>
+    set_fertility(data.frame(age_start = 15, age_end = 45, rate = 3)) |>
+    set_union_formation(
+      "on_demand",
+      matching = age_gap_matching_model(
+        3, 5, ancestry_endogamy = c(irish = 1, nw = 1)
+      )
+    )
+  result <- run_simulation(model, 0.6, seed = 2, union_weight_sample = 1)
+  set.seed(1)
+  sets <- extract_choice_sets(result, 10000, 10000)
+  # Men whose birth-time bin has reached the cutoff are in the calibration;
+  # none keeps the placeholder weight of a type without eligible men.
+  centre <- (floor(sets$birth_time_h / 0.25) + 0.5) * 0.25
+  ready <- sets$time - centre >= 15
+  expect_gt(sum(ready & sets$heritage_nw_h == 1), 1000)
+  expect_true(all(sets$log_weight[ready] > -999))
 })

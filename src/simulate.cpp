@@ -573,6 +573,10 @@ class Simulation {
     int types = -1;
     int calibration = -1;
     std::vector<double> log_weights;
+    // Types with eligible men at the solve, and the calibrator's eligibility
+    // event count when they were last checked.
+    std::vector<char> drawable;
+    unsigned long long checked = 0;
   };
   HeldWeights union_held, father_held, cohab_held;
   // Sampled weight records (D200). Each solve is numbered; held weights keep
@@ -1868,6 +1872,25 @@ int Simulation::find_candidate(
       held.types = types.count();
     }
   }
+  // A type without eligible men at the solve holds a placeholder weight. Its
+  // first eligible man, by aging past the cutoff, rejoining the pool,
+  // changing categories or arriving, triggers a recalibration.
+  if (hold) {
+    calibrator->include_through(now);
+    const unsigned long long events = calibrator->eligibility_events();
+    if (events > held.checked) {
+      const int known = static_cast<int>(held.drawable.size());
+      for (int t = 0; hold && t < types.count(); ++t) {
+        if ((t >= known || !held.drawable[t]) &&
+            calibrator->eligible_since(t, held.checked)) {
+          hold = false;
+        }
+      }
+      if (hold) {
+        held.checked = events;
+      }
+    }
+  }
   int calibration = -1;
   if (hold) {
     log_weights = held.log_weights;
@@ -1947,6 +1970,11 @@ int Simulation::find_candidate(
       held.types = types.count();
       held.calibration = calibration;
       held.log_weights = log_weights;
+      held.drawable.assign(types.count(), 0);
+      for (int t = 0; t < types.count(); ++t) {
+        held.drawable[t] = calibrator->has_eligible(t);
+      }
+      held.checked = calibrator->eligibility_events();
     }
   }
   if (union_weight_sample > 0 && !father) {

@@ -294,9 +294,12 @@ and every rule above applies with type in place of group:
 - **Held weights.** A model with the term recalibrates at most every 1/12
   year and uses its latest weights for searches in between, instead of
   recalibrating at every search (user decision, November 24, 2026). It
-  recalibrates sooner when a type appears whose men are old enough to be
-  drawn, or when a model schedule switches; newborn types wait, since none
-  of their men can be chosen. The interval is fixed, not a user argument.
+  recalibrates sooner when a model schedule switches, or when a type that
+  had no eligible men at the last calibration gains one: a new type, or an
+  existing one whose first man reaches the age cutoff, rejoins the pool,
+  changes categories or arrives. Until then such a type's men cannot be
+  chosen, so newborn types wait. Eligibility follows the calibration's
+  birth-time bins. The interval is fixed, not a user argument.
   Draws remain exact given the held weights. Models without the term still
   recalibrate at every search.
 

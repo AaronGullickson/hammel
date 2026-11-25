@@ -1,6 +1,6 @@
 # Sampled matching weights and reconstructed choice sets (D200).
 
-choice_population <- function(n = 4000, seed = 33) {
+choice_population <- function(n = 4000, seed = 33, race = "race") {
   set.seed(seed)
   persons <- data.frame(
     person_id = seq_len(n),
@@ -12,11 +12,10 @@ choice_population <- function(n = 4000, seed = 33) {
     race = sample(c("A", "B"), n, replace = TRUE, prob = c(0.7, 0.3)),
     heritage = sample(c("irish", "nw", "se"), n, replace = TRUE)
   )
-  hammel_population(
-    persons,
-    end_time = 0,
-    groups = list(race = group(), heritage = group(ancestry = TRUE))
-  )
+  names(persons)[names(persons) == "race"] <- race
+  groups <- list(group(), heritage = group(ancestry = TRUE))
+  names(groups)[1] <- race
+  hammel_population(persons, end_time = 0, groups = groups)
 }
 
 choice_model <- function(population, matching) {
@@ -177,6 +176,22 @@ test_that("choice sets hold the husband and eligible alternatives", {
 
   only <- extract_choice_sets(result, 10, 5, union_types = "cohabitation")
   expect_equal(nrow(only), 0L)
+})
+
+test_that("a dimension named type_id keeps the offsets", {
+  population <- choice_population(2000, race = "type_id")
+  matching <- age_gap_matching_model(
+    3, 5,
+    group_exogamy = list(type_id = c("A:B" = -2)),
+    ancestry_endogamy = list(heritage = c(irish = 1, nw = 0.5, se = 1.5))
+  )
+  result <- run_simulation(
+    choice_model(population, matching), 10, seed = 5, union_weight_sample = 1
+  )
+  set.seed(6)
+  sets <- extract_choice_sets(result, 100, 20)
+  expect_true(any(sets$log_weight != 0))
+  expect_true(all(sets$log_weight[sets$chosen] > -999))
 })
 
 test_that("extract_choice_sets validates its inputs", {

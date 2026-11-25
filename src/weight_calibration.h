@@ -62,6 +62,18 @@ class WeightCalibrator {
   std::vector<std::vector<double>> sums_;
   int included_ = 0;
   unsigned long long updates_ = 0;
+  // Men per type in included bins, and the event count at which each type
+  // last went from no included men to some (held typed weights, D199).
+  std::vector<double> included_men_;
+  std::vector<unsigned long long> eligible_stamp_;
+  unsigned long long eligibility_events_ = 0;
+  void count_included(int group, double delta) {
+    const bool had = included_men_[group] > 0.5;
+    included_men_[group] += delta;
+    if (!had && included_men_[group] > 0.5) {
+      eligible_stamp_[group] = ++eligibility_events_;
+    }
+  }
   void spread(size_t t, int male_type, int male_bin, double delta) {
     const LagTable& table = *tables_[t];
     std::vector<double>& sums = sums_[t];
@@ -82,6 +94,7 @@ class WeightCalibrator {
       for (int g = 0; g < groups_; ++g) {
         const double count = men_[static_cast<size_t>(g) * bins_ + included_];
         if (count != 0) {
+          count_included(g, count);
           for (size_t t = 0; t < tables_.size(); ++t) {
             spread(t, g, included_, count);
           }
@@ -129,6 +142,19 @@ class WeightCalibrator {
     grow();
   }
   int bins() const { return bins_; }
+  // Include the male bins that have reached the age cutoff by `now`.
+  void include_through(double now) { advance(now); }
+  // Typed models' held weights (D199): whether a type has men in included
+  // bins, and whether it gained its first since event count `stamp`.
+  unsigned long long eligibility_events() const { return eligibility_events_; }
+  bool has_eligible(int type) const {
+    return static_cast<size_t>(type) < included_men_.size() &&
+           included_men_[type] > 0.5;
+  }
+  bool eligible_since(int type, unsigned long long stamp) const {
+    return static_cast<size_t>(type) < eligible_stamp_.size() &&
+           eligible_stamp_[type] > stamp;
+  }
   // Extend per-type arrays to every registered type.
   void grow() {
     const int count = types_->count();
@@ -138,6 +164,8 @@ class WeightCalibrator {
     groups_ = count;
     const size_t n = static_cast<size_t>(count) * bins_;
     men_.resize(n, 0);
+    included_men_.resize(count, 0);
+    eligible_stamp_.resize(count, 0);
     women_.resize(n, 0);
     intensities_.resize(n, {0, 0, 0});
     positive_contributors_.resize(n, {0, 0, 0});
@@ -182,6 +210,7 @@ class WeightCalibrator {
     men_[i] += delta;
     const int k = static_cast<int>(i % bins_);
     if (k < included_) {
+      count_included(group, delta);
       for (size_t t = 0; t < tables_.size(); ++t) {
         spread(t, group, k, delta);
       }

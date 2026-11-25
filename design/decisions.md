@@ -3779,8 +3779,8 @@ ethnicity at birth.
 **Solver and diagnostics:** Models with an ancestry term use Newton
 steps found by conjugate gradients; models without one keep the dense
 Newton solve unchanged. Models with the term hold their weights for 1/12
-year between calibrations (sooner when a type with drawable men appears or
-a schedule switches), which supersedes D066's recalculation at each search
+year between calibrations (sooner when a type without eligible men at the
+last calibration gains one or a schedule switches), which supersedes D066's recalculation at each search
 for those models only; the interval is fixed and not a user argument
 (user decision, November 24, 2026, after per-search calibration took 609 s
 against 3.5 s for an 80-year 1880 run).

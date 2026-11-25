@@ -128,8 +128,9 @@ extract_choice_sets <- function(
     }
   }
 
-  # Offsets: the man's type entry for the union's calibration, else 0.
-  type_id <- record$types$type_id[match(man_key, record$type_keys)]
+  # Offsets: the man's type entry for the union's calibration, else 0. Type
+  # IDs are row positions, so a dimension named `type_id` cannot replace them.
+  type_id <- match(man_key, record$type_keys)
   calibration <- kept$calibration_id[k]
   weight <- record$weights$log_weight[
     match(

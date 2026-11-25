@@ -591,6 +591,23 @@ validate_ancestry_resolution <- function(x, call = rlang::caller_env()) {
       call = call
     )
   }
+  # The engine counts shares in whole units of the resolution.
+  limit <- .Machine$integer.max
+  if (round(1 / x) > limit) {
+    abort_hammel(
+      c(
+        "{.arg ancestry_resolution} is too small.",
+        "x" = "It is {describe_value(x)}.",
+        "i" = paste(
+          "Use 1 divided by a whole number up to {limit},",
+          "such as {.code 1/16}."
+        )
+      ),
+      "argument",
+      argument = "ancestry_resolution",
+      call = call
+    )
+  }
   invisible(x)
 }
 

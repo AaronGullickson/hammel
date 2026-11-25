@@ -259,8 +259,8 @@ WeightSolution WeightCalibrator::solve(
   }
   // Pool sums S[row, unit] come from the maintained sums by male type, times
   // the ancestry factor of the row's and type's profiles. Entries below the
-  // floor are recomputed exactly; a row that underflows is rescaled in log
-  // space.
+  // floor are recomputed exactly; a row that underflows or overflows (large
+  // ancestry factors) is rescaled in log space.
   const int R = static_cast<int>(rows.size());
   std::vector<double> S(static_cast<size_t>(R) * G, 0);
   auto pool = [&](int r, int m) -> double& {
@@ -318,7 +318,7 @@ WeightSolution WeightCalibrator::solve(
       pool(r, unit[m]) += value;
       total += value;
     }
-    if (total > 0) {
+    if (total > 0 && R_finite(total)) {
       continue;
     }
     auto log_ancestry = [&](int male_type) {
@@ -493,7 +493,8 @@ WeightSolution WeightCalibrator::solve(
         cached = false;
         double error = 0;
         for (int j = 0; j < n; ++j) {
-          error = std::max(error, std::abs(phi[j] - tau[j]));
+          const double gap = std::abs(phi[j] - tau[j]);
+          error = R_finite(gap) ? std::max(error, gap) : R_PosInf;
         }
         if (error < 1e-10) {
           converged = true;
@@ -534,8 +535,8 @@ WeightSolution WeightCalibrator::solve(
             evaluate(trial, trial_phi, trial_hess, false, typed);
           double trial_error = 0;
           for (int j = 0; j < n; ++j) {
-            trial_error =
-              std::max(trial_error, std::abs(trial_phi[j] - tau[j]));
+            const double gap = std::abs(trial_phi[j] - tau[j]);
+            trial_error = R_finite(gap) ? std::max(trial_error, gap) : R_PosInf;
           }
           if (trial_objective < objective || trial_error < error) {
             moved = true;
@@ -610,9 +611,11 @@ WeightSolution WeightCalibrator::solve(
                         : 0;
       }
     }
+    // Non-finite flows (a failed solve) count as a miss.
     double miss = 0;
     for (int m = 0; m < G; ++m) {
-      miss = std::max(miss, std::abs(s.flow[m] - s.target[m]));
+      const double gap = std::abs(s.flow[m] - s.target[m]);
+      miss = R_finite(gap) ? std::max(miss, gap) : R_PosInf;
     }
     if (miss > 1e-8) {
       s.infeasible = true;
