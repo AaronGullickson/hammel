@@ -36,12 +36,10 @@
 #'   years. Defaults to `TRUE` in interactive environments and `FALSE` in
 #'   non-interactive environments. Users can set the `hammel.progress` option
 #'   to control its use.
-#' @param union_weight_sample The fraction of unions formed by marriage and
-#'   cohabitation searches in this run whose matching weights are kept, from
-#'   0 (default, none) to 1. Kept weights let [extract_choice_sets()] build
-#'   conditional-logit choice sets with each man's log weight as an offset.
-#'   Unions are selected by their IDs, so recording does not change the
-#'   simulation.
+#' @param union_weight_sample The fraction of unions in this run whose matching
+#'   weights are kept, from 0 (default, none) to 1. Kept weights let
+#'   [extract_choice_sets()] build conditional-logit choice sets with each man's
+#'   log weight as an offset.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
 #'   `simulation` component recording selected settings. With
 #'   `union_weight_sample` above 0, it also has a `matching_weights`

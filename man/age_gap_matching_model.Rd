@@ -28,10 +28,11 @@ preferred age gap at which utility is halved.}
 dimension or a bare value for the only declared dimension: a finite numeric
 vector with unique category names.}
 
-\item{ancestry_endogamy}{Optional ancestry endogamy weights, as a named list
-keyed by dimension or a bare value for the only dimension that tracks
-ancestry: a finite numeric vector named by ancestry categories or
-\code{unknown}. See details.}
+\item{ancestry_endogamy}{A named list indicating endogamy weights for
+shared ancestry within a named group dimension. Each element of the list
+should be a named vector where the names correspond to the group dimension's
+categories and the values correspond to an endogamy weight. See details for
+further information.}
 
 \item{ancestry_resolution}{The resolution to which ancestry shares are
 rounded for matching, a single number such as \code{1/8} (default), \code{1/16} or

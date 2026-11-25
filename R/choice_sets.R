@@ -6,20 +6,19 @@
 #'
 #' @description
 #'
-#' DRAFT (agent-written; needs the user's review). Build wife-side
-#' conditional-logit choice sets for unions formed in a simulation run, with
-#' each candidate man's log matching weight as an offset.
+#' Build wife-side conditional-logit choice sets for unions formed in a
+#' simulation run, with each candidate man's log matching weight as an offset.
 #'
 #' @details
 #'
-#' The run must keep matching weights, with
-#' `run_simulation(..., union_weight_sample = )` above 0. Each choice set is
-#' one recorded union: its husband (`chosen = TRUE`) and a uniform sample of
-#' the other men eligible when it formed, who were alive, at least the
+#' The run must keep matching weights, with the `union_weight_sample` argument
+#' in [run_simulation()] set to a value above zero. Each choice set contains
+#' the actual recorded union (`chosen = TRUE`) and a specified number of
+#' counterfactual unions (`chosen = FALSE`) created from a uninform sample
+#' of the other men eligible when it formed, who were alive, at least the
 #' union process's `min_male_age`, had arrived if immigrants, and were in no
-#' live union. Known-kin exclusions
-#' and hard group restrictions (`NA` in `group_exogamy`) are not applied;
-#' drop restricted pairs with the category columns if needed.
+#' existing union. Known-kin exclusions and hard group restrictions
+#' (`NA` in `group_exogamy`) are not applied.
 #'
 #' Each candidate's `log_weight` is the calibrated weight of his matching
 #' type (categories and rounded ancestry profile) at that search, 0 when his
@@ -27,8 +26,6 @@
 #' of `chosen` on the matching model's terms estimates its coefficients:
 #' for example, `survival::clogit(chosen ~ age_diff + I(age_diff^2) +
 #' offset(log_weight) + strata(choice_id), data = sets)`.
-#'
-#' Sampling uses R's random-number generator; set a seed to reproduce it.
 #'
 #' @param population A `hammel_population` returned by [run_simulation()] with
 #'   `union_weight_sample` above 0.

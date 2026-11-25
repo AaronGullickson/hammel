@@ -28,12 +28,10 @@ years. Defaults to \code{TRUE} in interactive environments and \code{FALSE} in
 non-interactive environments. Users can set the \code{hammel.progress} option
 to control its use.}
 
-\item{union_weight_sample}{The fraction of unions formed by marriage and
-cohabitation searches in this run whose matching weights are kept, from
-0 (default, none) to 1. Kept weights let \code{\link[=extract_choice_sets]{extract_choice_sets()}} build
-conditional-logit choice sets with each man's log weight as an offset.
-Unions are selected by their IDs, so recording does not change the
-simulation.}
+\item{union_weight_sample}{The fraction of unions in this run whose matching
+weights are kept, from 0 (default, none) to 1. Kept weights let
+\code{\link[=extract_choice_sets]{extract_choice_sets()}} build conditional-logit choice sets with each man's
+log weight as an offset.}
 }
 \value{
 A \code{hammel_population} with updated histories and endpoint, plus a
