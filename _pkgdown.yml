@@ -104,6 +104,7 @@ reference:
       - augment_persons
       - augment_unions
       - extract_unpartnered_births
+      - extract_choice_sets
 
   - title: Example data
     desc: Packaged demographic inputs for examples and exploration.

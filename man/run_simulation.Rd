@@ -8,7 +8,8 @@ run_simulation(
   model,
   years,
   seed = NULL,
-  progress = getOption("hammel.progress", interactive())
+  progress = getOption("hammel.progress", interactive()),
+  union_weight_sample = 0
 )
 }
 \arguments{
@@ -27,10 +28,17 @@ specified, simulation will use current RNG.}
 years. Defaults to \code{TRUE} in interactive environments and \code{FALSE} in
 non-interactive environments. Users can set the \code{hammel.progress} option
 to control its use.}
+
+\item{union_weight_sample}{The fraction of unions in this run whose matching
+weights are kept, from 0 (default, none) to 1. Kept weights let
+\code{\link[=extract_choice_sets]{extract_choice_sets()}} build conditional-logit choice sets with each man's
+log weight as an offset.}
 }
 \value{
 A \code{hammel_population} with updated histories and endpoint, plus a
-\code{simulation} component recording selected settings.
+\code{simulation} component recording selected settings. With
+\code{union_weight_sample} above 0, it also has a \code{matching_weights}
+component for \code{\link[=extract_choice_sets]{extract_choice_sets()}}.
 }
 \description{
 Run a demographic simulation with the provided \code{hammel_model} for a given

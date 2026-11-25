@@ -128,6 +128,23 @@ check_nonnegative <- function(x, name, call = rlang::caller_env()) {
   invisible(x)
 }
 
+# A single whole number of at least 1.
+check_count <- function(x, name, call = rlang::caller_env()) {
+  if (!is.numeric(x) || length(x) != 1L || !is.finite(x) || x < 1 ||
+        x != trunc(x)) {
+    abort_hammel(
+      c(
+        "{.arg {name}} must be a single whole number of at least 1.",
+        "x" = "It is {describe_value(x)}."
+      ),
+      "argument",
+      argument = name,
+      call = call
+    )
+  }
+  invisible(x)
+}
+
 # Character labels drawn from `allowed`, without missing values.
 check_labels <- function(x, name, allowed, call = rlang::caller_env()) {
   subject <- describe_column(name)

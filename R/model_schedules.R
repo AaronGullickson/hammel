@@ -144,6 +144,7 @@ prepare_model_schedules <- function(
   components,
   start,
   end,
+  ancestry = NULL,
   call = rlang::caller_env()
 ) {
   matching_bank <- collect_model_bank(
@@ -152,6 +153,7 @@ prepare_model_schedules <- function(
   prepared_matching <- lapply(
     matching_bank, prepare_matching_model,
     population_groups = values,
+    ancestry = ancestry,
     call = call
   )
   times <- start

@@ -164,14 +164,13 @@ test_that("type-specific group strata built by binding stratified subsets", {
   expect_error(stratify_rates(typed,list(union_type=c(cohab=1))),"already has")
 })
 
-test_that("cohabitation and marriage use distinct matching and diagnostic weights", {
+test_that("cohabitation and marriage use distinct matching models", {
   model <- cohab_fixture(600,.5)
   model$population$persons$sex[1:300] <- "f"
   model$population$persons$group <- rep(c("A","B"),300)
   model$population$groups <- list(group = group())
   model$processes$union_formation$matching <- matching_model(~1,numeric(),group_exogamy = NA)
   model$processes$union_formation$cohab_matching <- matching_model(~1,numeric(),group_exogamy=c("A:B"=10))
-  model$processes$union_formation$diagnostics <- TRUE
   result <- run_simulation(model,.3,713)
   u <- augment_unions(result)
   marriage <- subset(u,union_type=="marriage")
@@ -180,7 +179,6 @@ test_that("cohabitation and marriage use distinct matching and diagnostic weight
   expect_gt(nrow(cohab),50)
   expect_true(all(marriage$group_w==marriage$group_h))
   expect_gt(mean(cohab$group_w!=cohab$group_h),.9)
-  expect_true(all(is.finite(cohab$.log_weight_A)))
   expect_equal(anyDuplicated(u$husband_id),0L)
 })
 

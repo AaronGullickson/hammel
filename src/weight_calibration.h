@@ -31,41 +31,59 @@ constexpr double kMaxLogWeight = 50;            // cap for unattainable targets
 constexpr double kPoolSumFloor = 1e-6;
 constexpr unsigned long long kPoolSumRefresh = 100000;
 
-// A calibration result by male group: log weights, target flow shares, and
-// the expected flow shares the weights achieve. `infeasible` marks targets
-// that no weights could meet (or a solve that did not converge).
+// A calibration result: log weights by matching type, and target and expected
+// flow shares by weighted unit (the type for a model with ancestry endogamy,
+// otherwise the category; D199). `infeasible` marks targets that no weights
+// could meet (or a solve that did not converge).
 struct WeightSolution {
   std::vector<double> log_weights, target, flow;
   bool infeasible = false;
 };
 
-// Unpartnered men and women by group and birth-time bin, women's search and
-// fertility intensities by bin, and incrementally maintained pool sums for
-// each registered preference table. solve() finds the male-group weights for
+// Unpartnered men and women by matching type and birth-time bin, women's
+// search and fertility intensities by bin, and incrementally maintained pool
+// sums for each registered preference table. solve() finds the weights for
 // one search; channels are 0 marriage search, 1 fertility, 2 cohabitation.
+// Types are matching categories unless ancestry endogamy splits them by
+// profile (D199); per-type arrays grow as types are registered.
 class WeightCalibrator {
-  int groups_, bins_;
+  const MatchingTypes* types_;
+  int groups_, categories_, bins_;
   long long first_;
   double width_, cutoff_;
-  std::vector<double> men_, women_;                 // [group * bins + bin]
+  std::vector<double> men_, women_;                 // [type * bins + bin]
   std::vector<std::array<double, 3>> intensities_;  // marriage, fertility
   std::vector<std::array<int, 3>> positive_contributors_;
-  // Per registered utility table: sums[(female group * G + male group) * bins
-  // + female bin] of count * weight over included male bins. Male bins
-  // [0, included_) have reached the age cutoff; older bins have lower indices.
+  // Per registered utility table: sums[(male type * C + female category) *
+  // bins + female bin] of count * lag weight over included male bins, before
+  // the ancestry factor. Male bins [0, included_) have reached the age
+  // cutoff; older bins have lower indices.
   std::vector<const LagTable*> tables_;
   std::vector<std::vector<double>> sums_;
   int included_ = 0;
   unsigned long long updates_ = 0;
-  void spread(size_t t, int male_group, int male_bin, double delta) {
+  // Men per type in included bins, and the event count at which each type
+  // last went from no included men to some (held typed weights, D199).
+  std::vector<double> included_men_;
+  std::vector<unsigned long long> eligible_stamp_;
+  unsigned long long eligibility_events_ = 0;
+  void count_included(int group, double delta) {
+    const bool had = included_men_[group] > 0.5;
+    included_men_[group] += delta;
+    if (!had && included_men_[group] > 0.5) {
+      eligible_stamp_[group] = ++eligibility_events_;
+    }
+  }
+  void spread(size_t t, int male_type, int male_bin, double delta) {
     const LagTable& table = *tables_[t];
     std::vector<double>& sums = sums_[t];
-    for (int f = 0; f < groups_; ++f) {
+    const int male_group = types_->category(male_type);
+    for (int f = 0; f < categories_; ++f) {
       // Lags for consecutive female bins are contiguous in the table.
       const double* weight =
         &table.weight[table.index(f, male_group, bins_ - 1 - male_bin)];
       double* out =
-        &sums[(static_cast<size_t>(f) * groups_ + male_group) * bins_];
+        &sums[(static_cast<size_t>(male_type) * categories_ + f) * bins_];
       for (int k = 0; k < bins_; ++k) {
         out[k] += delta * weight[k];
       }
@@ -76,6 +94,7 @@ class WeightCalibrator {
       for (int g = 0; g < groups_; ++g) {
         const double count = men_[static_cast<size_t>(g) * bins_ + included_];
         if (count != 0) {
+          count_included(g, count);
           for (size_t t = 0; t < tables_.size(); ++t) {
             spread(t, g, included_, count);
           }
@@ -100,11 +119,15 @@ class WeightCalibrator {
   WeightCalibrator(
     double min_birth,
     double max_birth,
-    int groups,
+    const MatchingTypes* types,
     double width,
     double cutoff
   )
-      : groups_(groups), width_(width), cutoff_(cutoff) {
+      : types_(types),
+        groups_(0),
+        categories_(types->categories()),
+        width_(width),
+        cutoff_(cutoff) {
     if (!(width > 0) || !R_finite(min_birth) || !R_finite(max_birth) ||
         max_birth < min_birth) {
       stop("Invalid weighted-choice calibration range.");
@@ -112,20 +135,48 @@ class WeightCalibrator {
     first_ = static_cast<long long>(std::floor(min_birth / width));
     const long long last =
       static_cast<long long>(std::floor(max_birth / width));
-    if (last - first_ + 1 > 50000000LL / std::max(1, groups)) {
+    if (last - first_ + 1 > 50000000LL / std::max(1, types->count())) {
       stop("[limits] Weighted-choice calibration range is too large.");
     }
     bins_ = static_cast<int>(last - first_ + 1);
-    men_.assign(static_cast<size_t>(groups) * bins_, 0);
-    women_ = men_;
-    intensities_.resize(men_.size(), {0, 0});
-    positive_contributors_.resize(men_.size(), {0, 0});
+    grow();
   }
   int bins() const { return bins_; }
+  // Include the male bins that have reached the age cutoff by `now`.
+  void include_through(double now) { advance(now); }
+  // Typed models' held weights (D199): whether a type has men in included
+  // bins, and whether it gained its first since event count `stamp`.
+  unsigned long long eligibility_events() const { return eligibility_events_; }
+  bool has_eligible(int type) const {
+    return static_cast<size_t>(type) < included_men_.size() &&
+           included_men_[type] > 0.5;
+  }
+  bool eligible_since(int type, unsigned long long stamp) const {
+    return static_cast<size_t>(type) < eligible_stamp_.size() &&
+           eligible_stamp_[type] > stamp;
+  }
+  // Extend per-type arrays to every registered type.
+  void grow() {
+    const int count = types_->count();
+    if (count <= groups_) {
+      return;
+    }
+    groups_ = count;
+    const size_t n = static_cast<size_t>(count) * bins_;
+    men_.resize(n, 0);
+    included_men_.resize(count, 0);
+    eligible_stamp_.resize(count, 0);
+    women_.resize(n, 0);
+    intensities_.resize(n, {0, 0, 0});
+    positive_contributors_.resize(n, {0, 0, 0});
+    for (auto& sums : sums_) {
+      sums.resize(n * categories_, 0.0);
+    }
+  }
   // Register a utility table before counts are added; returns its index.
   int add_table(const LagTable* table) {
     tables_.push_back(table);
-    sums_.emplace_back(static_cast<size_t>(groups_) * groups_ * bins_, 0.0);
+    sums_.emplace_back(static_cast<size_t>(groups_) * categories_ * bins_, 0.0);
     return static_cast<int>(tables_.size()) - 1;
   }
   // Replace a role's preference table; refresh() rebuilds sums from the
@@ -159,6 +210,7 @@ class WeightCalibrator {
     men_[i] += delta;
     const int k = static_cast<int>(i % bins_);
     if (k < included_) {
+      count_included(group, delta);
       for (size_t t = 0; t < tables_.size(); ++t) {
         spread(t, group, k, delta);
       }
@@ -174,9 +226,10 @@ class WeightCalibrator {
   size_t cells() const { return intensities_.size(); }
   // Cell-accounted fertility (D101) supplies channel totals directly before a
   // fertility-driven solve; per-woman contributions to that channel are zero.
+  // Cells beyond `values` (types registered since it was filled) get zero.
   void assign_channel(int channel, const std::vector<double>& values) {
     for (size_t i = 0; i < intensities_.size(); ++i) {
-      intensities_[i][channel] = values[i];
+      intensities_[i][channel] = i < values.size() ? values[i] : 0.0;
     }
   }
   void replace_role_intensity(
@@ -208,9 +261,10 @@ class WeightCalibrator {
   }
 
   // Expected male flow shares follow from each woman-bin's intensity and
-  // her group-level choice shares b[g] S[w,g] / sum_h b[h] S[w,h]. Find log
-  // weights so those shares meet the mirrored target (Newton on a convex
-  // objective, warm-started). Empty or uninformative states return b = 1.
+  // her choice shares b[u] S[w,u] / sum_v b[v] S[w,v] over weighted units.
+  // Find log weights so those shares meet the mirrored target (Newton on a
+  // convex objective, warm-started; `warm` holds log weights by unit). `delta`
+  // is by category. Empty or uninformative states return b = 1.
   WeightSolution solve(
     double now,
     int channel,
@@ -371,6 +425,10 @@ class SearchCalibration {
   // Place a woman in a search cell (-1: not searching) with her bin and weight.
   void update(int woman, int c, size_t bin, double weight) {
     grow(woman);
+    if (c >= 0 && bin >= totals_.size()) {
+      totals_.resize(bin + 1, {0, 0});
+      positive_.resize(bin + 1, {0, 0});
+    }
     const Woman& x0 = women_[woman];
     if (x0.active ? (c == x0.cell && bin == x0.bin && weight == x0.weight)
                   : c < 0) {

@@ -37,8 +37,14 @@
 #'   years. Defaults to `TRUE` in interactive environments and `FALSE` in
 #'   non-interactive environments. Users can set the `hammel.progress` option
 #'   to control its use.
+#' @param union_weight_sample The fraction of unions in this run whose matching
+#'   weights are kept, from 0 (default, none) to 1. Kept weights let
+#'   [extract_choice_sets()] build conditional-logit choice sets with each man's
+#'   log weight as an offset.
 #' @return A `hammel_population` with updated histories and endpoint, plus a
-#'   `simulation` component recording selected settings.
+#'   `simulation` component recording selected settings. With
+#'   `union_weight_sample` above 0, it also has a `matching_weights`
+#'   component for [extract_choice_sets()].
 #' @export
 #' @examples
 #' population <- generate_uniform_population(1000)
@@ -55,7 +61,8 @@ run_simulation <- function(
   model,
   years,
   seed = NULL,
-  progress = getOption("hammel.progress", interactive())
+  progress = getOption("hammel.progress", interactive()),
+  union_weight_sample = 0
 ) {
   # Errors raised by helpers called from local functions name this function.
   run_call <- rlang::current_env()
@@ -78,6 +85,18 @@ run_simulation <- function(
       ),
       "argument",
       argument = "progress"
+    )
+  }
+  if (!is.numeric(union_weight_sample) || length(union_weight_sample) != 1L ||
+        is.na(union_weight_sample) || union_weight_sample < 0 ||
+        union_weight_sample > 1) {
+    abort_hammel(
+      c(
+        "{.arg union_weight_sample} must be a single number from 0 to 1.",
+        "x" = "It is {describe_value(union_weight_sample)}."
+      ),
+      "argument",
+      argument = "union_weight_sample"
     )
   }
   missing_elements <- missing_model_elements(model)
@@ -405,6 +424,11 @@ run_simulation <- function(
   registries <- group_registries(
     population, lapply(transition_list, `[[`, "rates")
   )
+  # Ancestry endogamy (D199) is checked against the tracked dimensions before
+  # the models are translated.
+  ancestry_spec <- check_matching_ancestry(
+    union_process, declaration, population, registries
+  )
   resolved <- resolve_matching_models(union_process, declaration, registries)
   union_process <- resolved$process
   counted <- counted_dimensions(declaration)
@@ -434,6 +458,9 @@ run_simulation <- function(
   )
   sizes <- vapply(components, length, integer(1))
   offsets <- cumsum(c(0L, utils::head(sizes, -1)))
+  ancestry_layout <- matching_ancestry_layout(
+    ancestry_spec, dimensions, components, offsets
+  )
   for (d in dimensions) {
     if (!d %in% tracked &&
           any(
@@ -482,7 +509,8 @@ run_simulation <- function(
   model_context <- if (scheduled_models) {
     prepare_model_schedules(
       model_arguments, group_values, unname(inheritance_arguments),
-      registries, components, start, start + years
+      registries, components, start, start + years,
+      ancestry = ancestry_layout
     )
   } else {
     NULL
@@ -616,6 +644,17 @@ run_simulation <- function(
         conversion = cohab$conversion_spec,
         dissolution = dissolution$spec
       )
+    )
+  }
+  if (!is.null(ancestry_layout)) {
+    group_input$ancestry_matching <- ancestry_layout[
+      c("offsets", "sizes", "units")
+    ]
+    # Models with ancestry endogamy reuse their weights for 1/12 year
+    # (D199). The internal option sets another interval; 0 recalibrates at
+    # every search.
+    group_input$ancestry_matching$interval <- as.numeric(
+      getOption("hammel.ancestry_recalibration", 1 / 12)
     )
   }
   # Each transition process: strata over its own dimension (the origin) and
@@ -800,21 +839,30 @@ run_simulation <- function(
     matching <- if (scheduled_models) {
       model_context$matching
     } else {
-      prepare_matching_model(union_process$matching, group_values)
+      prepare_matching_model(
+        union_process$matching, group_values,
+        ancestry = ancestry_layout
+      )
     }
     father_matching <- if (scheduled_models) {
       model_context$father_matching
     } else if (is.null(union_process$father_matching)) {
       matching
     } else {
-      prepare_matching_model(union_process$father_matching, group_values)
+      prepare_matching_model(
+        union_process$father_matching, group_values,
+        ancestry = ancestry_layout
+      )
     }
     cohab_matching <- if (scheduled_models) {
       model_context$cohab_matching
     } else if (is.null(union_process$cohab_matching)) {
       matching
     } else {
-      prepare_matching_model(union_process$cohab_matching, group_values)
+      prepare_matching_model(
+        union_process$cohab_matching, group_values,
+        ancestry = ancestry_layout
+      )
     }
     native <- call_native(
       simulate_cpp(
@@ -826,7 +874,6 @@ run_simulation <- function(
         union_process$initiation == "rate",
         union_rates, father_matching,
         union_process$cancel_birth_if_no_match,
-        union_process$diagnostics,
         ancestry_matrix(population, tracked),
         inheritance, ffab, dissolution_rates, cohab$prob,
         cohab$conversion,
@@ -837,6 +884,7 @@ run_simulation <- function(
         if (scheduled_models) model_context$config else NULL,
         weight_input, group_input,
         immigration_input = immigration_input,
+        union_weight_sample = as.numeric(union_weight_sample),
         progress = progress_callback
       )
     )
@@ -956,25 +1004,6 @@ run_simulation <- function(
       )
     }
   }
-  if (union_process$diagnostics) {
-    # Weighted choice records the log group weights applied at each union's
-    # search (0 = unit weight), one column per group; earlier unions are NA.
-    if (!is.null(group_values)) {
-      added <- if (years > 0) {
-        native$diagnostic_log_weights
-      } else {
-        matrix(numeric(), 0, length(group_values))
-      }
-      new_rows <- seq_len(nrow(added)) + nrow(population$unions)
-      for (g in seq_along(group_values)) {
-        column <- paste0(".log_weight_", as.character(group_values)[g])
-        if (!column %in% names(result$unions)) {
-          result$unions[[column]] <- rep(NA_real_, nrow(result$unions))
-        }
-        result$unions[[column]][new_rows] <- added[, g]
-      }
-    }
-  }
   result$end_time <- start + years
   result$simulation <- list(
     start_time = start,
@@ -984,6 +1013,16 @@ run_simulation <- function(
   )
   if (!is.null(hetfert)) {
     result$simulation$hetfert <- hetfert
+  }
+  # Sampled matching weights cover this run only (D200).
+  result$matching_weights <- if (years > 0 && union_weight_sample > 0) {
+    format_matching_weights(
+      native$weight_record,
+      dimensions,
+      registries,
+      ancestry_layout,
+      union_process$min_male_age
+    )
   }
   # Unrealized births are part of the population's history: append this run's
   # records to any earlier ones. `unrealized_since` is when the record starts.

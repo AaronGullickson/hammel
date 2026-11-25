@@ -5,6 +5,41 @@ unspecified features or a standing pause instruction. The current user request
 controls work. Start with [the documentation index](README.md),
 [scientific contract](scientific-contract.md) and [decisions](decisions.md).
 
+## Ancestry endogamy in matching (November 24, 2026)
+
+This work was developed on `ancestry-share-matching` and merged into
+master (#45), which was then merged into external-migration. The
+implementation is described under D199 and D200.
+
+**Integration with immigration.** `Simulation::on_arrival` in
+`src/simulate.cpp` rounds each arriving person's ancestry profile once it
+is final and sets the group through `set_group()`, so arrival types extend
+the pools and calibrator. `extract_choice_sets()` (D200) counts an
+immigrant as an alternative only once he has arrived. No test yet combines
+immigration with `ancestry_endogamy`.
+
+**Agreed (D199).** The earlier plan to put raw shares in the matching
+formula was replaced. Matching models get `ancestry_endogamy`, a named
+weight vector per ancestry category (list form keyed by dimension;
+`unknown` allowed), adding `-sum(lambda[k] * |q_i[k] - q_j[k]|)` to pair
+utility. The term is additive, with no age interactions and no ancestry
+formula for now. Profiles are rounded jointly by largest remainder at a
+resolution argument on the matching model (default 1/8), used in both
+calibration and draws. Calibrated weights are per male type (category x
+rounded profile), so ancestry intermarriage is balanced by sex under
+symmetric preferences. Father and cohabitation models follow the existing
+inheritance rules. The specification is drafted in
+[group matching](group-matching.md#ancestry-endogamy) and
+[weighted-choice matching](weighted-choice-matching.md#ancestry-types)
+for the user's review.
+
+**Also decided.** Typed models solve weights by Newton with conjugate
+gradients; category-only models keep the dense solve. The
+`.log_weight_<group>` diagnostics are removed; a clogit-data helper may
+follow separately. The name `ancestry_resolution` is confirmed.
+`pop_usa1880` gained birthplace ancestry on the external-migration branch
+(`751e66b`); type counts from it are in the weighted-choice spec.
+
 ## Accepted milestones and active render
 
 Milestones 1–8 are complete by user acceptance: mortality/fertility (D029,

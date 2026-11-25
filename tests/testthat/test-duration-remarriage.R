@@ -158,7 +158,6 @@ test_that("grouped duration calibration matches the equivalent age hazards", {
     set_union_formation(
       model, "rate", matching,
       rates = stratify_rates(rates, list(group = c(A = 1, B = 1.3))),
-      diagnostics = TRUE,
       kinship_generations = 0L
     )
   }
@@ -169,7 +168,6 @@ test_that("grouped duration calibration matches the equivalent age hazards", {
   expect_identical(a, b)
   expect_identical(.Random.seed, rng)
   expect_true(all(a$unions$start_time[a$unions$start_time >= 0] >= 1))
-  expect_true(all(is.finite(a$unions$.log_weight_B[-seq_len(30)])))
   expect_identical(run_simulation(configure(duration), 4, 71), a)
 })
 

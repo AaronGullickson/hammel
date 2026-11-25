@@ -459,10 +459,7 @@ preference is deferred (D042).
 
 Omitting `matching` uses `age_gap_matching_model(0, 5)`. The helper
 converts a preferred age gap and half-weight distance in years to the existing
-quadratic utility model. `diagnostics = TRUE` adds weighted choice's applied
-`.log_weight_<group>` columns to new union records in grouped populations,
-without consuming random draws. Diagnostics default off; see the
-[union specification](union-formation-models.md#optional-union-diagnostics).
+quadratic utility model.
 
 
 ## Typed partnerships (D086)

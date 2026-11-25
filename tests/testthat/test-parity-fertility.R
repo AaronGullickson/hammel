@@ -125,7 +125,7 @@ test_that("parity composes with grouped typed fertility, conversion and stratifi
     set_union_formation("rate",rates=data.frame(age_start=15,age_end=Inf,rate=.4),
       cohab_prob=data.frame(age_start=15,age_end=Inf,prob=.5),
       union_convert_rate=data.frame(dur_start=0,dur_end=Inf,rate=.2),
-      kinship_generations=0L,diagnostics=TRUE) |>
+      kinship_generations=0L) |>
     set_union_dissolution(data.frame(dur_start=0,dur_end=Inf,rate=.1))
   explicit <- rbind(transform(rates,group="A"),transform(rates,group="B"))
   factor <- c(unpartnered=1.1,cohab=.9,marriage=1.2)[explicit$union_type]

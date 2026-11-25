@@ -137,11 +137,11 @@ test_that("grouped and stratified schedules preserve the explicit hazards", {
   stratified_rates <- rbind(stratify_rates(previous_rates(.8, .4, .2), list(group = c(A = 1))),
     stratify_rates(previous_rates(.5, .3, .1), list(group = c(B = 2))))
   scaled <- set_union_formation(model, "rate", matching, rates = stratified_rates,
-    diagnostics = TRUE, kinship_generations = 0)
+    kinship_generations = 0)
   explicit <- rates
   explicit$rate[explicit$group == "B"] <- 2 * explicit$rate[explicit$group == "B"]
   reference <- set_union_formation(model, "rate", matching, rates = explicit,
-    diagnostics = TRUE, kinship_generations = 0)
+    kinship_generations = 0)
   a <- run_simulation(scaled, 5, 73)
   expect_identical(a, run_simulation(reference, 5, 73))
   expect_true(any(a$unions$end_reason == "dissolution", na.rm = TRUE))
@@ -150,9 +150,9 @@ test_that("grouped and stratified schedules preserve the explicit hazards", {
   # Shared hazards versus three equal category hazards agree in distribution.
   plain <- set_union_formation(model, "rate", matching,
     rates = data.frame(age_start = 15, age_end = Inf, rate = 2),
-    diagnostics = TRUE, kinship_generations = 0)
+    kinship_generations = 0)
   stratified <- set_union_formation(model, "rate", matching,
-    rates = previous_rates(2, 2, 2), diagnostics = TRUE, kinship_generations = 0)
+    rates = previous_rates(2, 2, 2), kinship_generations = 0)
   expect_equivalent_unions(plain, stratified, 5)
   # History overlap is ambiguous only for the new stratification contract.
   bad <- stratified

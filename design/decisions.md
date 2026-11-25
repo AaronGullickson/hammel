@@ -4222,3 +4222,95 @@ status rather than a birthplace.
 
 **Amends:** D190's statement that the dimension is used like any group when
 named, and the specification's note on duration-based transitions in it.
+
+## D199 — Ancestry endogamy in matching (November 24, 2026)
+
+**Status:** User decisions, November 24, 2026, for the
+`ancestry-share-matching` branch. Implemented. Arriving immigrants
+receive matching types from their ancestry at arrival.
+
+**Decision:** Matching models can favor partners with similar ancestry,
+specified in [group matching](group-matching.md#ancestry-endogamy) and
+[weighted-choice matching](weighted-choice-matching.md#ancestry-types):
+
+- `ancestry_endogamy` on `matching_model()` and `age_gap_matching_model()`
+  takes a named vector of weights per ancestry category (list form keyed by
+  dimension). It adds `-sum(lambda[k] * |q_i[k] - q_j[k]|)` to pair utility
+  after the formula. `unknown` may be named.
+- The term is additive. It has no interactions with age or formula terms,
+  and there is no ancestry formula for now.
+- Matching uses profiles rounded to a resolution set on the matching model,
+  default 1/8, in both calibration and draws. All shares of a dimension are
+  rounded jointly by largest remainder, ties broken by category order.
+- Calibrated weights are per male type: matching category combined with
+  rounded profile. Targets mirror women of the same type.
+- Models in a run share one pool of types, so every model with the term
+  must name the same dimensions with the same resolution; weights may
+  differ (user decision, November 24, 2026).
+
+**Rationale:** Raw shares vary within age-by-category cells, so neither
+calibration nor the exact draw bounds can use them at reasonable cost.
+Rounding everywhere keeps calibration and draws exact for the stated model;
+scoring exact shares with rounded calibration would meet targets only
+approximately. Additivity keeps the age table separate from a small
+profile table. Typed weights are the purpose of the work: avoiding
+sex-unbalanced intermarriage by ancestry under symmetric preferences.
+
+**Unselected:** Raw shares as formula predictors (the earlier scope);
+representative profiles for calibration with exact scoring; a general
+ancestry formula or R function; category-only weights; assigning discrete
+ethnicity at birth.
+
+**Solver and diagnostics:** Models with an ancestry term use Newton
+steps found by conjugate gradients; models without one keep the dense
+Newton solve unchanged. Models with the term hold their weights for 1/12
+year between calibrations (sooner when a type without eligible men at the
+last calibration gains one or a schedule switches), which supersedes D066's recalculation at each search
+for those models only; the interval is fixed and not a user argument
+(user decision, November 24, 2026, after per-search calibration took 609 s
+against 3.5 s for an 80-year 1880 run).
+The `.log_weight_<group>` union diagnostics are
+removed (supersedes the recording part of D070); D200 replaces them with
+sampled weight records and a choice-set helper. The user confirmed the
+argument name
+`ancestry_resolution`.
+
+**Consequences:** Differences in ancestry smaller than the resolution do
+not affect matching. Calibration no longer reduces to unit weights or
+skips strict endogamy when a model has an ancestry term. Seeded histories
+of models without the term are unchanged.
+
+## D200 — Sampled weight records and choice-set reconstruction (November 24, 2026)
+
+**Status:** User decisions, November 24, 2026, on the
+`ancestry-share-matching` branch. Implemented. The number follows D199;
+renumber at merge if needed.
+
+**Decision (user, November 24, 2026):** Replace the removed
+`.log_weight_<group>` diagnostics in the same PR. Choice sets are
+reconstructed after the run from the histories, not built during it;
+known-kin exclusions are ignored in the reconstruction. The helper is
+`extract_choice_sets()` in a new `R/choice_sets.R`, and covers marriage
+or marriage and cohabitation unions as the analyst chooses. Because
+recording must be requested anyway, a run keeps the weights of a sample of
+its searches rather than of every calibration.
+
+**Details (agent proposal, accepted by the user):** A `run_simulation()`
+fraction, `union_weight_sample` (name chosen by the user; default 0),
+selects unions by a fixed hash of the union ID, consuming no random draws,
+and the result gains `matching_weights` (types, unions, weights). Hard
+group restrictions are not applied in the reconstruction. See
+[weighted-choice matching](weighted-choice-matching.md#choice-set-reconstruction-d200).
+
+**Rationale:** The engine alone knows the calibrated weights at each
+search; eligibility apart from kinship and hard restrictions can be rebuilt
+from the histories. One weight per type and search does not scale to
+ancestry types (about 600 types and 1,000 held calibrations in an 80-year
+1880 run), so only sampled searches are kept.
+
+**Unselected options:** Building choice sets in the engine during the run;
+recording every calibration; recomputing weights in R; drawing the sample
+with the run's random numbers.
+
+**Consequences:** Results without recording are unchanged. Recovery checks
+like milestone 3's become possible again for runs with ancestry types.
