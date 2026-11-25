@@ -22,8 +22,8 @@ types. The textual conflicts (`Person` fields, `simulate_cpp` arguments,
 the removed `diagnostic_log_weights` output, RcppExports and D198/D199
 ordering) were resolved on the throwaway `trial/ancestry-migration`
 branch, with resolutions recorded by `git rerere`. `extract_choice_sets()`
-(D200) must also require that each alternative man had arrived by the
-union's start, using the persons' arrival times.
+(D200) already requires that alternatives had arrived, when the persons
+table has `arrival_time`.
 
 **Agreed (D199).** The earlier plan to put raw shares in the matching
 formula was replaced. Matching models get `ancestry_endogamy`, a named

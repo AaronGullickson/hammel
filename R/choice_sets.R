@@ -16,7 +16,8 @@
 #' `run_simulation(..., union_weight_sample = )` above 0. Each choice set is
 #' one recorded union: its husband (`chosen = TRUE`) and a uniform sample of
 #' the other men eligible when it formed, who were alive, at least the
-#' union process's `min_male_age` and in no live union. Known-kin exclusions
+#' union process's `min_male_age`, had arrived if immigrants, and were in no
+#' live union. Known-kin exclusions
 #' and hard group restrictions (`NA` in `group_exogamy`) are not applied;
 #' drop restricted pairs with the category columns if needed.
 #'
@@ -80,27 +81,13 @@ extract_choice_sets <- function(
   wives <- match(all_unions$wife_id[row], persons$person_id)
   husbands <- match(all_unions$husband_id[row], persons$person_id)
 
-  men <- which(persons$sex == "m")
-  sets <- lapply(
-    seq_len(nrow(kept)), function(k) {
-      t <- kept$time[k]
-      live <- all_unions$start_time < t &
-        (is.na(all_unions$end_time) | all_unions$end_time > t)
-      partnered <- persons$person_id[men] %in% all_unions$husband_id[live]
-      eligible <- men[
-        t - persons$birth_time[men] >= record$min_male_age &
-          (is.na(persons$death_time[men]) | persons$death_time[men] > t) &
-          !partnered & men != husbands[k]
-      ]
-      if (length(eligible) > alternatives) {
-        eligible <- eligible[sample.int(length(eligible), alternatives)]
-      }
-      list(man = c(husbands[k], eligible), k = k)
-    }
+  sets <- sample_alternatives(
+    persons, all_unions, husbands, kept$time, alternatives,
+    record$min_male_age
   )
-  size <- vapply(sets, function(x) length(x$man), integer(1))
+  size <- lengths(sets)
   k <- rep(seq_len(nrow(kept)), size)
-  man <- unlist(lapply(sets, `[[`, "man"))
+  man <- unlist(sets)
   wife <- wives[k]
   time <- kept$time[k]
   out <- tibble::tibble(
@@ -120,11 +107,8 @@ extract_choice_sets <- function(
   man_key <- character(length(man))
   for (d in dims) {
     view <- dimension_view(population, d)
-    histories <- if (!is.null(view$transitions)) {
-      split(seq_len(nrow(view$transitions)), view$transitions$person_id)
-    }
-    w <- groups_at(view, wife, time, left = TRUE, histories = histories)
-    h <- groups_at(view, man, time, left = TRUE, histories = histories)
+    w <- categories_at(view, wife, time)
+    h <- categories_at(view, man, time)
     out[[paste0(d, "_w")]] <- as.character(w)
     out[[paste0(d, "_h")]] <- as.character(h)
     man_key <- paste(man_key, h, sep = "\r")
@@ -162,6 +146,110 @@ extract_choice_sets <- function(
 }
 
 # INTERNAL HELPERS ---------------------------------------------------------
+
+# Each union's husband followed by up to `alternatives` other men drawn
+# uniformly without replacement from those eligible at its time: alive, of
+# age, arrived (immigrants) and in no live union. A random batch of men is
+# checked per union and the first eligible ones kept, which is a uniform
+# sample; unions whose batch has too few eligible men use every man.
+sample_alternatives <- function(
+  persons,
+  unions,
+  husbands,
+  times,
+  alternatives,
+  min_male_age
+) {
+  men <- which(persons$sex == "m")
+  n <- length(men)
+  birth <- persons$birth_time[men]
+  death <- persons$death_time[men]
+  arrival <- if ("arrival_time" %in% names(persons)) {
+    persons$arrival_time[men]
+  } else {
+    rep(NA_real_, n)
+  }
+  # Each man's unions, contiguous after ordering by husband.
+  owner <- match(unions$husband_id, persons$person_id[men])
+  order <- order(owner)
+  owner <- owner[order]
+  start <- unions$start_time[order]
+  end <- unions$end_time[order]
+  end[is.na(end)] <- Inf
+  count <- tabulate(owner, n)
+  first <- match(seq_len(n), owner)
+  husband <- match(husbands, men)
+
+  # Whether men m (positions among men) are eligible at times t.
+  eligible <- function(m, t) {
+    ok <- t - birth[m] >= min_male_age &
+      (is.na(death[m]) | death[m] > t) &
+      (is.na(arrival[m]) | arrival[m] <= t)
+    has <- which(ok & count[m] > 0L)
+    if (length(has)) {
+      c <- count[m[has]]
+      who <- rep(seq_along(has), c)
+      index <- rep(first[m[has]], c) + sequence(c) - 1L
+      live <- start[index] < t[has][who] & end[index] > t[has][who]
+      ok[has[tabulate(who[live], length(has)) > 0L]] <- FALSE
+    }
+    ok
+  }
+
+  # Unions whose batch holds too few eligible men draw a batch four times
+  # larger; a batch of every man in random order settles the rest.
+  out <- vector("list", length(times))
+  pending <- seq_along(times)
+  size <- min(n, max(4L * alternatives, 200L))
+  while (length(pending)) {
+    draws <- lapply(
+      pending, function(j) {
+        sample.int(n, size, useHash = size < n)
+      }
+    )
+    k <- rep(pending, each = size)
+    m <- unlist(draws)
+    ok <- split(
+      eligible(m, times[k]) & m != husband[k],
+      rep(seq_along(pending), each = size)
+    )
+    short <- logical(length(pending))
+    for (i in seq_along(pending)) {
+      batch <- draws[[i]][ok[[i]]]
+      if (length(batch) < alternatives && size < n) {
+        short[i] <- TRUE
+        next
+      }
+      j <- pending[i]
+      out[[j]] <- men[c(husband[j], utils::head(batch, alternatives))]
+    }
+    pending <- pending[short]
+    size <- min(n, 4L * size)
+  }
+  out
+}
+
+# Categories of rows at their times, before transitions at those times
+# (which follow searches); rows without transitions keep their category.
+categories_at <- function(view, rows, times) {
+  out <- as.character(view$persons$group[rows])
+  tx <- view$transitions
+  if (is.null(tx) || !nrow(tx)) {
+    return(out)
+  }
+  moved <- which(view$persons$person_id[rows] %in% tx$person_id)
+  if (length(moved)) {
+    histories <- split(seq_len(nrow(tx)), tx$person_id)
+    out[moved] <- as.character(
+      groups_at(
+        view, rows[moved], times[moved],
+        left = TRUE,
+        histories = histories
+      )
+    )
+  }
+  out
+}
 
 # The engine's sampled weight record (D200) as tibbles: each type's matching
 # categories and rounded ancestry shares, the kept unions and their

@@ -42,7 +42,8 @@ The run must keep matching weights, with
 \code{run_simulation(..., union_weight_sample = )} above 0. Each choice set is
 one recorded union: its husband (\code{chosen = TRUE}) and a uniform sample of
 the other men eligible when it formed, who were alive, at least the
-union process's \code{min_male_age} and in no live union. Known-kin exclusions
+union process's \code{min_male_age}, had arrived if immigrants, and were in no
+live union. Known-kin exclusions
 and hard group restrictions (\code{NA} in \code{group_exogamy}) are not applied;
 drop restricted pairs with the category columns if needed.
 

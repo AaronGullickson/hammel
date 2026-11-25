@@ -158,6 +158,23 @@ test_that("choice sets hold the husband and eligible alternatives", {
   share_w <- rowSums(sets[grep("^heritage_.*_w$", names(sets))])
   expect_equal(share_w, rep(1, nrow(sets)))
 
+  # Brute force: no candidate is in a live union, and each set holds the
+  # husband plus min(20, eligible men) alternatives.
+  men <- result$persons[result$persons$sex == "m", ]
+  for (set in per_set[seq_len(40)]) {
+    t <- set$time[1]
+    live <- result$unions$start_time < t &
+      (is.na(result$unions$end_time) | result$unions$end_time > t)
+    expect_false(any(set$man_id %in% result$unions$husband_id[live]))
+    pool <- men$person_id[
+      t - men$birth_time >= 15 &
+        (is.na(men$death_time) | men$death_time > t) &
+        !men$person_id %in% result$unions$husband_id[live]
+    ]
+    expect_true(all(set$man_id %in% pool))
+    expect_equal(nrow(set), 1L + min(20L, length(pool) - 1L))
+  }
+
   only <- extract_choice_sets(result, 10, 5, union_types = "cohabitation")
   expect_equal(nrow(only), 0L)
 })
