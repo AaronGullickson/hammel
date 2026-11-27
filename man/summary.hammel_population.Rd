@@ -28,14 +28,21 @@ population pyramid}
 \item{end_time}{The population's reference time, in years.}
 \item{persons_alive}{The number of persons alive at the reference time.}
 \item{n_births}{The number of recorded persons with a birth time,
-including persons in the starting population.}
+including persons in the starting population but not immigrants.}
 \item{n_births_u}{The number of retained unrealized birth records, or
 \code{NA} when no unrealized birth table is present.}
 \item{n_deaths}{The number of recorded persons with a death time.}
+\item{n_immigrants}{The number of recorded persons who immigrated, or
+\code{NA} when the population has no arrival records.}
+\item{immigrants_by_stream}{A named integer vector of immigrants by
+stream (their \code{birthplace}), or \code{NULL} when the population has no
+arrival records.}
 \item{n_unions}{The number of recorded union episodes, including
-ended unions.}
+ended unions but not unions that began before an immigrant partner's
+arrival.}
 \item{n_dissolutions}{The number of union episodes with end reason
-\code{"dissolution"}.}
+\code{"dissolution"}, excluding dissolutions before an immigrant partner's
+arrival.}
 \item{age_counts}{A tibble of living male and female counts by five-year
 age group, with columns \code{age}, \code{male}, and \code{female}.}
 \item{simulation}{A list describing the latest simulation run, with

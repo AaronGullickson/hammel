@@ -1,8 +1,9 @@
 # Scientific contract
 
-Updated November 5, 2026. This is the current mortality, fertility, union-formation,
-dissolution, remarriage, cohabitation/conversion, group identity/ancestry, and
-observation contract. Milestones 1–8 are accepted as complete
+Updated November 18, 2026. This is the current mortality, fertility, union-formation,
+dissolution, remarriage, cohabitation/conversion, group identity/ancestry,
+[external immigration](#external-immigration-d184d198) and observation
+contract. Milestones 1–8 are accepted as complete
 (D029, D050, D077, D093, D105, D116, D127, D130), retaining documented limitations.
 Milestone 8 schedules every rate process by cells with one clock per process
 (D128) and adds weight models that choose who in a cell experiences an event
@@ -894,3 +895,42 @@ births. These are marginal Poisson-model intervals, not replication-based
 uncertainty or a guarantee under demographic dependence. See
 [the analysis contract](demographic-analysis.md#optional-poisson-rate-intervals)
 for units, examples and edge cases.
+
+## External immigration (D184–D198)
+
+Each immigration stream adds people from outside the simulated population as
+a Poisson process with a constant or piecewise-constant calendar intensity:
+a `count` of expected arrivals per year, or a crude `rate` per person-year
+lived by the destination's living population, immigrants included (D194).
+Arrivals are drawn with replacement from a template population's living
+people, at its end or, with `step`, as it stood at the latest cut (D196); the
+template is never depleted. A weight model, or a calendar schedule of them,
+changes who is drawn, not how many arrive (D184, D197). By default arrivals
+are D140 households: the clock runs at the person intensity divided by the
+expected household size, so person counts keep their expectation but vary
+more than a Poisson count (D187). Cloning streams import individuals without
+histories (D188).
+
+A migrant enters exactly as at the template's end or cut: age and every
+elapsed duration are unchanged, with dates shifted to the arrival time, and
+nothing happens between the template's time and arrival. Imported unions,
+births and transitions are pre-migration; non-migrating partners and
+children are `external_relatives`, which are never simulated or counted
+and carry a `censor_time`; parents outside the household are unknown. Group
+duration continues from the template in shared dimensions, from birth when
+the template records no transition, and starts at arrival in assigned
+dimensions, in `birthplace` and for clones (D186). The automatic `birthplace`
+group is `"native"` for the born and the stream for immigrants, and it never
+changes (D190, D198).
+
+A person is observed from the later of birth and arrival. Events at or
+before arrival, including imported events at the template's endpoint, are
+not destination events and contribute no exposure; union-level calculations
+left-truncate unions that arrive ongoing at the arrival time (D185–D187).
+`calculate_immigration_rates()` reports crude rates: arrivals over the
+destination's person-years, not hazards of the origin population. Its
+optional intervals divide arrivals and person-years by the row's household
+dispersion (the sum of squared household sizes over arrivals) before the
+exact Poisson interval, unlike D124's unadjusted intervals. There is no
+emigration. See [external immigration](immigration.md) for the full
+specification, worked examples and open decisions.

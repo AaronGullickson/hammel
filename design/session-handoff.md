@@ -7,23 +7,16 @@ controls work. Start with [the documentation index](README.md),
 
 ## Ancestry endogamy in matching (November 24, 2026)
 
-The user wants this work in a separate PR on `ancestry-share-matching`,
-branched at `6b12c31`, before the external-migration tip `c775be1`.
-Recheck the branch base when resuming. The implementation is on the
-branch (D199).
+This work was developed on `ancestry-share-matching` and merged into
+master (#45), which was then merged into external-migration. The
+implementation is described under D199 and D200.
 
-**Merging with external-migration.** Whichever branch merges second needs
-an edit that Git does not flag as a conflict: `Simulation::on_arrival` in
-`src/simulate.cpp` must give each arriving person a rounded ancestry
-profile and set the group through `set_group()`, replacing the direct
-`people[i].group = person_stratum(matching_spec, i);`. Without it every
-immigrant keeps type 0 and the pools and calibrator never see arrival
-types. The textual conflicts (`Person` fields, `simulate_cpp` arguments,
-the removed `diagnostic_log_weights` output, RcppExports and D198/D199
-ordering) were resolved on the throwaway `trial/ancestry-migration`
-branch, with resolutions recorded by `git rerere`. `extract_choice_sets()`
-(D200) already requires that alternatives had arrived, when the persons
-table has `arrival_time`.
+**Integration with immigration.** `Simulation::on_arrival` in
+`src/simulate.cpp` rounds each arriving person's ancestry profile once it
+is final and sets the group through `set_group()`, so arrival types extend
+the pools and calibrator. `extract_choice_sets()` (D200) counts an
+immigrant as an alternative only once he has arrived. No test yet combines
+immigration with `ancestry_endogamy`.
 
 **Agreed (D199).** The earlier plan to put raw shares in the matching
 formula was replaced. Matching models get `ancestry_endogamy`, a named

@@ -588,21 +588,26 @@ matching_dimensions <- function(model, dims, call = rlang::caller_env()) {
         call = call
       )
     }
-    if (length(dims) != 1L) {
+    # Bare settings belong to the only counted dimension (D190).
+    counted <- attr(dims, "counted")
+    if (is.null(counted)) {
+      counted <- dims
+    }
+    if (length(counted) != 1L) {
       abort_hammel(
         c(
           "Matching group settings must name their dimension.",
-          "x" = "The model declares several dimensions: {.val {dims}}.",
+          "x" = "The model declares several dimensions: {.val {counted}}.",
           "i" = paste0(
             "Give settings as a list by dimension, such as ",
-            "{.code group_exogamy = list(", dims[1], " = ...)}."
+            "{.code group_exogamy = list(", counted[1], " = ...)}."
           )
         ),
         "groups",
         call = call
       )
     }
-    used <- c(used, dims)
+    used <- c(used, counted)
   }
   used <- unique(used)
   if (length(used) && !length(dims)) {
@@ -958,6 +963,7 @@ resolve_matching_models <- function(
   call = rlang::caller_env()
 ) {
   dims <- names(declaration)
+  attr(dims, "counted") <- counted_dimensions(declaration)
   fields <- c("matching", "father_matching", "cohab_matching")
   used <- unique(
     unlist(

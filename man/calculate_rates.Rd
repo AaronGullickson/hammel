@@ -151,6 +151,11 @@ simulation.
 All breaks defined by the function use half-open intervals that are inclusive
 at the lower bound and exclusive at the upper bound.
 
+When \code{conf_level} is set, \code{conf_low} and \code{conf_high} columns are included in
+the returned object, corresponding to the desired confidence interval of the
+rate. This confidence interval is determined by the exact Poisson interval,
+not normal approximation.
+
 For more details on each rate, see below.
 }
 \section{Choosing a calculator}{

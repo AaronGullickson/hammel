@@ -26,8 +26,9 @@
 #' existing RNG state.
 #'
 #' @param model A `hammel_model` containing a population, mortality, fertility,
-#'   and union-formation processes, optionally union dissolution and group
-#'   transition processes. The population must have a finite `end_time`.
+#'   and union-formation processes, optionally union dissolution, group
+#'   transition and immigration processes. The population must have a finite
+#'   `end_time`.
 #' @param years Simulation duration in years; fractional years are
 #'   supported.
 #' @param seed Optional integer seed for random number generation. If not
@@ -121,7 +122,15 @@ run_simulation <- function(
     )
   }
   population <- model$population
-  population <- apply_group_declaration(population, model_groups(model))
+  # Models with immigration, and populations that have had it, carry the
+  # automatic birthplace dimension (D190).
+  declared <- with_birthplace(
+    population, model_groups(model), model$processes$immigration,
+    user_groups = model$groups
+  )
+  population <- apply_group_declaration(
+    declared$population, declared$declaration
+  )
   check_population(population)
   population <- normalize_population_transitions(population)
   population <- normalize_population_ancestry(population)
@@ -248,14 +257,15 @@ run_simulation <- function(
              "fertility",
              "union_formation",
              "union_dissolution",
-             "group_transition"
+             "group_transition",
+             "immigration"
            )
       )) {
     unsupported <- setdiff(
       names(model$processes),
       c(
         "mortality", "fertility", "union_formation", "union_dissolution",
-        "group_transition"
+        "group_transition", "immigration"
       )
     )
     abort_hammel(
@@ -281,6 +291,19 @@ run_simulation <- function(
   }
   union_process <- model$processes$union_formation
   attach_process(model, union_process)
+  immigration_process <- model$processes$immigration
+  if (!is.null(immigration_process)) {
+    attach_process(model, immigration_process)
+    if (!is.null(hetfert)) {
+      abort_hammel(
+        c(
+          "Immigration can't be combined with fertility heterogeneity.",
+          "i" = "Remove the immigration process or the heterogeneity."
+        ),
+        "specification"
+      )
+    }
+  }
   calendar_inputs <- list(
     mortality = death_rates,
     fertility = birth_rates,
@@ -408,10 +431,11 @@ run_simulation <- function(
   )
   resolved <- resolve_matching_models(union_process, declaration, registries)
   union_process <- resolved$process
+  counted <- counted_dimensions(declaration)
   match_dims <- if (length(resolved$dims)) {
     resolved$dims
-  } else if (length(dimensions) == 1L) {
-    dimensions
+  } else if (length(counted) == 1L) {
+    counted
   }
   group_values <- if (length(resolved$dims)) {
     resolved$values
@@ -419,6 +443,10 @@ run_simulation <- function(
     registries[[match_dims]]
   }
   tracked <- tracked_ancestry(declaration)
+  # Migrants may bring ancestry in categories nobody has yet (D185).
+  if (!is.null(immigration_process)) {
+    population <- complete_ancestry_columns(population, registries)
+  }
   components <- lapply(
     dimensions, function(d) {
       if (d %in% tracked) {
@@ -570,6 +598,38 @@ run_simulation <- function(
     )
   }
   engine_persons <- population$persons
+  # External relatives of immigrants (D186) stay outside the engine: unions
+  # with them are removed from its input and restored afterwards, references
+  # to them are hidden, and births to children among them are supplied as
+  # counts and latest times.
+  external <- population[["external_relatives"]]
+  engine_unions <- population$unions
+  external_unions <- engine_unions[0, , drop = FALSE]
+  if (!is.null(external) && nrow(external)) {
+    outside <- engine_unions$wife_id %in% external$person_id |
+      engine_unions$husband_id %in% external$person_id
+    external_unions <- engine_unions[outside, , drop = FALSE]
+    engine_unions <- engine_unions[!outside, , drop = FALSE]
+    for (field in c("mother_id", "father_id")) {
+      hidden <- engine_persons[[field]] %in% external$person_id
+      engine_persons[[field]][hidden] <- NA
+    }
+    born <- external[!is.na(external$mother_id), , drop = FALSE]
+    mothers <- as.character(born$mother_id)
+    key <- as.character(engine_persons$person_id)
+    births <- as.integer(c(table(mothers))[key])
+    births[is.na(births)] <- 0L
+    engine_persons$.hammel_external_births <- births
+    engine_persons$.hammel_id_floor <- max(
+      c(population$persons$person_id, external$person_id)
+    )
+    engine_persons$.hammel_union_floor <- max(c(0, population$unions$union_id))
+    engine_persons$.hammel_external_last_birth <- if (nrow(born)) {
+      as.numeric(c(tapply(born$birth_time, mothers, max))[key])
+    } else {
+      rep(NA_real_, nrow(engine_persons))
+    }
+  }
   group_input <- if (!grouped) {
     NULL
   } else {
@@ -704,15 +764,18 @@ run_simulation <- function(
   }
   if ("previous_union" %in% names(union_rates) || cohab_enabled ||
         length(weight_models)) {
+    people <- population$persons[c("person_id", "death_time")]
+    if (!is.null(external)) {
+      people <- rbind(people, external[c("person_id", "death_time")])
+    }
     previous <- call_native(
-      previous_union_info_cpp(
-        population$persons, population$unions,
-        counts_cohab
-      )
+      previous_union_info_cpp(people, population$unions, counts_cohab)
     )
-    engine_persons$.hammel_previous_union <- previous$previous_union
-    engine_persons$.hammel_previous_union_end <- previous$end_time
-    engine_persons$.hammel_legal_previous <- previous$legal_previous
+    members <- seq_len(nrow(population$persons))
+    engine_persons$.hammel_previous_union <- previous$previous_union[members]
+    engine_persons$.hammel_previous_union_end <- previous$end_time[members]
+    engine_persons$.hammel_legal_previous <-
+      previous$legal_previous[members]
   }
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L || !is.finite(seed) ||
@@ -746,6 +809,17 @@ run_simulation <- function(
       add = TRUE
     )
     set.seed(seed)
+  }
+  # After the seed, so custom weight and assignment functions are
+  # reproducible.
+  immigration_input <- if (is.null(immigration_process)) {
+    NULL
+  } else {
+    prepare_immigration(
+      immigration_process, declaration, registries, components, offsets,
+      start, start + years, counts_cohab, cohab_enabled,
+      call = run_call
+    )
   }
   population$persons <- initialize_fertility_weights(
     population$persons,
@@ -793,7 +867,7 @@ run_simulation <- function(
     native <- call_native(
       simulate_cpp(
         engine_persons, death_rates, birth_rates,
-        start, years, birth_interval, population$unions,
+        start, years, birth_interval, engine_unions,
         matching,
         union_process$min_male_age,
         as.integer(union_process$kinship_generations),
@@ -809,6 +883,7 @@ run_simulation <- function(
         transition_rates,
         if (scheduled_models) model_context$config else NULL,
         weight_input, group_input,
+        immigration_input = immigration_input,
         union_weight_sample = as.numeric(union_weight_sample),
         progress = progress_callback
       )
@@ -825,6 +900,12 @@ run_simulation <- function(
     }
     for (column in names(native$persons)) {
       persons[[column]] <- native$persons[[column]]
+    }
+    # Restore parent references hidden from the engine.
+    if (!is.null(external)) {
+      members <- seq_len(nrow(population$persons))
+      persons$mother_id[members] <- population$persons$mother_id
+      persons$father_id[members] <- population$persons$father_id
     }
     if (!is.null(hetfert)) {
       persons$hetfert <- native$hetfert
@@ -854,6 +935,9 @@ run_simulation <- function(
       )
       new$move_id <- tx$move_id + previous
       new$initiator_id <- tx$initiator_id
+      if ("pre_migration" %in% names(population$transitions)) {
+        new$pre_migration <- rep(FALSE, nrow(new))
+      }
       result$transitions <- tibble::as_tibble(
         rbind(population$transitions, new)
       )
@@ -871,7 +955,9 @@ run_simulation <- function(
         result$ancestry[[dimensions[k]]] <- table
       }
     }
-    unions <- result$unions
+    # Unions with external relatives come first, so the engine's new unions
+    # keep their row offset below.
+    unions <- engine_unions
     added_unions <- nrow(native$unions) - nrow(unions)
     if (added_unions > 0L) {
       unions <- rbind(
@@ -881,7 +967,11 @@ run_simulation <- function(
     for (column in names(native$unions)) {
       unions[[column]] <- native$unions[[column]]
     }
-    result$unions <- tibble::as_tibble(unions)
+    result$unions <- if (nrow(external_unions)) {
+      bind_columns(external_unions, unions)
+    } else {
+      tibble::as_tibble(unions)
+    }
     if (native$weighted_infeasible > 0) {
       searches <- as.integer(native$weighted_infeasible)
       warn_hammel(
@@ -957,6 +1047,15 @@ run_simulation <- function(
       )]
     )
   }
+  if (!is.null(immigration_process)) {
+    arrivals <- if (years > 0) native$arrivals else NULL
+    result$persons <- record_arrivals(result$persons, arrivals)
+    result <- import_histories(
+      result, arrivals, immigration_process, immigration_input, declaration,
+      registries
+    )
+  }
+  result <- mark_pre_migration(result)
   result$persons <- tibble::as_tibble(result$persons)
   result$unions <- tibble::as_tibble(result$unions)
   check_population(result)

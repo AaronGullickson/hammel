@@ -24,11 +24,15 @@ normalize_population_transitions <- function(population) {
   tx <- population$transitions
   if (is.null(tx)) {
     population$transitions <- empty_transitions()
+    if (all(arrival_columns %in% names(population$persons))) {
+      population$transitions$pre_migration <- logical()
+    }
     return(population)
   }
   tx <- tibble::as_tibble(tx)
-  if (!"group" %in% names(tx) && length(dims) == 1L) {
-    tx$group <- rep(dims, nrow(tx))
+  counted <- counted_dimensions(population$groups)
+  if (!"group" %in% names(tx) && length(counted) == 1L) {
+    tx$group <- rep(counted, nrow(tx))
     tx <- tx[c(
       "person_id", "time", "group", setdiff(
         names(tx), c("person_id", "time", "group")
@@ -120,12 +124,11 @@ validate_transition_history <- function(
       call = call
     )
   }
-  for (column in c("origin", "destination")) {
-    check_group_labels(
-      tx[[column]], paste0("transitions$", column),
-      call = call
-    )
-  }
+  # An NA origin marks entry into a group, such as an immigrant's assigned
+  # category at arrival (D186); it is checked below as a first row.
+  entry <- is.na(tx$origin)
+  check_group_labels(tx$origin[!entry], "transitions$origin", call = call)
+  check_group_labels(tx$destination, "transitions$destination", call = call)
   if (!nrow(tx)) {
     return(invisible(population))
   }
@@ -178,10 +181,10 @@ validate_transition_history <- function(
   )) {
     rows <- rows[order(tx$time[rows])]
     current <- as.character(p[[tx$group[rows[1]]]][i[rows[1]]])
-    chained <- length(rows) < 2L || all(
+    chained <- !any(entry[rows[-1L]]) && (length(rows) < 2L || all(
       as.character(tx$destination[head(rows, -1L)]) ==
         as.character(tx$origin[tail(rows, -1L)])
-    )
+    ))
     if (anyDuplicated(tx$time[rows]) || !chained ||
           as.character(tail(tx$destination[rows], 1)) != current) {
       person <- tx$person_id[rows[1]]

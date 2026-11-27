@@ -1,7 +1,8 @@
 # hammel (development version)
 
-- Add an option to define intergroup partnering by an `ancestry_endogamy` argument to the provided matching model. This approach compares the group ancestry shares of potential matches and gives them more weight where similar.
-- Set progress bar to TRUE in interactive sessions and FALSE in non-interactive sessions. Users can override with option `hammel.progress`.
+- An `immigration` process that allows users to simulate external migration into the simulation over time from multiple immigrant streams. See the new vignette on the "Triple Melting Pot" for details on how to use it and how to track immigrant generations. (#27)
+- Add an option to define intergroup partnering by an `ancestry_endogamy` argument to the provided matching model. This approach compares the group ancestry shares of potential matches and gives them more weight where similar. (#45)
+- Set progress bar to TRUE in interactive sessions and FALSE in non-interactive sessions. Users can override with option `hammel.progress`. (#38)
 
 # hammel 0.2.0
 

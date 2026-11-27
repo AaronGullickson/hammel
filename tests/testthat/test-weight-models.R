@@ -97,7 +97,7 @@ test_that("zero coefficients and constant custom weights reproduce unweighted ru
   expect_identical(run_simulation(constant, 2, seed = 5), plain)
 })
 
-test_that("custom functions receive members and the cell, without exact times", {
+test_that("custom functions receive members, the cell and the time", {
   model <- weighted_mortality_model(200)
   seen <- NULL
   f <- function(members, bin) {
@@ -111,7 +111,10 @@ test_that("custom functions receive members and the cell, without exact times", 
     "previous_union") %in% names(seen$members)))
   # Without declared groups there are no group columns.
   expect_false(any(c("group", "partner_group") %in% names(seen$members)))
-  expect_false(any(c("birth_time", "age", "time") %in% names(seen$members)))
+  # Birth and arrival times and the evaluation time, not derived ages.
+  expect_true(all(c("birth_time", "arrival_time") %in% names(seen$members)))
+  expect_false("age" %in% names(seen$members))
+  expect_true(is.numeric(seen$bin$time))
   expect_identical(seen$bin$process, "mortality")
   expect_true(all(c("sex", "age_start", "age_end", "time_start", "time_end") %in% names(seen$bin)))
   # The same model as a formula agrees in distribution. Formulas store weights
@@ -696,4 +699,72 @@ test_that("process summaries nest weight models and schedules", {
   text <- cli::cli_fmt(print(result))
   expect_true(any(grepl("Weight model: calendar schedule", text, fixed = TRUE)))
   expect_true(any(grepl("Years [10, Inf): ~partnered", text, fixed = TRUE)))
+})
+
+test_that("custom weights see birth and arrival times and the event time", {
+  template <- hammel_population(
+    data.frame(
+      person_id = 1:2, sex = "m", birth_time = c(-30, -40),
+      death_time = NA_real_, mother_id = NA_integer_, father_id = NA_integer_
+    ),
+    end_time = 0
+  )
+  calls <- list()
+  weights <- weight_model(fun = function(members, bin) {
+    calls[[length(calls) + 1L]] <<- list(members = members, time = bin$time)
+    rep(0, nrow(members))
+  })
+  model <- make_model(20, death_rate = 0.3) |>
+    set_mortality(
+      data.frame(sex = c("m", "f"), age_start = 0, age_end = Inf, rate = 0.3),
+      weights = weights
+    ) |>
+    set_immigration(
+      a = immigration_stream(per_year(10), template, household = NULL)
+    )
+  result <- run_simulation(model, 3, seed = 1)
+  expect_gt(length(calls), 0)
+  members <- do.call(rbind, lapply(calls, `[[`, "members"))
+  expect_true(all(c("birth_time", "arrival_time") %in% names(members)))
+  people <- result$persons
+  at <- match(members$person_id, people$person_id)
+  expect_equal(members$birth_time, people$birth_time[at])
+  expect_identical(members$arrival_time, people$arrival_time[at])
+  expect_true(any(!is.na(members$arrival_time)))
+  expect_true(any(is.na(members$arrival_time)))
+  # Mortality weights are evaluated at each death.
+  times <- vapply(calls, `[[`, numeric(1), "time")
+  deaths <- people$death_time[!is.na(people$death_time)]
+  expect_true(all(vapply(deaths, function(t) any(abs(times - t) < 1e-9),
+                         logical(1))))
+  # Exact time since arrival at the event.
+  since <- rep(times, vapply(calls, function(x) nrow(x$members), 1L)) -
+    members$arrival_time
+  expect_true(all(since[!is.na(since)] >= 0))
+})
+
+test_that("custom union weights see each partner's birth and arrival", {
+  seen <- NULL
+  weights <- weight_model(fun = function(members, bin) {
+    seen <<- members
+    expect_true(is.numeric(bin$time))
+    rep(0, nrow(members))
+  })
+  model <- make_model(20)
+  model$population$persons$sex <- rep(c("f", "m"), 10)
+  model$population$unions <- tibble::tibble(
+    union_id = 1:10, wife_id = seq(1, 19, 2), husband_id = seq(2, 20, 2),
+    start_time = -1, end_time = NA_real_, end_reason = NA_character_
+  )
+  model <- set_union_dissolution(
+    model, data.frame(dur_start = 0, dur_end = Inf, rate = 1),
+    weights = weights
+  )
+  run_simulation(model, 2, seed = 2)
+  expect_true(all(
+    c("birth_time_w", "birth_time_h", "arrival_time_w", "arrival_time_h") %in%
+      names(seen)
+  ))
+  expect_true(all(seen$birth_time_w == -20))
+  expect_true(all(is.na(seen$arrival_time_h)))
 })

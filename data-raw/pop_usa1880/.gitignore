@@ -1,0 +1,2 @@
+# For now, don't put IPUMS data under version control
+*.dat.gz

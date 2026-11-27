@@ -100,7 +100,7 @@ Observe population counts at specified instants.
 
 Calculate observed event rates from counts and exposure; retain calculator-specific helpers.
 
-- Functions: **`calculate_mortality_rates()`**, `person_rate_rows()`, **`calculate_fertility_rates()`**, `add_unrealized_births()`, `person_breaks()`, `check_demographic_breaks()`, **`calculate_cohab_convert_rate()`**, **`calculate_dissolution_rates()`**, **`calculate_marriage_rates()`**, **`calculate_transition_rates()`**, **`calculate_union_rates()`**, `calculate_entry_rates()`, `prepare_union_group_observations()`, `run_person_lexis()`, `order_rows_keep()`, `band_dim()`, `union_strata()`, `encode_combined()`, `validate_rate_conf_level()`, `add_rate_confidence()`.
+- Functions: **`calculate_mortality_rates()`**, `person_rate_rows()`, **`calculate_fertility_rates()`**, `add_unrealized_births()`, `person_breaks()`, `check_demographic_breaks()`, **`calculate_cohab_convert_rate()`**, **`calculate_dissolution_rates()`**, **`calculate_marriage_rates()`**, **`calculate_transition_rates()`**, **`calculate_immigration_rates()`**, **`calculate_union_rates()`**, `calculate_entry_rates()`, `prepare_union_group_observations()`, `run_person_lexis()`, `order_rows_keep()`, `band_dim()`, `union_strata()`, `encode_combined()`, `validate_rate_conf_level()`, `add_rate_confidence()`.
 
 ### `R/calculate_tfr.R`
 
@@ -162,7 +162,7 @@ Retrieve HMD mortality and HFD fertility rates, convert them to Hammel tables, a
 
 Declare group dimensions and apply/check declarations.
 
-- Functions: **`group()`**, `validate_group()`, `check_group_names()`, `normalize_group_declaration()`, **`set_groups()`**, `apply_group_declaration()`, `model_groups()`, `declared_group()`, `single_dimension()`, `validate_group_declaration()`.
+- Functions: **`group()`**, `validate_group()`, `check_group_names()`, `normalize_group_declaration()`, **`set_groups()`**, `apply_group_declaration()`, `model_groups()`, `counted_dimensions()`, `declared_group()`, `single_dimension()`, `validate_group_declaration()`.
 
 ### `R/group_history.R`
 
@@ -199,6 +199,12 @@ Construct, validate, and attach population objects; normalize union tables.
 Specify persistent fertility heterogeneity and initialize/check individual weights. Internal only (D176).
 
 - Functions: `het_fert()`, `enable_het_fert()`, `validate_het_fert()`, `fertility_log_variance()`, `validate_fertility_weights()`, `initialize_fertility_weights()`.
+
+### `R/immigration.R`
+
+Construct, validate, and attach immigration streams (D184–D187); prepare migrants and households and their imported state for the engine; import histories after a run; validate and record arrival columns, external relatives and `pre_migration`; provide history lookups that include external relatives.
+
+- Functions: **`immigration()`**, **`set_immigration()`**, **`immigration_stream()`**, **`migrant_assignment()`**, **`summary.hammel_immigration()`**, **`print.summary.hammel_immigration()`**, `new_immigration()`, `validate_immigration()`, `new_immigration_stream()`, `validate_immigration_stream()`, `check_intensity()`, `validate_migrant_assignment()`, `migrant_parties()`, `clone_state()`, `with_birthplace()`, `intensity_table()`, `complete_ancestry_columns()`, `prepare_immigration()`, `prepare_stream()`, `template_cuts()`, `prepare_slice()`, `population_at()`, `migrant_probabilities()`, `assignment_probabilities()`, `arriving_members()`, `custom_assignment()`, `migrant_ancestry()`, `template_people()`, `migrant_history_state()`, `check_arrivals()`, `check_external_relatives()`, `check_pre_migration()`, `bind_columns()`, `import_histories()`, `with_external_rows()`, `history_people()`, `kin_people()`, `observed_unions()`, `mark_pre_migration()`, `record_arrivals()`.
 
 ### `R/matching_groups.R`
 

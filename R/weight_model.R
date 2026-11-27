@@ -23,8 +23,9 @@
 #' be smaller where cells are small or homogeneous.
 #'
 #' Attach a weight model with the `weights` argument of [set_mortality()],
-#' [set_fertility()], [set_union_dissolution()], [set_group_transition()] and
-#' [set_union_formation()], or `weights_conversion` of [set_union_formation()].
+#' [set_fertility()], [set_union_dissolution()], [set_group_transition()],
+#' [set_union_formation()] and [immigration_stream()], or `weights_conversion`
+#' of [set_union_formation()].
 #'
 #' @section Variables: Group variables are named by the declared group
 #'   dimensions (see [set_groups()]); for a dimension `race` with categories A
@@ -38,6 +39,13 @@
 #'   `ancestry_race_A` and `ancestry_race_unknown`. Group transitions may also
 #'   use `destination`, the destination of the risk in the transition's
 #'   dimension.
+#'
+#'   Immigration streams select template people rather than cell members, and
+#'   may use `age` (at the template's end), `sex` and the template's groups
+#'   shared with the simulation. Household streams select households by their
+#'   carriers and may also use `partnered` (0/1), `household_size`,
+#'   `n_dependents` and `partner_age` (NA when unpartnered, so the term
+#'   contributes nothing for unpartnered carriers).
 #'
 #'   Dissolution and conversion are union processes and may use `race_w`,
 #'   `race_h`, `parity_w`, `previous_union_w`, `previous_union_h`,
@@ -58,15 +66,22 @@
 #' @section Custom functions: Instead of using a formula, users can create a
 #'   custom function with `fun`. `fun(members, bin)` receives a tibble with one
 #'   row per eligible member of the chosen cell, holding the variables above for
-#'   every declared dimension (with labels for categorical variables) and
-#'   identifiers (`person_id`, or `union_id`, `wife_id` and `husband_id`), and a
+#'   every declared dimension (with labels for categorical variables),
+#'   identifiers (`person_id`, or `union_id`, `wife_id` and `husband_id`) and
+#'   `birth_time` and `arrival_time` (`NA` for people who did not immigrate;
+#'   `birth_time_w`, `birth_time_h`, `arrival_time_w` and `arrival_time_h` for
+#'   union processes), and a
 #'   list `bin` describing the cell: its `process`, strata (each dimension's
 #'   category, or `<dim>_w`/`<dim>_h` for union processes, NA when the rates do
 #'   not stratify by it; `origin` and `destination` for transitions), band
-#'   (`age_start`/`age_end` or `dur_start`/`dur_end`) and the active rate period
-#'   `time_start`/`time_end` (NA for static rates). Exact ages and times are not
-#'   passed. In fertility with weighted matching calibration, the function is
-#'   evaluated at every refresh of every woman, which can be slow.
+#'   (`age_start`/`age_end` or `dur_start`/`dur_end`), the active rate period
+#'   `time_start`/`time_end` (NA for static rates) and `time`, when the weights
+#'   are evaluated. Exact ages and durations follow from these: age is
+#'   `bin$time - birth_time` and time since arrival
+#'   `bin$time - arrival_time`. Weights are usually evaluated at the event; in
+#'   fertility and search with weighted matching calibration, they are
+#'   evaluated, and `time` set, at every refresh of every woman, which can be
+#'   slow.
 #'
 #' @section Time-varying weights: A process's `weights` may instead be a tibble
 #'   with numeric `time_start`, `time_end` and a list column `model` of weight
@@ -213,6 +228,22 @@ weight_builtins <- function(type) {
     levels = c("none", "separated", "widowed"),
     level_codes = c(none = 0L, separated = 1L, widowed = 2L)
   )
+  if (type == "migrant") {
+    return(
+      list(
+        sex = list(
+          code = -1L,
+          levels = c("f", "m"),
+          level_codes = c(f = 1L, m = 0L)
+        ),
+        age = list(code = -1L),
+        partnered = list(code = -1L),
+        household_size = list(code = -1L),
+        n_dependents = list(code = -1L),
+        partner_age = list(code = -1L)
+      )
+    )
+  }
   if (type == "union") {
     return(
       list(
@@ -246,7 +277,9 @@ weight_builtins <- function(type) {
 }
 
 # Resolve a weight variable for a process type ("person", "transition",
-# "union"): its engine code, component and levels, or NULL when unavailable.
+# "union", "migrant"): its engine code, component and levels, or NULL when
+# unavailable. Migrant weights (immigration selection) are evaluated in R and
+# use only `sex`, `age` and group dimensions.
 # Group variables are named by declared dimension (D134), so they resolve only
 # with `context` (at simulation): `categories` (each dimension's categories,
 # named by dimension), `ancestry` (ancestry variable names, in engine column
@@ -266,6 +299,9 @@ weight_variable <- function(name, type, context = NULL) {
       component = match(d, dims) - 1L,
       levels = as.character(context$categories[[d]])
     )
+  }
+  if (type == "migrant") {
+    return(if (name %in% dims) group_info(1L, name))
   }
   if (type != "union") {
     if (name %in% dims) {
@@ -311,6 +347,9 @@ weight_group_name_possible <- function(name, type) {
       !grepl("^(partner|same|female|male|ancestry)_", x) &&
       !grepl("_(w|h)$", x) &&
       grepl("^[A-Za-z][A-Za-z0-9_.]*$", x)
+  }
+  if (type == "migrant") {
+    return(dim_ok(name))
   }
   if (type == "union") {
     base <- sub("_[wh]$", "", name)
@@ -455,7 +494,8 @@ weight_design <- function(
     process <- c(
       person = "person processes",
       transition = "group transitions",
-      union = "union processes"
+      union = "union processes",
+      migrant = "immigration streams"
     )[[type]]
     abort_hammel(
       c(

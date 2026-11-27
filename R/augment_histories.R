@@ -38,6 +38,8 @@
 #'   augment_unions()
 augment_unions <- function(population) {
   check_population(population)
+  # Partners may be external relatives of immigrants (D186).
+  population$persons <- history_people(population)
   persons <- population$persons
   result <- tibble::as_tibble(population$unions)
   dims <- names(population$groups)
@@ -142,6 +144,15 @@ augment_persons <- function(population) {
 #' Return births where the mother was outside both cohabitation and marriage,
 #' with parent ages and optional groups supplied by [augment_persons()].
 #'
+#' @details
+#'
+#' Births are extracted from the full histories in `persons`, not only from
+#' the simulated period. They include births before the simulation started
+#' and, with immigration, births before arrival of children who arrived with
+#' their parents. To keep only births during the simulation, filter the
+#' result on `birth_time`; children who arrived have a non-missing
+#' `arrival_time`.
+#'
 #' @param population A `hammel_population` with person and union
 #'   histories, such as the result of [run_simulation()].
 #' @return A separate tibble containing selected person rows and `age_mother`,
@@ -164,10 +175,12 @@ augment_persons <- function(population) {
 #' extract_unpartnered_births(result)
 extract_unpartnered_births <- function(population) {
   parents <- add_parent_columns(population)
+  # Mothers' unions may include external relatives (D186); only births to
+  # members are returned.
   rows <- call_native(
-    unpartnered_birth_rows_cpp(population$persons, population$unions)
+    unpartnered_birth_rows_cpp(history_people(population), population$unions)
   )
-  parents[rows, , drop = FALSE]
+  parents[rows[rows <= nrow(parents)], , drop = FALSE]
 }
 
 # HELPER FUNCTIONS ---------------------------------------------------------
@@ -198,15 +211,17 @@ add_parent_columns <- function(population, call = rlang::caller_env()) {
       call = call
     )
   }
+  # Parents may be external relatives of immigrants (D186).
+  people <- history_people(population)
   for (parent in c("mother", "father")) {
-    rows <- match(persons[[paste0(parent, "_id")]], persons$person_id)
+    rows <- match(persons[[paste0(parent, "_id")]], people$person_id)
     result[[paste0("age_", parent)]] <-
-      persons$birth_time - persons$birth_time[rows]
+      persons$birth_time - people$birth_time[rows]
   }
   for (d in dims) {
     for (parent in c("mother", "father")) {
-      rows <- match(persons[[paste0(parent, "_id")]], persons$person_id)
-      result[[paste0(d, "_", parent)]] <- persons[[d]][rows]
+      rows <- match(persons[[paste0(parent, "_id")]], people$person_id)
+      result[[paste0(d, "_", parent)]] <- people[[d]][rows]
     }
   }
   result

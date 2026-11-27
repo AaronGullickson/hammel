@@ -18,17 +18,19 @@
 #' - [union_formation()]
 #' - [union_dissolution()]
 #' - [group_transition()]
+#' - [immigration()]
 #'
 #' Use this function to attach an already-created process. The convenience
 #' setters [set_mortality()], [set_fertility()], [set_union_formation()],
-#' [set_union_dissolution()], and [set_group_transition()] construct and attach
-#' the corresponding process in one call.
+#' [set_union_dissolution()], [set_group_transition()], and
+#' [set_immigration()] construct and attach the corresponding process in one
+#' call.
 #'
 #' @param model A [hammel_model] object.
 #' @param process A `hammel_process` specification.
 #' @return An updated [hammel_model]. The input model is not modified.
 #' @seealso [mortality()], [fertility()], [union_formation()],
-#'   [union_dissolution()], [group_transition()]
+#'   [union_dissolution()], [group_transition()], [immigration()]
 #' @export
 #' @examples
 #' mortality_process <- mortality(usa_2000_mortality)
@@ -54,8 +56,8 @@ attach_process <- function(model, process, call = rlang::caller_env()) {
         "x" = "It is {describe_value(process)}.",
         "i" = paste(
           "Create processes with {.fn mortality}, {.fn fertility},",
-          "{.fn union_formation}, {.fn union_dissolution} or",
-          "{.fn group_transition}."
+          "{.fn union_formation}, {.fn union_dissolution},",
+          "{.fn group_transition} or {.fn immigration}."
         )
       ),
       "specification",
@@ -117,6 +119,14 @@ attach_process <- function(model, process, call = rlang::caller_env()) {
     validate_process_weights(process$weights, "transition", call = call)
     process$rates <- tibble::as_tibble(process$rates)
     return(store_transition_process(model, process, call = call))
+  }
+  if (name == "immigration") {
+    validate_immigration(process, call = call)
+    # A process without streams removes immigration (D184).
+    if (!length(process$streams)) {
+      model$processes$immigration <- NULL
+      return(model)
+    }
   }
   if (name == "union_dissolution") {
     validate_union_dissolution(process, call = call)

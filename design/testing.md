@@ -1525,3 +1525,303 @@ process. All existing hetfert, weight-model and calendar-rate tests were kept,
 with only the enabling call changed. `devtools::test()` passed 7,562
 expectations with 0 failures, 0 warnings and 1 skip (the opt-in live database
 test). No engine code changed.
+
+## External immigration phase 1 (November 16, 2026)
+
+`tests/testthat/test-immigration.R` covers the D185 contract: constructor and
+setter validation (stream names, replacement and removal, intensity tables,
+weights, assignments); Poisson arrival counts at a constant intensity over 30
+seeds; piecewise calendar intensities, including a zero interval and a
+coverage gap error; age and sex preservation, unknown parents and fresh IDs;
+eligibility (dead and partnered template people are never drawn; an empty
+eligible set is an error); weight-model selection probabilities, invariance to
+scaling all weights, and observed selection frequencies; shared, ignored and
+assigned groups (fixed, probability and custom methods) and the compatibility
+errors; ancestry copied from templates or set to the migrant's category;
+observation from arrival (population counts, mortality exposure, no
+unassigned births for migrants, and recovery of a constant death rate among
+migrants); the accounting identity living = initial + arrivals + births −
+deaths; arrival columns only with immigration and their survival through a
+restart; validation of arrival columns; and summaries.
+
+To check that models without immigration are unchanged, the result or error
+of every native `*_cpp` call made by the existing offline test files (all but
+`test-immigration.R` and the live database test) was hashed in call order on
+`master` (5640556) and on this branch, both built with `-ffp-contract=off`
+through `R_MAKEVARS_USER` (D175). The branch's `simulate_cpp` result gains an
+`arrivals` element, empty without streams, which was dropped before hashing.
+Both runs made 1,830 calls, and all 1,830 hashes were identical. With default
+flags, `devtools::test()` passed 8,714 expectations (165 in the new file) with
+no failures or warnings and one skip (the opt-in live database test).
+
+## External immigration phase 2 (November 16, 2026)
+
+`tests/testthat/test-immigration-histories.R` covers the D186 contract with a
+hand-built template: a widow whose three children include one by a man who
+was never her partner. It checks the imported union (shifted dates, fresh
+IDs, `pre_migration`), external relatives (dates, parent links, the unknown
+non-partner father, `censor_time`) and per-arrival copies; derived state in
+the engine, by parity-only fertility (births only at imported parity 3+),
+birth spacing from an imported last birth, widowed-only remarriage, and
+group duration continuing from a template transition while an assigned group
+starts at arrival; entry rows and duration-based transition rates, alone and
+combined with another group; observation never counting external relatives
+or pre-migration union-years; `augment_unions()` and
+`extract_unpartnered_births()` resolving external partners; kin functions
+with and without `include_external`; restarts keeping histories, unique IDs
+and parity; flattening a template's own external relatives with their
+censor times; population validation; and the cohabitation-template error.
+
+The result or error of every native `*_cpp` call made by the existing
+offline test files (all but the two immigration files and the live database
+test) was again hashed in call order on `master` (5640556) and this branch,
+both built with `-ffp-contract=off` (D175), dropping `simulate_cpp`'s
+`arrivals` element. Both runs made 1,830 calls, and all hashes were
+identical. With default flags, `devtools::test()` passed 8,793 expectations
+with no failures or warnings and one skip (the opt-in live database test).
+
+A seeded run with 40,088 arrivals over 50 years from a 12,728-person
+template (24,375 external relatives) took 2.9 seconds in total, 0.25 of them
+importing histories, after the import was vectorized.
+
+## External immigration phase 3 (November 16, 2026)
+
+`tests/testthat/test-immigration-households.R` covers the D187 contract with
+the specification's worked example as a hand-built template. It checks that
+households partition the template's living persons, with carriers, partners,
+dependents attached to the living mother or else the father, and
+`age_independence`; that a dependent whose mother is a template external
+relative joins the father; a household's arrival (shared time and stream,
+the live union at its imported duration, parent links within the party, the
+son's mother created once as an external relative); an orphan's unknown
+parents; imported parity with destination births fathered by the imported
+husband; shared assigned categories, ancestry and entry rows; intensity
+conversion by expected household size, party and person counts against
+their Poisson and compound Poisson spread, and selection by carrier weights;
+duration-dependent dissolution of live unions and their left-truncated
+dissolution rates; no destination formations; no searches while partnered;
+cohabitation links and conversions after arrival; restarts; and validation
+of the household argument.
+
+The result or error of every native `*_cpp` call was hashed in call order
+with `-ffp-contract=off` (D175), dropping `simulate_cpp`'s `arrivals`
+element. The offline test files other than the three immigration files
+made 1,830 calls on `master` (5640556) and on this branch, all identical.
+The phase 1 and 2 immigration test files made 151 calls on the phase 2
+commit (f354b10) and on this branch, all identical, so individual streams
+are unchanged. With default flags, `devtools::test()` passed 8,877
+expectations with no failures or warnings and one skip (the opt-in live
+database test).
+
+A seeded run with a household stream of intensity 800 over 50 years from a
+24,784-person template had 39,737 arrivals in 20,559 households and took 2.0
+seconds.
+
+## Household default and cloning streams (November 16, 2026)
+
+Under D188, `test-immigration.R` checks that a cloning stream draws partnered
+and unpartnered living people but not the dead, that clones arrive never
+partnered with unknown parents, no external relatives and an entry row at
+arrival, and that a template with unions warns (`no_effect`) while one
+without does not. The phase 2 history tests now use household streams with
+`household(age_independence = 0)`, so the drawn widow still arrives alone
+with her history. The engine was unchanged. `devtools::test()` passed 8,885
+expectations with no failures or warnings and one skip (the opt-in live
+database test).
+
+## Household selection variables (November 16, 2026)
+
+Under D189, `test-immigration-households.R` checks the household variables
+each carrier receives in the worked-example template, exact selection
+probabilities from formulas on `partnered`, `n_dependents`,
+`household_size` and `partner_age` (which acts only on couples), a custom
+assignment that sends couples' households to one region, and the error for
+household variables on a cloning stream. `devtools::test()` passed 8,899
+expectations with no failures or warnings and one skip (the opt-in live
+database test).
+
+## Birthplace group (November 17, 2026)
+
+`tests/testthat/test-immigration-birthplace.R` covers D190: categories
+(`"native"` and the streams) and the `automatic` flag; native newborns of
+immigrant mothers; no `stream` column; opt-in ancestry, with immigrants at
+100% of their stream, the starting population native, and newborns at the
+average of their parents' shares (an unknown father's half unknown); a
+template's own birthplace ignored; persistence through restarts with and
+without immigration, new streams adding categories, and supplied starting
+birthplaces; mortality stratified by birthplace; `birthplace` excluded from
+only-dimension defaults (transitions without `group`, bare `group_exogamy`,
+transition rates and observation by the one declared dimension); and
+validation of reserved stream names, `birthplace_ancestry`, assignments and
+user-declared `birthplace` groups. The immigration tests were updated for
+the `birthplace` column and its entry rows, and a combined observation view
+now keeps `pre_migration` on its empty transitions table.
+
+The offline test files other than the four immigration files made 1,830
+native calls on `master` (5640556) and on this branch with
+`-ffp-contract=off`, all with identical hashes. `devtools::test()` passed
+8,958 expectations with no failures or warnings and one skip (the opt-in
+live database test).
+
+## Custom migrant assignment at arrival (November 17, 2026)
+
+Under D193, `test-immigration-households.R` checks that a custom rule gives
+each arriving member their own category (generation 1.5 for children under
+13 and 1 for others within one household), the members it sees (template
+IDs in household order, roles, household variables, one household number
+per arrival, the arrival time, and no household columns on cloning
+streams), sampling once per household keeping members together and
+following the seed, and errors for results of the wrong length or with
+undeclared categories. Existing custom assignment tests now return
+categories. The offline test files other than the four immigration files
+made 1,830 native calls on `master` and this branch with
+`-ffp-contract=off`, all with identical hashes; `devtools::test()` passed
+8,979 expectations with no failures or warnings and one skip (the opt-in
+live database test).
+
+A seeded run with a household stream of intensity 800 over 50 years from a
+template of about 25,000 people (40,139 arrivals in 20,903 households) took
+8.6 seconds with a fixed `generation` assignment and 13.0 seconds with a
+custom one, about 0.21 milliseconds per arriving household.
+
+A restart that called `set_groups()` without `birthplace` dropped the
+automatic dimension from the population, so its arrival entry rows failed
+validation. Declarations now keep a population's automatic dimensions;
+`test-immigration-birthplace.R` checks that the dimension and its ancestry
+survive such a restart. `devtools::test()` passed 8,983 expectations with
+one skip (the opt-in live database test).
+
+## Intensity tables (November 17, 2026)
+
+`tests/testthat/test-immigration-intensity.R` covers D194: a closed
+population growing as a pure-birth process under a rate intensity
+(E[N(T)] = N(0) exp(rT), over 20 seeds); `calculate_immigration_rates()`
+recovering a rate in a shrinking population, a household rate stream and a
+rate stream mixed with a count stream (stream rates summing to the total
+over shared person-years); calendar rate tables pausing and resuming; exact
+person-years and arrival counts against a direct loop; and argument
+validation. The immigration tests now pass intensities as tables (a
+`per_year()` test helper), and the validation test checks bare numbers,
+both or neither kind, extra rows and negative values.
+
+The offline test files other than the five immigration files made 1,830
+native calls on `master` and this branch with `-ffp-contract=off`, all with
+identical hashes; `devtools::test()` passed 9,018 expectations with no
+failures or warnings and one skip (the opt-in live database test).
+
+At report scale (a 20,000-person destination, a household stream from a
+template of about 25,000, 50 years), `count = 800` took 3.4 seconds for
+40,339 arrivals and `rate = 0.02` 3.0 seconds for 37,486 arrivals, with
+crude rates of 0.0202 and 0.0197 in the two 25-year halves. Household
+arrivals are compound Poisson, so the helper's Poisson intervals are too
+narrow for them.
+
+`calculate_immigration_rates()` now stratifies arrivals and person-years
+together with `by` (sex and declared dimensions) and splits streams with
+`streams = TRUE`. `test-immigration-intensity.R` checks that arrivals are
+classified by their region at arrival though some have since moved, that
+regional person-years sum to the total, that sex, region and stream strata
+partition arrivals, and the `birthplace` and unknown-`by` errors.
+`devtools::test()` passed 9,035 expectations with one skip (the opt-in live
+database test).
+
+Immigration-rate intervals now adjust for household clumping: each row's
+`dispersion` is the sum of squared household sizes over its arrivals, and
+the exact Poisson interval is taken for both counts divided by it.
+`test-immigration-intensity.R` checks that individual streams keep
+`poisson.test()`'s intervals exactly, that two-person households have
+dispersion 2 (1 when split by sex) with wider intervals, and adjusted 90%
+coverage across 40 replications. Over 200 replications at 95%, coverage was
+0.92 adjusted versus 0.81 plain for two-person households, and 0.95 versus
+0.76 for a simulated template (mean dispersion 2.62).
+
+## Times in custom weight functions (November 17, 2026)
+
+Under D195, `test-weight-models.R` checks that custom mortality weights see
+`birth_time` and `arrival_time` matching the population (`NA` for natives),
+that they are evaluated at each death through `bin$time`, that time since
+arrival is never negative, and that custom dissolution weights see both
+partners' birth and arrival times; one test asserting the old "no exact
+times" contract was updated. With the two new tests removed so both sides
+run the same tests, the offline files other than the five immigration files
+made 1,830 native calls on `master` and this branch with
+`-ffp-contract=off`, all with identical hashes. `devtools::test()` passed
+9,062 expectations with one skip (the opt-in live database test).
+
+## Template cuts (November 17, 2026)
+
+`tests/testthat/test-immigration-cuts.R` covers D196: the internal
+`population_at()` on a hand-built template (a child not yet born, a husband
+still alive and married before his death, the widow and child after) and on
+a simulated population with deaths and regional moves (valid populations,
+no later records, and each person's region at the cut matching their
+history); arrivals from successive cuts with ages at each cut, couples
+arriving married from the early cut and the widow arriving widowed from the
+later one with her marriage's end shifted to her arrival; coverage errors
+for cuts beyond the template's history and for templates without one;
+`step` validation; and the summary. Preparing an all-partner batch of
+external relatives exposed logical `NA` parent IDs, now kept numeric. A
+household test built its template from unseeded random numbers; it is now
+deterministic.
+
+With `-ffp-contract=off`, the offline test files other than the six
+immigration files (and without D195's two new weight tests) made 1,830
+native calls on `master` and this branch, all identical. The five earlier
+immigration files made 396 calls on commit 072c7d1 and this branch, all
+identical except the unseeded test, which differed between two runs of the
+same commit too. `devtools::test()` passed 9,136 expectations with one skip
+(the opt-in live database test).
+
+At report scale (a template of 29,744 people simulated from 0 to 150, a
+destination run from 100 to 150, `count = 800`), a run took 3.2 seconds
+without cuts, 4.7 with `step = 5` (10 cuts) and 10.6 with `step = 1` (50
+cuts).
+
+## Template cut performance (November 17, 2026)
+
+Profiling a report-like run (two household streams with custom selection
+weights, custom generation inheritance and assignment, three groups and
+birthplace ancestry, 50 years with yearly cuts) showed most of the cut
+overhead in `split()` and `factor()` on character keys over whole
+templates: history import rebuilt lookup lists per stream and cut, and
+imported state used `table()` and `tapply()` on mother IDs. Both now match
+numerically and index only each batch's arrivals. The run fell from 21.4 to
+10.1 seconds (5.6 without cuts). The five earlier immigration test files
+made 400 native calls on commit 0f56650 and this branch, all identical, and
+complete results of seeded runs with and without cuts (persons, unions,
+transitions, ancestry and external relatives) were identical.
+`devtools::test()` passed 9,136 expectations with one skip.
+
+## Immigration weight schedules (November 17, 2026)
+
+Under D197, `test-immigration-cuts.R` checks that a weight schedule switches
+selection at its boundaries (one person, then both under a uniform model,
+then the other), that slices start at cuts and schedule boundaries with a
+custom function's `bin` holding both the cut and the interval, that a
+household stream favouring couples and then singles keeps its person
+intensity in both periods, and that schedules must cover the run and can't
+use household variables on cloning streams. In `test-immigration.R`, a
+schedule is now accepted and one mixing formulas and functions rejected.
+With `-ffp-contract=off`, the offline test files other than the six
+immigration files (without D195's two weight tests) made 1,830 native calls
+on `master` and this branch, and the five earlier immigration files 396 on
+commit 51c34e2 and this branch, all identical.
+`devtools::test()` passed 9,149 expectations with one skip.
+
+## Immigration review fixes (November 18, 2026)
+
+Fixes from a code review, each reproduced before the change and covered by
+a regression test. `test-immigration-households.R` checks that a converted
+cohabitation's end equals the live marriage's start when the template ends
+at 2000 and the destination at 0 (the run previously failed validation),
+and that a newborn and a union dated at the template's end report no
+destination births or union formations (four of each before the fix).
+`test-immigration-cuts.R` checks that cuts every 0.1 years over a 0.2-year
+run from 2000 are 2000 and 2000.1, not also 2000.2. Under D190 and D198,
+`test-immigration-birthplace.R` checks that a transition without `group`
+attached before `set_groups()` resolves past `birthplace` at run time, and
+that transitions in `birthplace` (to `"native"` or another stream) and an
+implicit fallback to it are `groups` errors. `test-immigration-intensity.R`
+now checks that `dispersion` is reported only with `conf_level`.
+`devtools::test()` passed 9,183 expectations with one skip, and
+`devtools::check()` reported no errors or warnings.

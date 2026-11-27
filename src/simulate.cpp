@@ -50,6 +50,7 @@ struct Person {
   double id, born, died, mother, father, last_birth;
   bool female;
   int group;
+  double arrived = NA_REAL;  // arrival time of an immigrant (D185)
   int type = 0;  // matching type: group and ancestry profile (D199)
 };
 
@@ -265,6 +266,45 @@ double draw_threshold() {
   return value;
 }
 
+// One external immigration stream (D185): its piecewise-constant intensity
+// (in parties per year) and its parties (D187). Party p's members are rows
+// party_start[p] to party_start[p + 1] - 1; individual streams have one-person
+// parties. Parties have a cumulative selection probability and per-dimension
+// assignment probabilities. Each member has an age, sex, categories (-1
+// where assigned at arrival) and ancestry shares (NA in blocks filled at
+// arrival). Imported histories (D186) give each member's state at the
+// template endpoint as elapsed times: since the last birth, since the last
+// union ended and since entering each group (NA: none, or for assigned
+// groups entry at arrival). Links within a party are member offsets (-1
+// none): parents, and for a woman her current partner, with the union's
+// elapsed duration, type and template row. `next` is the next arrival time.
+struct ImmigrationSlice {
+  NumericVector age, cumulative, since_birth, since_end, union_since;
+  LogicalVector female, union_cohab;
+  IntegerVector parity, previous, legal, party_start, mother, father, partner,
+    union_row;
+  IntegerMatrix categories;
+  NumericMatrix ancestry, since_entry;
+  List assignment;
+  double expected_size = 1;  // persons per party under selection (D187)
+};
+
+// A stream's intensity is in persons; its clock runs at intensity divided by
+// the active slice's expected party size. Template cuts (D196) give one
+// slice per cut, active from its cut time; without cuts there is one.
+struct ImmigrationStream {
+  std::vector<double> time_start, time_end, intensity;
+  std::vector<ImmigrationSlice> slices;
+  std::vector<double> cuts;
+  int active = 0;
+  double next = R_PosInf;
+  // A crude-rate stream (D194): its hazard is `rate` per living person, and
+  // it arrives when the hazard `used` since its last draw reaches
+  // `threshold`; `since` is when `used` was last brought up to date.
+  bool per_person = false;
+  double rate = 0, threshold = 0, used = 0, since = 0;
+};
+
 // The strata of each non-fertility process from the active schedules.
 struct ProcessStrata {
   std::vector<std::vector<Band>> mortality, search, dissolution, conversion;
@@ -318,7 +358,8 @@ class Simulation {
     Nullable<List> transition_input,
     Nullable<List> model_schedule_input,
     Nullable<List> weight_input,
-    Nullable<List> group_input
+    Nullable<List> group_input,
+    Nullable<List> immigration_input
   );
   Simulation(const Simulation&) = delete;
   // Keep the search weights of this fraction of the unions formed by
@@ -341,6 +382,7 @@ class Simulation {
   void setup_calibration();
   void read_transitions(Nullable<List> transition_input);
   void read_weights(Nullable<List> weight_input);
+  void read_immigration(Nullable<List> immigration_input);
   void load_probabilities();
   void load_schedules();
   void load_dissolution();
@@ -468,6 +510,10 @@ class Simulation {
   void on_conversion(int i, int unit, double now);
   void on_search(int i, double now);
   void on_birth(int i, double now);
+  void on_arrival(int k, double now);
+  void draw_arrival(ImmigrationStream& stream, double now);
+  void schedule_rate_arrival(ImmigrationStream& stream, double now);
+  void population_change(int delta, double now);
   void append_ancestry(int child, int mother, int father);
   int newborn_category(
     int d,
@@ -637,6 +683,23 @@ class Simulation {
   bool fertility_refresh_weights = false;
   double weight_now = 0;  // event time, for custom-function rate periods
 
+  // External immigration (D185): streams, each tracked dimension's engine
+  // column for each category's ancestry share, the earliest possible migrant
+  // birth, and the arrivals recorded.
+  std::vector<ImmigrationStream> streams;
+  std::vector<std::vector<int>> category_component;
+  double immigration_min_birth = R_PosInf;
+  std::vector<double> arrival_person, arrival_time;
+  std::vector<int> arrival_stream, arrival_row, arrival_cats, arrival_party,
+    arrival_slice;
+  // Unions that arrive live (D187): engine ID, template row and party.
+  std::vector<double> arrival_union;
+  std::vector<int> arrival_union_row, arrival_union_party;
+  int party_count = 0;
+  // Living destination people, for crude-rate streams (D194).
+  bool any_rate_stream = false;
+  double living = 0;
+
   // Unrealized births: (period, group, union type, parity start/end, age
   // start/end) -> count.
   std::map<
@@ -682,7 +745,8 @@ Simulation::Simulation(
   Nullable<List> transition_input,
   Nullable<List> model_schedule_input,
   Nullable<List> weight_input,
-  Nullable<List> group_input
+  Nullable<List> group_input,
+  Nullable<List> immigration_input
 )
     : unions(unions),
       all_mortality(mortality_rates),
@@ -756,20 +820,28 @@ Simulation::Simulation(
     stop("ffab must be a finite probability in [0, 1].");
   }
   read_groups(group_input, persons.nrows());
+  read_immigration(immigration_input);
   const std::map<double, int> index = read_people(persons, initial_ancestry);
+  // New IDs also follow records kept outside the engine, such as external
+  // relatives of immigrants and their unions (D186).
+  if (persons.containsElementNamed(".hammel_id_floor")) {
+    next_id = std::max(next_id, NumericVector(persons[".hammel_id_floor"])[0]);
+  }
 
-  // Draw models for the union, father and cohabitation matching models. An
-  // empty population never draws, so custom-formula grids are skipped then.
-  if (!people.empty() && !scheduled_models) {
+  // Draw models for the union, father and cohabitation matching models. A
+  // population that stays empty never draws, so custom-formula grids are
+  // skipped then.
+  const bool populated = !people.empty() || !streams.empty();
+  if (populated && !scheduled_models) {
     union_draw = make_draw_model(matching, group_count, end - min_birth);
   }
-  if (!scheduled_models && !people.empty() &&
+  if (!scheduled_models && populated &&
       SEXP(father_matching) != SEXP(matching)) {
     father_draw_storage =
       make_draw_model(father_matching, group_count, end - min_birth);
     father_draw = &father_draw_storage;
   }
-  if (!scheduled_models && cohab_enabled && !people.empty() &&
+  if (!scheduled_models && cohab_enabled && populated &&
       SEXP(cohab_matching) != SEXP(matching)) {
     cohab_draw_storage =
       make_draw_model(cohab_matching, group_count, end - min_birth);
@@ -801,6 +873,10 @@ Simulation::Simulation(
   probability_schedules.resize(probability_spec.count * 3);
   load_probabilities();
   read_unions(index);
+  if (persons.containsElementNamed(".hammel_union_floor")) {
+    next_union_id =
+      std::max(next_union_id, NumericVector(persons[".hammel_union_floor"])[0]);
+  }
 
   union_weighted = applies_weights(matching);
   father_weighted = applies_weights(father_matching);
@@ -841,6 +917,15 @@ Simulation::Simulation(
     refresh_person(i, start);
   }
   collect_sources();
+  // Arrival clocks draw last, so runs without immigration draw nothing more.
+  for (const Person& p : people) {
+    if (NumericVector::is_na(p.died)) {
+      ++living;
+    }
+  }
+  for (auto& stream : streams) {
+    draw_arrival(stream, start);
+  }
 }
 
 void Simulation::add_calendar_time(double time) {
@@ -949,7 +1034,12 @@ Simulation::read_people(DataFrame persons, NumericMatrix initial_ancestry) {
     }
   }
   std::map<double, int> index;
-  min_birth = start;
+  const bool arrivals = persons.containsElementNamed("arrival_time");
+  NumericVector arrival_times =
+    arrivals ? NumericVector(persons["arrival_time"]) : NumericVector();
+  // Pools and calibration bin by birth time, so they must reach the earliest
+  // migrant birth.
+  min_birth = std::min(start, immigration_min_birth);
   for (int i = 0; i < ids.size(); ++i) {
     const bool female = as<std::string>(sexes[i]) == "f";
     people.push_back(
@@ -957,6 +1047,9 @@ Simulation::read_people(DataFrame persons, NumericMatrix initial_ancestry) {
        -std::numeric_limits<double>::infinity(), female,
        person_stratum(matching_spec, i)}
     );
+    if (arrivals) {
+      people.back().arrived = arrival_times[i];
+    }
     index[ids[i]] = i;
     next_id = std::max(next_id, ids[i]);
     min_birth = std::min(min_birth, births[i]);
@@ -978,8 +1071,19 @@ Simulation::read_people(DataFrame persons, NumericMatrix initial_ancestry) {
   }
   // Parity selects fertility cells when schedules are parity-specific; it is
   // always tracked because weight models may use it. On restart, the latest
-  // recorded birth, including to children who died, restores spacing.
+  // recorded birth, including to children who died, restores spacing; births
+  // to children who are external relatives (D186) are supplied by R.
   parity.assign(people.size(), 0);
+  if (persons.containsElementNamed(".hammel_external_births")) {
+    IntegerVector births = persons[".hammel_external_births"];
+    NumericVector latest = persons[".hammel_external_last_birth"];
+    for (int i = 0; i < static_cast<int>(people.size()); ++i) {
+      parity[i] = births[i];
+      if (!NumericVector::is_na(latest[i])) {
+        people[i].last_birth = latest[i];
+      }
+    }
+  }
   for (int i = 0; i < static_cast<int>(people.size()); ++i) {
     const int m = mother_of[i];
     if (m < 0) {
@@ -1243,6 +1347,65 @@ void Simulation::read_weights(Nullable<List> weight_input) {
       "function is evaluated at every refresh of every woman, which can be "
       "slow."
     );
+  }
+}
+
+// Immigration streams (D185) prepared by R. Intensity edges inside the run
+// are calendar boundaries, where arrival clocks are redrawn.
+void Simulation::read_immigration(Nullable<List> immigration_input) {
+  if (immigration_input.isNull()) {
+    return;
+  }
+  List input(immigration_input.get());
+  immigration_min_birth = as<double>(input["min_birth"]);
+  List components = input["category_component"];
+  for (int d = 0; d < components.size(); ++d) {
+    category_component.push_back(as<std::vector<int>>(components[d]));
+  }
+  List list = input["streams"];
+  for (int k = 0; k < list.size(); ++k) {
+    List x = list[k];
+    ImmigrationStream stream;
+    stream.time_start = as<std::vector<double>>(x["time_start"]);
+    stream.time_end = as<std::vector<double>>(x["time_end"]);
+    stream.intensity = as<std::vector<double>>(x["intensity"]);
+    stream.cuts = as<std::vector<double>>(x["cuts"]);
+    List slices = x["slices"];
+    for (int c = 0; c < slices.size(); ++c) {
+      List y = slices[c];
+      ImmigrationSlice slice;
+      slice.age = y["age"];
+      slice.cumulative = y["cumulative"];
+      slice.female = y["female"];
+      slice.categories = as<IntegerMatrix>(y["categories"]);
+      slice.ancestry = as<NumericMatrix>(y["ancestry"]);
+      slice.assignment = y["assignment"];
+      slice.parity = y["parity"];
+      slice.since_birth = y["since_birth"];
+      slice.previous = y["previous_union"];
+      slice.legal = y["legal_previous"];
+      slice.since_end = y["since_union_end"];
+      slice.since_entry = as<NumericMatrix>(y["since_entry"]);
+      slice.party_start = y["party_start"];
+      slice.mother = y["mother"];
+      slice.father = y["father"];
+      slice.partner = y["partner"];
+      slice.union_since = y["union_since"];
+      slice.union_cohab = y["union_cohab"];
+      slice.union_row = y["union_row"];
+      slice.expected_size = as<double>(y["expected_size"]);
+      stream.slices.push_back(slice);
+    }
+    for (double cut : stream.cuts) {
+      add_calendar_time(cut);
+    }
+    stream.per_person = as<bool>(x["per_person"]);
+    any_rate_stream = any_rate_stream || stream.per_person;
+    for (size_t j = 0; j < stream.time_start.size(); ++j) {
+      add_calendar_time(stream.time_start[j]);
+      add_calendar_time(stream.time_end[j]);
+    }
+    streams.push_back(stream);
   }
 }
 
@@ -2251,7 +2414,7 @@ List Simulation::weight_members(
     names.push_back(name);
   };
   if (!is_union) {
-    NumericVector id(n);
+    NumericVector id(n), born(n), arrived(n);
     CharacterVector sex(n), type(n), previous(n);
     IntegerVector partnered(n), births(n);
     std::vector<CharacterVector> own(dimensions), partners(dimensions);
@@ -2263,6 +2426,8 @@ List Simulation::weight_members(
       const int i = units[r];
       const int partner = current_partner[i];
       id[r] = people[i].id;
+      born[r] = people[i].born;
+      arrived[r] = people[i].arrived;
       sex[r] = people[i].female ? "f" : "m";
       type[r] = kUnionTypeLabels[static_cast<int>(person_value(2, 0, i, -1))];
       partnered[r] = partner >= 0;
@@ -2276,6 +2441,8 @@ List Simulation::weight_members(
     }
     add("person_id", id);
     add("sex", sex);
+    add("birth_time", born);
+    add("arrival_time", arrived);
     for (int d = 0; d < dimensions; ++d) {
       add(dim_names[d], own[d]);
     }
@@ -2298,7 +2465,8 @@ List Simulation::weight_members(
       add("destination", destination);
     }
   } else {
-    NumericVector id(n), wife(n), husband(n), gap(n);
+    NumericVector id(n), wife(n), husband(n), gap(n), born_w(n), born_h(n),
+      arrived_w(n), arrived_h(n);
     CharacterVector previous_w(n), previous_h(n), type(n);
     IntegerVector parity_w(n);
     std::vector<CharacterVector> wives(dimensions), husbands(dimensions);
@@ -2313,6 +2481,10 @@ List Simulation::weight_members(
       id[r] = x.id;
       wife[r] = people[x.wife].id;
       husband[r] = people[x.husband].id;
+      born_w[r] = people[x.wife].born;
+      born_h[r] = people[x.husband].born;
+      arrived_w[r] = people[x.wife].arrived;
+      arrived_h[r] = people[x.husband].arrived;
       for (int d = 0; d < dimensions; ++d) {
         wives[d][r] = dim_label(d, category(x.wife, d));
         husbands[d][r] = dim_label(d, category(x.husband, d));
@@ -2331,6 +2503,10 @@ List Simulation::weight_members(
       add(dim_names[d] + "_w", wives[d]);
       add(dim_names[d] + "_h", husbands[d]);
     }
+    add("birth_time_w", born_w);
+    add("birth_time_h", born_h);
+    add("arrival_time_w", arrived_w);
+    add("arrival_time_h", arrived_h);
     add("parity_w", parity_w);
     add("previous_union_w", previous_w);
     add("previous_union_h", previous_h);
@@ -2368,6 +2544,9 @@ void Simulation::custom_eta(
   std::vector<double>& eta
 ) {
   Function f(spec.fun);
+  // The time at which the weights are evaluated: the event, or for stored
+  // weights the refresh.
+  bin["time"] = weight_now;
   PutRNGstate();
   NumericVector result;
   try {
@@ -2895,7 +3074,17 @@ List Simulation::run(SEXP progress) {
         event_source = k;
       }
     }
-    if (boundary < end && boundary <= next_event) {
+    // Arrivals follow every other process at exact ties (D185).
+    double next_arrival = R_PosInf;
+    int arrival_source = -1;
+    for (size_t k = 0; k < streams.size(); ++k) {
+      if (streams[k].next < next_arrival) {
+        next_arrival = streams[k].next;
+        arrival_source = static_cast<int>(k);
+      }
+    }
+    const double first = std::min(next_event, next_arrival);
+    if (boundary < end && boundary <= first) {
       weight_now = boundary;
       const EventSource& x = sources[boundary_source];
       if (x.cells) {
@@ -2905,11 +3094,19 @@ List Simulation::run(SEXP progress) {
       }
       continue;
     }
-    if (!(next_event < end)) {
+    if (!(first < end)) {
       break;
     }
     if (++processed % 1024 == 0) {
       checkUserInterrupt();
+    }
+    if (next_arrival < next_event) {
+      weight_now = next_arrival;
+      if (probability_tracker) {
+        probability_tracker->advance(next_arrival);
+      }
+      on_arrival(arrival_source, next_arrival);
+      continue;
     }
     const double now = next_event;
     weight_now = now;
@@ -2978,9 +3175,33 @@ bool Simulation::apply_calendar_boundary() {
       return false;
     }
   }
+  for (const auto& stream : streams) {
+    if (!(now <= stream.next)) {
+      return false;
+    }
+  }
   calendar_boundaries.erase(calendar_boundaries.begin());
   weight_now = now;
   checkUserInterrupt();
+  // A stream whose intensity interval starts or ends here, or whose template
+  // cut (D196) begins here, redraws its clock, valid after survival to the
+  // boundary (memoryless).
+  for (auto& stream : streams) {
+    bool redraw =
+      std::find(stream.time_start.begin(), stream.time_start.end(), now) !=
+        stream.time_start.end() ||
+      std::find(stream.time_end.begin(), stream.time_end.end(), now) !=
+        stream.time_end.end();
+    for (size_t c = 0; c < stream.cuts.size(); ++c) {
+      if (stream.cuts[c] == now) {
+        stream.active = static_cast<int>(c);
+        redraw = true;
+      }
+    }
+    if (redraw) {
+      draw_arrival(stream, now);
+    }
+  }
   const bool matching_changed = update_models(now);
   const bool weights_changed = switch_weights(now);
   const bool probability_changed = calendar_changes_at(all_probability, now);
@@ -3096,6 +3317,7 @@ void Simulation::on_transition(int i, int slot, double now) {
 // Retain the person's history, record death, widow any partner, and leave
 // every process.
 void Simulation::on_death(int i, double now) {
+  population_change(-1, now);
   people[i].died = now;
   std::vector<int> widowed, ended;
   for (int u : person_unions[i]) {
@@ -3279,10 +3501,253 @@ void Simulation::on_birth(int i, double now) {
     tp.entry.push_back(now);
   }
   ++birth_count;
+  population_change(1, now);
   // The newborn enters its cells; the mother's spacing (and possibly her
   // union state, in on-demand mode) has changed.
   refresh_person(child, now);
   refresh_person(i, now);
+}
+
+// An arriving party (D185, D187): draw a party by selection probability and
+// one category per assigned dimension, shared by its members. Each member is
+// a destination person of the same age and sex, with categories and ancestry
+// from the template or the assignment, parents linked within the party and
+// unknown otherwise. A woman's current partner arrives with her in a live
+// union of the same duration and type.
+void Simulation::on_arrival(int k, double now) {
+  ImmigrationStream& stream = streams[k];
+  const ImmigrationSlice& slice = stream.slices[stream.active];
+  const double u = R::runif(0, 1);
+  const int n = slice.cumulative.size();
+  const int r = std::min(
+    n - 1,
+    static_cast<int>(
+      std::upper_bound(slice.cumulative.begin(), slice.cumulative.end(), u) -
+      slice.cumulative.begin()
+    )
+  );
+  const int first = slice.party_start[r], last = slice.party_start[r + 1];
+  const int size = last - first;
+  if (next_id + size >= kMaxExactId ||
+      people.size() + size >=
+        static_cast<size_t>(std::numeric_limits<int>::max())) {
+    stop("[limits] Population exceeds supported ID or row limits.");
+  }
+  // Assigned dimensions are the same for every member of a stream. Fixed and
+  // probability assignments draw once for the party; a custom assignment
+  // (D193) is an R function of the arriving members that returns each
+  // member's category code.
+  const int party = party_count++;
+  std::vector<std::vector<int>> assigned(dimensions);
+  for (int d = 0; d < dimensions; ++d) {
+    if (slice.categories(first, d) >= 0) {
+      continue;
+    }
+    SEXP rule = slice.assignment[d];
+    if (Rf_isFunction(rule)) {
+      IntegerVector rows(size);
+      for (int j = 0; j < size; ++j) {
+        rows[j] = first + j + 1;
+      }
+      // R's random functions must see all preceding native draws, and
+      // native scheduling must resume from the state the callback leaves.
+      PutRNGstate();
+      IntegerVector codes;
+      try {
+        Function assign(rule);
+        codes = as<IntegerVector>(assign(rows, now, party + 1));
+      } catch (...) {
+        GetRNGstate();
+        throw;
+      }
+      GetRNGstate();
+      const int count = static_cast<int>(dim_labels[d].size());
+      for (int code : codes) {
+        if (code < 0 || code >= count) {
+          stop("Invalid migrant assignment category.");
+        }
+      }
+      assigned[d].assign(codes.begin(), codes.end());
+      continue;
+    }
+    NumericMatrix probs(rule);
+    const double draw = R::runif(0, 1);
+    double cumulative = 0;
+    int c = -1;
+    for (int j = 0; j < probs.ncol(); ++j) {
+      if (probs(r, j) > 0) {
+        c = j;  // protect the final positive category against rounding
+        cumulative += probs(r, j);
+        if (draw < cumulative) {
+          break;
+        }
+      }
+    }
+    if (c < 0) {
+      stop("Invalid migrant assignment probabilities.");
+    }
+    assigned[d].assign(size, c);
+  }
+  const int base = static_cast<int>(people.size());
+  for (int m = first; m < last; ++m) {
+    const int i = static_cast<int>(people.size());
+    const int mother = slice.mother[m] < 0 ? -1 : base + slice.mother[m];
+    const int father = slice.father[m] < 0 ? -1 : base + slice.father[m];
+    people.push_back(
+      {++next_id, now - slice.age[m], NA_REAL,
+       mother < 0 ? NA_REAL : people[mother].id,
+       father < 0 ? NA_REAL : people[father].id,
+       -std::numeric_limits<double>::infinity(), slice.female[m] != 0, 0}
+    );
+    people[i].arrived = now;
+    // Imported reproductive history (D186): parity and spacing.
+    if (!NumericVector::is_na(slice.since_birth[m])) {
+      people[i].last_birth = now - slice.since_birth[m];
+    }
+    mother_of.push_back(mother);
+    father_of.push_back(father);
+    kids.emplace_back();
+    for (int parent : {mother, father}) {
+      if (parent >= 0) {
+        kids[parent].push_back(i);
+      }
+    }
+    parity.push_back(slice.parity[m]);
+    cats.resize(static_cast<size_t>(i + 1) * dimensions);
+    const size_t row = static_cast<size_t>(i) * ancestry_components;
+    ancestry.resize(row + ancestry_components);
+    for (size_t g = 0; g < ancestry_components; ++g) {
+      ancestry[row + g] = slice.ancestry(m, g);
+    }
+    for (int d = 0; d < dimensions; ++d) {
+      int c = slice.categories(m, d);
+      if (c < 0) {
+        c = assigned[d][m - first];
+        const InheritanceRule& rule = inheritance_rules[d];
+        if (rule.size) {
+          for (size_t g = 0; g < rule.size; ++g) {
+            ancestry[row + rule.offset + g] = 0;
+          }
+          ancestry[row + category_component[d][c]] = 1;
+        }
+      }
+      cats[static_cast<size_t>(i) * dimensions + d] = c;
+    }
+    // The arrival's matching type uses its final ancestry (D199).
+    profile.push_back(types.profile_of(ancestry.data() + row));
+    set_group(i, person_stratum(matching_spec, i));
+    kinship->append(mother, father);
+    // Imported union history: previous-union state and when it began.
+    person_unions.emplace_back();
+    current_partner.push_back(-1);
+    previous_union.push_back(slice.previous[m]);
+    legal_previous.push_back(slice.legal[m]);
+    previous_union_end.push_back(
+      NumericVector::is_na(slice.since_end[m]) ? NA_REAL
+                                               : now - slice.since_end[m]
+    );
+    if (calibrator) {
+      counted_woman.push_back(0);
+    }
+    // Group duration continues from the template, or for an assigned group
+    // runs from arrival.
+    for (auto& tp : tprocs) {
+      const double since = slice.since_entry(m, tp.dim);
+      tp.entry.push_back(NumericVector::is_na(since) ? now : now - since);
+    }
+  }
+  // A current union arrives live, with its imported duration (D187).
+  for (int m = first; m < last; ++m) {
+    if (!slice.female[m] || slice.partner[m] < 0) {
+      continue;
+    }
+    check_union_capacity();
+    const int wife = base + (m - first), husband = base + slice.partner[m];
+    const int u = static_cast<int>(union_history.size());
+    union_history.push_back(
+      {++next_union_id, now - slice.union_since[m], NA_REAL, wife, husband}
+    );
+    union_history.back().cohab = slice.union_cohab[m];
+    person_unions[wife].push_back(u);
+    person_unions[husband].push_back(u);
+    current_partner[wife] = husband;
+    current_partner[husband] = wife;
+    arrival_union.push_back(union_history.back().id);
+    arrival_union_row.push_back(slice.union_row[m]);
+    arrival_union_party.push_back(party);
+  }
+  for (int i = base; i < base + size; ++i) {
+    if (!people[i].female) {
+      add_male(i);
+    }
+    add_counted_woman(i, now);
+    arrival_person.push_back(people[i].id);
+    arrival_time.push_back(now);
+    arrival_stream.push_back(k);
+    arrival_row.push_back(first + (i - base));
+    arrival_party.push_back(party);
+    arrival_slice.push_back(stream.active);
+    for (int d = 0; d < dimensions; ++d) {
+      arrival_cats.push_back(category(i, d));
+    }
+  }
+  for (int i = base; i < base + size; ++i) {
+    refresh_person(i, now);
+  }
+  population_change(size, now);
+  draw_arrival(stream, now);
+}
+
+// The stream's next arrival under its intensity at now; none while zero.
+// A count stream's hazard is constant; a crude-rate stream (D194) draws a
+// cumulative-hazard threshold and schedules from the living population.
+void Simulation::draw_arrival(ImmigrationStream& stream, double now) {
+  double rate = 0;
+  for (size_t j = 0; j < stream.intensity.size(); ++j) {
+    if (stream.time_start[j] <= now && now < stream.time_end[j]) {
+      rate = stream.intensity[j] / stream.slices[stream.active].expected_size;
+      break;
+    }
+  }
+  if (!stream.per_person) {
+    stream.next = rate > 0 ? now + draw_threshold() / rate : R_PosInf;
+    return;
+  }
+  stream.rate = rate;
+  stream.threshold = rate > 0 ? draw_threshold() : 0;
+  stream.used = 0;
+  stream.since = now;
+  schedule_rate_arrival(stream, now);
+}
+
+// A crude-rate stream's next arrival at its current hazard, rate x living.
+void Simulation::schedule_rate_arrival(ImmigrationStream& stream, double now) {
+  const double hazard = stream.rate * living;
+  // Rounding can leave `used` just past the threshold; never schedule in
+  // the past.
+  const double remaining = std::max(0.0, stream.threshold - stream.used);
+  stream.next = hazard > 0 ? now + remaining / hazard : R_PosInf;
+}
+
+// The living population changes by `delta` at now (D194): crude-rate streams
+// add the hazard accumulated at the old size, then reschedule at the new.
+void Simulation::population_change(int delta, double now) {
+  if (any_rate_stream) {
+    for (auto& stream : streams) {
+      if (stream.per_person) {
+        stream.used += stream.rate * living * (now - stream.since);
+        stream.since = now;
+      }
+    }
+  }
+  living += delta;
+  if (any_rate_stream) {
+    for (auto& stream : streams) {
+      if (stream.per_person) {
+        schedule_rate_arrival(stream, now);
+      }
+    }
+  }
 }
 
 // A person's matching group and the type it gives with their ancestry
@@ -3581,7 +4046,16 @@ List Simulation::results() {
     _["weighted_infeasible"] = weighted_infeasible,
     _["draw_approximate"] = draw_approximate, _["unrealized"] = unrealized,
     _["cells_consistent"] = cells_consistent,
-    _["hetfert"] = wrap(fertility_weights), _["weight_record"] = weight_record
+    _["hetfert"] = wrap(fertility_weights),
+    _["weight_record"] = weight_record,
+    _["arrivals"] = List::create(
+      _["person_id"] = wrap(arrival_person), _["time"] = wrap(arrival_time),
+      _["stream"] = wrap(arrival_stream), _["row"] = wrap(arrival_row),
+      _["categories"] = wrap(arrival_cats), _["party"] = wrap(arrival_party),
+      _["slice"] = wrap(arrival_slice), _["union_id"] = wrap(arrival_union),
+      _["union_row"] = wrap(arrival_union_row),
+      _["union_party"] = wrap(arrival_union_party)
+    )
   );
 }
 
@@ -3621,6 +4095,7 @@ List simulate_cpp(
   Nullable<List> model_schedule_input = R_NilValue,
   Nullable<List> weight_input = R_NilValue,
   Nullable<List> group_input = R_NilValue,
+  Nullable<List> immigration_input = R_NilValue,
   double union_weight_sample = 0,
   Nullable<Function> progress = R_NilValue
 ) {
@@ -3630,7 +4105,7 @@ List simulate_cpp(
     union_rates, father_matching, cancel_birth_if_no_match, initial_ancestry,
     inheritance, ffab, dissolution_rates, cohab_prob, conversion_rates,
     cohab_matching, counts_cohab, check_cells, hetfert, transition_input,
-    model_schedule_input, weight_input, group_input
+    model_schedule_input, weight_input, group_input, immigration_input
   );
   simulation.set_union_weight_sample(union_weight_sample);
   return simulation.run(progress);
