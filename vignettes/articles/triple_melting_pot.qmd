@@ -11,7 +11,6 @@ execute:
 ```{r}
 #| label: setup
 # TODO: add religion as a group and give it exogamy terms
-# TODO: add German as a separate stream
 
 library(hammel)
 library(dplyr)
@@ -48,6 +47,7 @@ Ideally, we might like to have detailed immigration streams that capture specifi
 
 pal_stream <- c(
   "Irish" = "green",
+  "German" = "grey30",
   "NW Europe" = "dodgerblue",
   "Southern Europe" = "yellow",
   "Eastern Europe" = "firebrick",
@@ -58,8 +58,8 @@ usa_historical_migration |>
   mutate(
     stream = factor(
       stream,
-      levels = c("irish", "nw_europe", "south_europe", "east_europe", "other"),
-      labels = c("Irish", "NW Europe", "Southern Europe", "Eastern Europe", "Other")
+      levels = c("irish", "german", "nw_europe", "south_europe", "east_europe", "other"),
+      labels = c("Irish", "German", "NW Europe", "Southern Europe", "Eastern Europe", "Other")
     )
   ) |>
   ggplot(aes(x = time_start + 0.5, y = rate, fill = stream))+
@@ -367,6 +367,15 @@ stream_irish <- immigration_stream(
   )
 )
 
+stream_german <- immigration_stream(
+  usa_historical_migration |> filter(stream == "german") |> select(-stream),
+  template = pop_template,
+  assignment = list(
+    generation = migrant_assignment("custom", fun = generation_assign),
+    race = migrant_assignment("fixed", fixed_value = "White")
+  )
+)
+
 stream_nw_europe <- immigration_stream(
   usa_historical_migration |> filter(stream == "nw_europe") |> select(-stream),
   template = pop_template,
@@ -426,6 +435,7 @@ model <- hammel_model() |>
         birthplace = c(
           native = 1,
           irish = 1,
+          german = 1,
           nw_europe = 1,
           south_europe = 1,
           east_europe = 1,
@@ -436,6 +446,7 @@ model <- hammel_model() |>
   ) |>
   set_immigration(
     irish = stream_irish,
+    german = stream_german,
     nw_europe = stream_nw_europe,
     east_europe = stream_east_europe,
     south_europe = stream_south_europe,
@@ -554,6 +565,7 @@ choice_sets <- choice_sets |>
     age_diff = birth_time_w - birth_time_h,
     d_native = abs(birthplace_native_h - birthplace_native_w),
     d_irish = abs(birthplace_irish_w - birthplace_irish_h),
+    d_german = abs(birthplace_german_w - birthplace_german_h),
     d_nw_europe = abs(birthplace_nw_europe_h - birthplace_nw_europe_w),
     d_east_europe = abs(birthplace_east_europe_h - birthplace_east_europe_w),
     d_south_europe = abs(birthplace_south_europe_h - birthplace_south_europe_w),
@@ -564,7 +576,8 @@ choice_sets <- choice_sets |>
   )
 
 model <- clogit(chosen ~ age_diff + I(age_diff^2) +
-  d_native + d_irish + d_nw_europe + d_east_europe + d_south_europe + d_other +
+  d_native + d_irish + d_german + d_nw_europe + d_east_europe +
+  d_south_europe + d_other +
   race_bw + race_bo + race_wo +
   offset(log_weight) + strata(choice_id), 
   data = choice_sets)

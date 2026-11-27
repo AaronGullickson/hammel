@@ -30,7 +30,8 @@ code_bpl <- function(bpl) {
     bpl >= 900 ~ NA_character_,
     bpl < 100 ~ "native",
     bpl == 414 ~ "irish",
-    (bpl >= 400 & bpl <= 429) | bpl == 453 ~ "nw_europe",
+    bpl == 453 ~ "german",
+    (bpl >= 400 & bpl <= 429) ~ "nw_europe",
     bpl >= 430 & bpl <= 440 ~ "south_europe",
     bpl >= 450 & bpl <= 465 ~ "east_europe",
     TRUE ~ "other"
@@ -367,7 +368,7 @@ pop_usa1880$groups <- list(
     inheritance = group_inheritance("custom", fun = gen_inheritance)
   ),
   birthplace = hammel::group(
-    categories = c("native", "irish", "nw_europe", "east_europe",
+    categories = c("native", "irish", "german", "nw_europe", "east_europe",
                    "south_europe", "other"),
     ancestry = TRUE,
     inheritance = group_inheritance("fixed", fixed_value = "native")

@@ -270,16 +270,16 @@
 
 #' Historical U.S. immigration rates, 1820 to 1970
 #'
-#' Annual crude immigration rates for five origin streams. Each rate is the
+#' Annual crude immigration rates for six origin streams. Each rate is the
 #' reported immigration count for that stream and year divided by the
 #' estimated U.S. resident population on July 1 of the same year.
 #'
 #' @md
 #' @format A tibble with 755 rows and four columns.
 #' \describe{
-#'   \item{stream}{Origin stream: `irish`, `nw_europe` (including Germany),
+#'   \item{stream}{Origin stream: `irish`, `german`, `nw_europe`,
 #'     `south_europe`, `east_europe`, or `other`. The `other` stream is the
-#'     published total minus the four named regional counts.}
+#'     published total minus the five named regional counts.}
 #'   \item{time_start, time_end}{Bounds of the half-open annual modeling
 #'     interval, from the reported year to that year plus one.}
 #'   \item{rate}{Immigrants per U.S. resident per year.}
